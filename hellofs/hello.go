@@ -1,3 +1,8 @@
+// Copyright 2012 The Go Authors.  All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// Hellofs implements a simple "hello world" file system.
 package main
 
 import (
@@ -7,13 +12,13 @@ import (
 	"syscall"
 	"time"
 
-	"code.google.com/p/rsc/fuse"
+	fuse "code.google.com/p/rsc/fuse/proto"
 )
 
 var nhandle fuse.Handle = 2
 
 func main() {
-	c, err := fuse.Mount("/mnt/acme")
+	c, err := fuse.Mount("/mnt")
 	if err != nil {
 		log.Fatal(err)
 	}

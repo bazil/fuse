@@ -22,12 +22,12 @@
 // OF ANY KIND CONCERNING THE MERCHANTABILITY OF THIS SOFTWARE OR ITS
 // FITNESS FOR ANY PARTICULAR PURPOSE.
 
-// Package fuse is a message-based library for writing FUSE file systems
+// Package proto implements the low-level protocol for writing FUSE file systems
 // on FreeBSD, Linux, and OS X.
 //
 // On OS X, it requires OSXFUSE (http://osxfuse.github.com/).
 //
-package fuse
+package proto
 
 import (
 	"bytes"
@@ -904,8 +904,6 @@ func (r *ForgetRequest) Respond() {
 
 // A Dirent represents a single directory entry.
 type Dirent struct {
-	Offset uint64  // offset of this entry in directory
-
 	Inode uint64  // inode this entry names
 	Type uint32  // ?
 	Name string  // name of entry

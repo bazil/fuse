@@ -4,7 +4,7 @@
 
 // TODO: Rewrite using package syscall not cgo
 
-package fuse
+package proto
 
 /*
 
