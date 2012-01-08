@@ -46,7 +46,7 @@ mountfuse(char *mtpt, char **err)
 	char buf[200];
 	struct vfsconf vfs;
 	char *f;
-	
+
 	if(getvfsbyname("fusefs", &vfs) < 0){
 		if(access(f="/Library/Filesystems/osxfusefs.fs"
 			"/Support/load_osxfusefs", 0) < 0){
@@ -69,7 +69,7 @@ mountfuse(char *mtpt, char **err)
 			return -1;
 		}
 	}
-	
+
 	// Look for available FUSE device.
 	for(i=0;; i++){
 		snprintf(buf, sizeof buf, "/dev/osxfuse%d", i);
@@ -105,7 +105,6 @@ mountfuse(char *mtpt, char **err)
 import "C"
 
 import "unsafe"
-
 
 func mount(dir string) (int, string) {
 	errp := (**C.char)(C.malloc(16))

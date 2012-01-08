@@ -17,7 +17,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	
+
 	c.Serve(FS{})
 }
 
@@ -32,7 +32,7 @@ func (FS) Root() (fuse.Node, fuse.Error) {
 type Dir struct{}
 
 func (Dir) Attr(intr fuse.Intr) (fuse.Attr, fuse.Error) {
-	return fuse.Attr{Mode: os.ModeDir|0555}, nil
+	return fuse.Attr{Mode: os.ModeDir | 0555}, nil
 }
 
 func (Dir) Lookup(name string, intr fuse.Intr) (fuse.Node, fuse.Error) {
