@@ -6,16 +6,11 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
-	"syscall"
-	"time"
 
-	fuse "code.google.com/p/rsc/fuse/proto"
+	"code.google.com/p/rsc/fuse"
 )
-
-var nhandle fuse.Handle = 2
 
 func main() {
 	c, err := fuse.Mount("/mnt")
@@ -23,132 +18,45 @@ func main() {
 		log.Fatal(err)
 	}
 	
-	for {
-		req, err := c.ReadRequest()
-		if err != nil {
-			log.Fatal(err)
-		}
+	c.Serve(FS{})
+}
 
-		fmt.Printf("<- %s\n", req)
-		var resp interface{}
-		switch r := req.(type) {
-		default:
-			log.Fatal("unknown request", req)
-		case *fuse.InitRequest:
-			s := &fuse.InitResponse{
-				Major:        7,
-				Minor:        8,
-				MaxReadahead: 0,
-				Flags:        0,
-				MaxWrite:     4096,
-			}
-			resp = s
-			r.Respond(s)
-		case *fuse.StatfsRequest:
-			s := &fuse.StatfsResponse{}
-			resp = s
-			r.Respond(s)
-		case *fuse.GetattrRequest:
-			switch r.Node {
-			case fuse.RootID:
-				s := &fuse.GetattrResponse{
-					AttrValid: 1*time.Minute,
-					Attr: fuse.Attr{
-						Inode: 1,
-						Atime: time.Now(),
-						Mtime: time.Now(),
-						Ctime: time.Now(),
-						Mode: os.ModeDir | 0777,
-						Nlink: 1,
-					},
-				}
-				resp = s
-				r.Respond(s)
-			case 2:
-				s := &fuse.GetattrResponse{
-					AttrValid: 1*time.Minute,
-					Attr: fuse.Attr{
-							Inode: 2,
-							Size: 0,
-							Blocks: 0,
-							Mode: 0444,
-							Atime: time.Now(),
-							Mtime: time.Now(),
-							Ctime: time.Now(),
-							Crtime: time.Now(),
-							Nlink: 1,
-					},
-				}
-				resp = s
-				r.Respond(s)
-			default:
-				log.Fatal("unexpected getattr")
-			}
-		case *fuse.LookupRequest:
-			switch r.Node {
-			case fuse.RootID:
-				switch r.Name {
-				case "hello":
-					s := &fuse.LookupResponse{
-						Node: 2,
-						Generation: 1,
-						EntryValid: 1*time.Minute,
-						AttrValid: 1*time.Minute,
-						Attr: fuse.Attr{
-							Inode: 2,
-							Size: 0,
-							Blocks: 0,
-							Mode: 0444,
-							Atime: time.Now(),
-							Mtime: time.Now(),
-							Ctime: time.Now(),
-							Crtime: time.Now(),
-							Nlink: 1,
-						},
-					}
-					r.Respond(s)
-					resp = s
-				default:
-					r.RespondError(syscall.ENOENT)
-					resp = syscall.ENOENT
-				}
-			}
-		case *fuse.OpenRequest:
-			s := &fuse.OpenResponse{
-				Handle: fuse.Handle(r.Node),
-				Flags: fuse.OpenDirectIO,  // ignore sizes
-			}
-			nhandle++
-			resp = s
-			r.Respond(s)
-		case *fuse.ReadRequest:
-			var data []byte
-			switch r.Handle {
-			case 1:
-				data = fuse.AppendDirent(data, fuse.Dirent{Inode: 1, Name: "."})
-				data = fuse.AppendDirent(data, fuse.Dirent{Inode: 1, Name: ".."})
-				data = fuse.AppendDirent(data, fuse.Dirent{Inode: 2, Name: "hello", Type: 0})
-			case 2:
-				data = []byte("hello, world\n")
-			}
-			if r.Offset >= int64(len(data)) {
-				data = nil
-			} else {
-				data = data[r.Offset:]
-			}
-			if len(data) > r.Size {
-				data = data[:r.Size]
-			}
-			s := &fuse.ReadResponse{Data: data}
-			resp = s
-			r.Respond(s)
-		case *fuse.ForgetRequest, *fuse.AccessRequest, *fuse.ReleaseRequest, *fuse.DestroyRequest, *fuse.FlushRequest:
-			resp = ""
-			r.(interface{Respond()}).Respond()
-		case *fuse.GetxattrRequest, *fuse.SetxattrRequest, *fuse.ListxattrRequest, *fuse.RemovexattrRequest:
-			r.RespondError(syscall.ENOSYS)
-			resp = syscall.ENOSYS
-		}
-		fmt.Printf("-> %#x %s\n", req.Hdr().ID, resp)
+// FS implements the hello world file system.
+type FS struct{}
+
+func (FS) Root() (fuse.Node, fuse.Error) {
+	return Dir{}, nil
+}
+
+// Dir implements both Node and Handle for the root directory.
+type Dir struct{}
+
+func (Dir) Attr(intr fuse.Intr) (fuse.Attr, fuse.Error) {
+	return fuse.Attr{Mode: os.ModeDir|0555}, nil
+}
+
+func (Dir) Lookup(name string, intr fuse.Intr) (fuse.Node, fuse.Error) {
+	if name == "hello" {
+		return File{}, nil
 	}
+	return nil, fuse.ENOENT
+}
+
+var dirDirs = []fuse.Dirent{
+	{Inode: 2, Name: "hello", Type: 0},
+}
+
+func (Dir) Read(intr fuse.Intr) ([]fuse.Dirent, fuse.Error) {
+	return dirDirs, nil
+}
+
+// File implements both Node and Handle for the hello file.
+type File struct{}
+
+func (File) Attr(intr fuse.Intr) (fuse.Attr, fuse.Error) {
+	return fuse.Attr{Mode: 0444}, nil
+}
+
+func (File) Read(intr fuse.Intr) ([]byte, fuse.Error) {
+	return []byte("hello, world\n"), nil
 }

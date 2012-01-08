@@ -1,2 +1,2 @@
-package proto
+package fuse
 

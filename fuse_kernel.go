@@ -35,7 +35,7 @@
     SUCH DAMAGE.
 */
 
-package proto
+package fuse
 
 import (
 	"fmt"

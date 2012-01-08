@@ -22,12 +22,66 @@
 // OF ANY KIND CONCERNING THE MERCHANTABILITY OF THIS SOFTWARE OR ITS
 // FITNESS FOR ANY PARTICULAR PURPOSE.
 
-// Package proto implements the low-level protocol for writing FUSE file systems
-// on FreeBSD, Linux, and OS X.
+// Package fuse enables writing FUSE file systems on FreeBSD, Linux, and OS X.
 //
 // On OS X, it requires OSXFUSE (http://osxfuse.github.com/).
 //
-package proto
+// There are two approaches to writing a FUSE file system.  The first is to speak
+// the low-level message protocol, reading from a Conn using ReadRequest and
+// writing using the various Respond methods.  This approach is closest to
+// the actual interaction with the kernel and can be the simplest one in contexts
+// such as protocol translators.
+//
+// Servers of synthesized file systems tend to share common bookkeeping
+// that is abstracted away by the second approach, which is to call the Conn's
+// Serve method to serve the FUSE protocol using
+// an implementation of the service methods in the interfaces
+// FS (file system), Node (file or directory), and Handle (opened file or directory).
+// There are a daunting number of such methods that can be written,
+// but few are required.
+// The specific methods are described in the documentation for those interfaces.
+//
+// The hellofs subdirectory contains a simple illustration of the ServeFS approach.
+//
+// Service Methods
+//
+// The required and optional methods for the FS, Node, and Handle interfaces
+// have the general form
+//
+//	Op(req *OpRequest, resp *OpResponse, intr Intr) Error
+//
+// where Op is the name of a FUSE operation.  Op reads request parameters
+// from req and writes results to resp.  An operation whose only result is
+// the error result omits the resp parameter.  Multiple goroutines may call
+// service methods simultaneously; the methods being called are responsible
+// for appropriate synchronization.
+//
+// Interrupted Operations
+//
+// In some file systems, some operations
+// may take an undetermined amount of time.  For example, a Read waiting for
+// a network message or a matching Write might wait indefinitely.  If the request
+// is cancelled and no longer needed, the package will close intr, a chan struct{}.
+// Blocking operations should select on a receive from intr and attempt to
+// abort the operation early if the receive succeeds (meaning the channel is closed).
+// To indicate that the operation failed because it was aborted, return fuse.EINTR.
+//
+// If an operation does not block for an indefinite amount of time, the intr parameter
+// can be ignored.
+//
+// Authentication
+//
+// All requests types embed a Header, meaning that the method can inspect
+// req.Pid, req.Uid, and req.Gid as necessary to implement permission checking.
+// Alternately, XXX
+//
+// Mount Options
+//
+// XXX
+// 
+package fuse
+
+// BUG(rsc): The mount code for FreeBSD and Linux has not been written yet.
 
 import (
 	"bytes"
@@ -41,14 +95,18 @@ import (
 	"unsafe"
 )
 
+// A Conn represents a connection to a mounted FUSE file system.
 type Conn struct {
 	fd int
 	buf []byte
+	
+	serveConn
 }
 
-// Mount mounts a new fuse connection on the named directory
+// Mount mounts a new FUSE connection on the named directory
 // and returns a connection for reading and writing FUSE messages.
 func Mount(dir string) (*Conn, error) {
+	// TODO(rsc): mount options (...string?)
 	fd, errstr := mount(dir)
 	if errstr != "" {
 		return nil, errors.New(errstr)
@@ -64,10 +122,13 @@ type Request interface {
 	// Hdr returns the Header associated with this request.
 	Hdr() *Header
 	
-	// RespondError responds to the request with the given error number.
-	RespondError(err syscall.Errno)
+	// RespondError responds to the request with the given error.
+	RespondError(Error)
 
 	String() string
+	
+	// handle returns the HandleID for the request, or 0.
+	handle() HandleID
 }
 
 // A RequestID identifies an active FUSE request.
@@ -78,9 +139,9 @@ type RequestID uint64
 // that have not yet been forgotten by ForgetRequests.
 type NodeID uint64
 
-// A Handle is a number identifying an open directory or file.
+// A HandleID is a number identifying an open directory or file.
 // It only needs to be unique while the directory or file is open.
-type Handle uint64
+type HandleID uint64
 
 // The RootID identifies the root directory of a FUSE file system.
 const RootID NodeID = rootID
@@ -89,7 +150,7 @@ const RootID NodeID = rootID
 type Header struct {
 	Conn *Conn  // connection this request was received on
 	ID RequestID  // unique ID for request
-	Node NodeID // directoy or file the request is about
+	Node NodeID // file or directory the request is about
 	Uid uint32  // user ID of process making request
 	Gid uint32  // group ID of process making request
 	Pid uint32  // process ID of process making request
@@ -103,10 +164,46 @@ func (h *Header) Hdr() *Header {
 	return h
 }
 
-func (h *Header) RespondError(err syscall.Errno) {
+func (h *Header) handle() HandleID {
+	return 0
+}
+
+// An Error is a FUSE error.
+type Error interface {
+	errno() int32
+}
+
+const (
+	// ENOSYS indicates that the call is not supported.
+	ENOSYS = Errno(syscall.ENOSYS)
+
+	// ESTALE is used by Serve to respond to violations of the FUSE protocol.
+	ESTALE = Errno(syscall.ESTALE)
+
+	ENOENT = Errno(syscall.ENOENT)
+)
+
+type errno int
+
+func (e errno) errno() int32 {
+	return int32(e)
+}
+
+// Errno implements Error using a syscall.Errno.
+type Errno syscall.Errno
+
+func (e Errno) errno() int32 {
+	return int32(e)
+}
+
+func (e Errno) String() string {
+	return syscall.Errno(e).Error()
+}
+
+func (h *Header) RespondError(err Error) {
 	// FUSE uses negative errors!
 	// TODO: File bug report against OSXFUSE: positive error causes kernel panic.
-	out := &outHeader{Error: -int32(err), Unique: uint64(h.ID)}
+	out := &outHeader{Error: -err.errno(), Unique: uint64(h.ID)}
 	h.Conn.respond(out, unsafe.Sizeof(*out))
 }
 
@@ -234,14 +331,13 @@ func (c *Conn) ReadRequest() (Request, error) {
 
 	case opRead, opReaddir:
 		in := (*readIn)(m.data())
-		fmt.Printf("READ %x\n", m.bytes())
 		if m.len() < unsafe.Sizeof(*in) {
 			goto corrupt
 		}
 		req = &ReadRequest{
 			Header: m.Header(),
 			Dir: m.hdr.Opcode == opReaddir,
-			Handle: Handle(in.Fh),
+			Handle: HandleID(in.Fh),
 			Offset: int64(in.Offset),
 			Size: int(in.Size),
 		}
@@ -261,7 +357,7 @@ func (c *Conn) ReadRequest() (Request, error) {
 		req = &ReleaseRequest{
 			Header: m.Header(),
 			Dir: m.hdr.Opcode == opReleasedir,
-			Handle: Handle(in.Fh),
+			Handle: HandleID(in.Fh),
 			Flags: in.Flags,
 			ReleaseFlags: ReleaseFlags(in.ReleaseFlags),
 			LockOwner: in.LockOwner,
@@ -369,7 +465,7 @@ func (c *Conn) ReadRequest() (Request, error) {
 		}
 		req = &FlushRequest{
 			Header: m.Header(),
-			Handle: Handle(in.Fh),
+			Handle: HandleID(in.Fh),
 			Flags: in.FlushFlags,
 			LockOwner: in.LockOwner,
 		}
@@ -474,8 +570,6 @@ func (r *InitRequest) String() string {
 
 // An InitResponse is the response to an InitRequest.
 type InitResponse struct {
-	Major uint32
-	Minor uint32
 	MaxReadahead uint32
 	Flags InitFlags
 	MaxWrite uint32
@@ -489,8 +583,8 @@ func (r *InitResponse) String() string {
 func (r *InitRequest) Respond(resp *InitResponse) {
 	out := &initOut{
 		outHeader: outHeader{Unique: uint64(r.ID)},
-		Major: resp.Major,
-		Minor: resp.Minor,
+		Major: kernelVersion,
+		Minor: kernelMinorVersion,
 		MaxReadahead: resp.MaxReadahead,
 		Flags: uint32(resp.Flags),
 		MaxWrite: resp.MaxWrite,
@@ -812,7 +906,7 @@ func (r *OpenRequest) Respond(resp *OpenResponse) {
 
 // A OpenResponse is the response to a OpenRequest.
 type OpenResponse struct {
-	Handle Handle
+	Handle HandleID
 	Flags OpenFlags
 }
 
@@ -824,9 +918,13 @@ func (r *OpenResponse) String() string {
 type ReadRequest struct {
 	Header
 	Dir bool  // is this Readdir?
-	Handle Handle
+	Handle HandleID
 	Offset int64
 	Size int
+}
+
+func (r *ReadRequest) handle() HandleID {
+	return r.Handle
 }
 
 func (r *ReadRequest) String() string {
@@ -852,10 +950,14 @@ func (r *ReadResponse) String() string {
 type ReleaseRequest struct {
 	Header
 	Dir bool  // is this Releasedir?
-	Handle Handle
+	Handle HandleID
 	Flags uint32  // flags from OpenRequest
 	ReleaseFlags ReleaseFlags
 	LockOwner uint32
+}
+
+func (r *ReleaseRequest) handle() HandleID {
+	return r.Handle
 }
 
 func (r *ReleaseRequest) String() string {
@@ -931,9 +1033,13 @@ func AppendDirent(data []byte, dir Dirent) []byte {
 // A FlushRequest asks to flush XXX.
 type FlushRequest struct {
 	Header
-	Handle Handle
+	Handle HandleID
 	Flags uint32
 	LockOwner uint64
+}
+
+func (r *FlushRequest) handle() HandleID {
+	return r.Handle
 }
 
 func (r *FlushRequest) String() string {
