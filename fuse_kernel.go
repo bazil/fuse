@@ -91,22 +91,55 @@ type fileLock struct {
 	Pid   uint32
 }
 
-// Bitmasks for fuse_setattr_in.valid
-const (
-	fattrMode  = 1 << 0
-	fattrUid   = 1 << 1
-	fattrGid   = 1 << 2
-	fattrSize  = 1 << 3
-	fattrAtime = 1 << 4
-	fattrMtime = 1 << 5
-	fattrFh    = 1 << 6
+// The SetattrValid are bit flags describing which fields in the SetattrRequest
+// are included in the change.
+type SetattrValid uint32
 
+const (
+	SetattrMode SetattrValid = 1<<0
+	SetattrUid SetattrValid = 1<<1
+	SetattrGid SetattrValid = 1<<2
+	SetattrSize SetattrValid = 1<<3
+	SetattrAtime SetattrValid = 1<<4
+	SetattrMtime SetattrValid = 1<<5
+	SetattrHandle SetattrValid = 1<<6  // TODO: What does this mean?
+	
 	// OS X only
-	fattrCrtime   = 1 << 28
-	fattrChgtime  = 1 << 29
-	fattrBkuptime = 1 << 30
-	fattrFlags    = 1 << 31
+	SetattrCrtime SetattrValid = 1<<28
+	SetattrChgtime SetattrValid = 1<<29
+	SetattrBkuptime SetattrValid = 1<<30
+	SetattrFlags SetattrValid = 1<<31
 )
+
+func (fl SetattrValid) Mode() bool { return fl&SetattrMode != 0 }
+func (fl SetattrValid) Uid() bool { return fl&SetattrUid != 0 }
+func (fl SetattrValid) Gid() bool { return fl&SetattrGid != 0 }
+func (fl SetattrValid) Size() bool { return fl&SetattrSize != 0 }
+func (fl SetattrValid) Atime() bool { return fl&SetattrAtime != 0 }
+func (fl SetattrValid) Mtime() bool { return fl&SetattrMtime != 0 }
+func (fl SetattrValid) Handle() bool { return fl&SetattrHandle != 0 }
+func (fl SetattrValid) Crtime() bool { return fl&SetattrCrtime != 0 }
+func (fl SetattrValid) Chgtime() bool { return fl&SetattrChgtime != 0 }
+func (fl SetattrValid) Bkuptime() bool { return fl&SetattrBkuptime != 0 }
+func (fl SetattrValid) Flags() bool { return fl&SetattrFlags != 0 }
+
+func (fl SetattrValid) String() string {
+	return flagString(uint32(fl), setattrValidNames)
+}
+
+var setattrValidNames = []flagName{
+	{uint32(SetattrMode), "SetattrMode"},
+	{uint32(SetattrUid), "SetattrUid"},
+	{uint32(SetattrGid), "SetattrGid"},
+	{uint32(SetattrSize), "SetattrSize"},
+	{uint32(SetattrAtime), "SetattrAtime"},
+	{uint32(SetattrMtime), "SetattrMtime"},
+	{uint32(SetattrHandle), "SetattrHandle"},
+	{uint32(SetattrCrtime), "SetattrCrtime"},
+	{uint32(SetattrChgtime), "SetattrChgtime"},
+	{uint32(SetattrBkuptime), "SetattrBkuptime"},
+	{uint32(SetattrFlags), "SetattrFlags"},
+}
 
 // The OpenFlags are returned in the OpenResponse.
 type OpenFlags uint32
@@ -337,6 +370,22 @@ type openOut struct {
 	Padding   uint32
 }
 
+type createOut struct {
+	outHeader
+
+	Nodeid         uint64 // Inode ID
+	Generation     uint64 // Inode generation
+	EntryValid     uint64 // Cache timeout for the name
+	AttrValid      uint64 // Cache timeout for the attributes
+	EntryValidNsec uint32
+	AttrValidNsec  uint32
+	Attr           attr
+
+	Fh        uint64
+	OpenFlags uint32
+	Padding   uint32
+}
+
 type releaseIn struct {
 	Fh           uint64
 	Flags        uint32
@@ -369,6 +418,16 @@ type writeOut struct {
 	outHeader
 	Size    uint32
 	Padding uint32
+}
+
+// The WriteFlags are returned in the WriteResponse.
+type WriteFlags uint32
+
+func (fl WriteFlags) String() string {
+	return flagString(uint32(fl), writeFlagNames)
+}
+
+var writeFlagNames = []flagName{
 }
 
 const compatStatfsSize = 48

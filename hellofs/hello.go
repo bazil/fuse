@@ -31,8 +31,8 @@ func (FS) Root() (fuse.Node, fuse.Error) {
 // Dir implements both Node and Handle for the root directory.
 type Dir struct{}
 
-func (Dir) Attr(intr fuse.Intr) (fuse.Attr, fuse.Error) {
-	return fuse.Attr{Mode: os.ModeDir | 0555}, nil
+func (Dir) Attr() fuse.Attr {
+	return fuse.Attr{Mode: os.ModeDir | 0555}
 }
 
 func (Dir) Lookup(name string, intr fuse.Intr) (fuse.Node, fuse.Error) {
@@ -46,17 +46,17 @@ var dirDirs = []fuse.Dirent{
 	{Inode: 2, Name: "hello", Type: 0},
 }
 
-func (Dir) Read(intr fuse.Intr) ([]fuse.Dirent, fuse.Error) {
+func (Dir) ReadDir(intr fuse.Intr) ([]fuse.Dirent, fuse.Error) {
 	return dirDirs, nil
 }
 
 // File implements both Node and Handle for the hello file.
 type File struct{}
 
-func (File) Attr(intr fuse.Intr) (fuse.Attr, fuse.Error) {
-	return fuse.Attr{Mode: 0444}, nil
+func (File) Attr() fuse.Attr {
+	return fuse.Attr{Mode: 0444}
 }
 
-func (File) Read(intr fuse.Intr) ([]byte, fuse.Error) {
+func (File) ReadAll(intr fuse.Intr) ([]byte, fuse.Error) {
 	return []byte("hello, world\n"), nil
 }
