@@ -18,8 +18,8 @@ import (
 	"time"
 )
 
-var debugf = log.Printf
-var _debugf = nop
+//var debugf = log.Printf
+var debugf = nop
 
 func nop(...interface{}) {}
 
@@ -290,9 +290,9 @@ func hash(s string) uint64 {
 }
 
 type serveHandle struct {
-	handle   Handle
-	readData []byte
-	trunc bool
+	handle    Handle
+	readData  []byte
+	trunc     bool
 	writeData []byte
 }
 
@@ -459,7 +459,9 @@ func (c *Conn) serve(fs FS, r Request) {
 	case *SetattrRequest:
 		s := &SetattrResponse{}
 		if r.Valid == SetattrSize|SetattrHandle && r.Size == 0 {
-			if _, ok := handle.(interface{WriteAll([]byte, Intr) Error}); ok {
+			if _, ok := handle.(interface {
+				WriteAll([]byte, Intr) Error
+			}); ok {
 				shandle.trunc = true
 			}
 		}
@@ -483,7 +485,7 @@ func (c *Conn) serve(fs FS, r Request) {
 		s.Attr = snode.attr()
 		done(s)
 		r.Respond(s)
-	
+
 		/*
 			case *ReadlinkRequest, *SymlinkRequest, *MknodRequest, *MkdirRequest,
 				*UnlinkRequest, *RmdirRequest, *RenameRequest, *LinkRequest:
@@ -493,7 +495,9 @@ func (c *Conn) serve(fs FS, r Request) {
 		*/
 
 	case *AccessRequest:
-		if n, ok := node.(interface{Access(*AccessRequest, Intr) Error}); ok {
+		if n, ok := node.(interface {
+			Access(*AccessRequest, Intr) Error
+		}); ok {
 			if err := n.Access(r, intr); err != nil {
 				done(err)
 				r.RespondError(err)
@@ -507,9 +511,13 @@ func (c *Conn) serve(fs FS, r Request) {
 		var n2 Node
 		var err Error
 		s := &LookupResponse{}
-		if n, ok := node.(interface{Lookup(string, Intr) (Node, Error)}); ok {
+		if n, ok := node.(interface {
+			Lookup(string, Intr) (Node, Error)
+		}); ok {
 			n2, err = n.Lookup(r.Name, intr)
-		} else if n, ok := node.(interface{Lookup(*LookupRequest, *LookupResponse, Intr) (Node, Error)}); ok {
+		} else if n, ok := node.(interface {
+			Lookup(*LookupRequest, *LookupResponse, Intr) (Node, Error)
+		}); ok {
 			n2, err = n.Lookup(r, s, intr)
 		} else {
 			done(ENOENT)
@@ -527,7 +535,9 @@ func (c *Conn) serve(fs FS, r Request) {
 
 	case *MkdirRequest:
 		s := &MkdirResponse{}
-		n, ok := node.(interface{Mkdir(*MkdirRequest, Intr) (Node, Error)})
+		n, ok := node.(interface {
+			Mkdir(*MkdirRequest, Intr) (Node, Error)
+		})
 		if !ok {
 			done(EPERM)
 			r.RespondError(EPERM)
@@ -546,7 +556,9 @@ func (c *Conn) serve(fs FS, r Request) {
 	case *OpenRequest:
 		s := &OpenResponse{Flags: OpenDirectIO}
 		var h2 Handle
-		if n, ok := node.(interface{Open(*OpenRequest, *OpenResponse, Intr) (Handle, Error)}); ok {
+		if n, ok := node.(interface {
+			Open(*OpenRequest, *OpenResponse, Intr) (Handle, Error)
+		}); ok {
 			hh, err := n.Open(r, s, intr)
 			if err != nil {
 				done(err)
@@ -560,9 +572,11 @@ func (c *Conn) serve(fs FS, r Request) {
 		s.Handle = c.saveHandle(h2)
 		done(s)
 		r.Respond(s)
-	
+
 	case *CreateRequest:
-		n, ok := node.(interface{Create(*CreateRequest, *CreateResponse, Intr) (Node, Handle, Error)})
+		n, ok := node.(interface {
+			Create(*CreateRequest, *CreateResponse, Intr) (Node, Handle, Error)
+		})
 		if !ok {
 			// If we send back ENOSYS, FUSE will try mknod+open.
 			done(EPERM)
@@ -601,7 +615,9 @@ func (c *Conn) serve(fs FS, r Request) {
 	case *ReadRequest:
 		s := &ReadResponse{Data: make([]byte, 0, r.Size)}
 		if snode.isDir {
-			if h, ok := handle.(interface{ReadDir(Intr) ([]Dirent, Error)}); ok {
+			if h, ok := handle.(interface {
+				ReadDir(Intr) ([]Dirent, Error)
+			}); ok {
 				if shandle.readData == nil {
 					attr := snode.attr()
 					dirs, err := h.ReadDir(intr)
@@ -627,7 +643,9 @@ func (c *Conn) serve(fs FS, r Request) {
 				break
 			}
 		} else {
-			if h, ok := handle.(interface{ReadAll(Intr) ([]byte, Error)}); ok {
+			if h, ok := handle.(interface {
+				ReadAll(Intr) ([]byte, Error)
+			}); ok {
 				if shandle.readData == nil {
 					data, err := h.ReadAll(intr)
 					if err != nil {
@@ -646,7 +664,9 @@ func (c *Conn) serve(fs FS, r Request) {
 				break
 			}
 		}
-		h, ok := handle.(interface{Read(*ReadRequest, *ReadResponse, Intr) Error})
+		h, ok := handle.(interface {
+			Read(*ReadRequest, *ReadResponse, Intr) Error
+		})
 		if !ok {
 			fmt.Printf("NO READ FOR %T\n", handle)
 			done(EIO)
@@ -660,7 +680,7 @@ func (c *Conn) serve(fs FS, r Request) {
 		}
 		done(s)
 		r.Respond(s)
-	
+
 	case *WriteRequest:
 		s := &WriteResponse{}
 		if shandle.trunc && r.Offset == int64(len(shandle.writeData)) {
@@ -670,7 +690,9 @@ func (c *Conn) serve(fs FS, r Request) {
 			r.Respond(s)
 			break
 		}
-		if h, ok := handle.(interface{Write(*WriteRequest, *WriteResponse, Intr) Error}); ok {
+		if h, ok := handle.(interface {
+			Write(*WriteRequest, *WriteResponse, Intr) Error
+		}); ok {
 			if err := h.Write(r, s, intr); err != nil {
 				done(err)
 				r.RespondError(err)
@@ -686,7 +708,9 @@ func (c *Conn) serve(fs FS, r Request) {
 
 	case *FlushRequest:
 		if shandle.trunc {
-			h := handle.(interface{WriteAll([]byte, Intr) Error})
+			h := handle.(interface {
+				WriteAll([]byte, Intr) Error
+			})
 			if err := h.WriteAll(shandle.writeData, intr); err != nil {
 				done(err)
 				r.RespondError(err)
@@ -695,7 +719,9 @@ func (c *Conn) serve(fs FS, r Request) {
 			shandle.writeData = nil
 			shandle.trunc = false
 		}
-		if h, ok := handle.(interface{Flush(*FlushRequest, Intr) Error}); ok {
+		if h, ok := handle.(interface {
+			Flush(*FlushRequest, Intr) Error
+		}); ok {
 			if err := h.Flush(r, intr); err != nil {
 				done(err)
 				r.RespondError(err)
@@ -708,7 +734,9 @@ func (c *Conn) serve(fs FS, r Request) {
 	case *ReleaseRequest:
 		// No matter what, release the handle.
 		c.dropHandle(r.handle())
-		if h, ok := handle.(interface{Release(*ReleaseRequest, Intr) Error}); ok {
+		if h, ok := handle.(interface {
+			Release(*ReleaseRequest, Intr) Error
+		}); ok {
 			if err := h.Release(r, intr); err != nil {
 				done(err)
 				r.RespondError(err)
@@ -718,8 +746,6 @@ func (c *Conn) serve(fs FS, r Request) {
 		done(nil)
 		r.Respond()
 
-		
-		
 		/*	case *FsyncRequest, *FsyncdirRequest:
 				done(ENOSYS)
 				r.RespondError(ENOSYS)
@@ -728,7 +754,7 @@ func (c *Conn) serve(fs FS, r Request) {
 				done(ENOSYS)
 				r.RespondError(ENOSYS)
 		*/
-	
+
 		/*
 			// One of a kind.
 			case *InterruptRequest:

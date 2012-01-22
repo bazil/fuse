@@ -16,7 +16,7 @@ func TestFuse(t *testing.T) {
 	dir := "/tmp/fusetestmnt"
 	exec.Command("umount", dir).Run()
 	os.MkdirAll(dir, 0777)
-	
+
 	c, err := Mount(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -24,9 +24,9 @@ func TestFuse(t *testing.T) {
 	defer exec.Command("umount", dir).Run()
 
 	go c.Serve(testFS{})
-	time.Sleep(1*time.Second)
-	
-	_, err = os.Stat(dir+"/"+fuseTests[0].name)
+	time.Sleep(1 * time.Second)
+
+	_, err = os.Stat(dir + "/" + fuseTests[0].name)
 	if err != nil {
 		t.Fatalf("mount did not work")
 		return
@@ -37,9 +37,12 @@ func TestFuse(t *testing.T) {
 	}
 }
 
-var fuseTests = []struct{
+var fuseTests = []struct {
 	name string
-	node interface { Node; test(string, *testing.T) }
+	node interface {
+		Node
+		test(string, *testing.T)
+	}
 }{
 	{"readAll", readAll{}},
 	{"readAll1", &readAll1{}},
@@ -67,6 +70,7 @@ var fuseTests = []struct{
 type readAll struct{ file }
 
 const hi = "hello, world"
+
 func (readAll) ReadAll(intr Intr) ([]byte, Error) {
 	return []byte(hi), nil
 }
@@ -84,7 +88,7 @@ func (readAll) test(path string, t *testing.T) {
 
 // Test Read.
 
-type readAll1 struct { file }
+type readAll1 struct{ file }
 
 func (readAll1) Read(req *ReadRequest, resp *ReadResponse, intr Intr) Error {
 	HandleRead(req, resp, []byte(hi))
@@ -122,9 +126,9 @@ func (w *writeAll) test(path string, t *testing.T) {
 
 type writeAll2 struct {
 	file
-	data []byte
+	data    []byte
 	setattr bool
-	flush bool
+	flush   bool
 }
 
 func (w *writeAll2) Setattr(req *SetattrRequest, resp *SetattrResponse, intr Intr) Error {
@@ -174,19 +178,19 @@ func (r *release) test(path string, t *testing.T) {
 		return
 	}
 	f.Close()
-	time.Sleep(1*time.Second)
+	time.Sleep(1 * time.Second)
 	if !r.did {
 		t.Error("Close did not Release")
 	}
 }
 
-type file struct {}
-type dir struct {}
+type file struct{}
+type dir struct{}
 
 func (f file) Attr() Attr { return Attr{Mode: 0666} }
-func (f dir) Attr() Attr { return Attr{Mode: os.ModeDir | 0777} }
+func (f dir) Attr() Attr  { return Attr{Mode: os.ModeDir | 0777} }
 
-type testFS struct {}
+type testFS struct{}
 
 func (testFS) Root() (Node, Error) {
 	return testFS{}, nil

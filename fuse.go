@@ -181,8 +181,8 @@ const (
 	ESTALE = Errno(syscall.ESTALE)
 
 	ENOENT = Errno(syscall.ENOENT)
-	EIO = Errno(syscall.EIO)
-	EPERM = Errno(syscall.EPERM)
+	EIO    = Errno(syscall.EIO)
+	EPERM  = Errno(syscall.EPERM)
 )
 
 type errno int
@@ -314,8 +314,8 @@ func (c *Conn) ReadRequest() (Request, error) {
 		if m.len() < unsafe.Sizeof(*in) {
 			goto corrupt
 		}
-		mode := os.FileMode(in.Mode&0777)
-		switch in.Mode&syscall.S_IFMT {
+		mode := os.FileMode(in.Mode & 0777)
+		switch in.Mode & syscall.S_IFMT {
 		case syscall.S_IFREG:
 			// nothing
 		case syscall.S_IFDIR:
@@ -340,20 +340,20 @@ func (c *Conn) ReadRequest() (Request, error) {
 		if in.Mode&syscall.S_ISGID != 0 {
 			mode |= os.ModeSetgid
 		}
-		
+
 		req = &SetattrRequest{
-			Header: m.Header(),
-			Valid: SetattrValid(in.Valid),
-			Handle: HandleID(in.Fh),
-			Size: in.Size,
-			Atime: time.Unix(int64(in.Atime), int64(in.AtimeNsec)),
-			Mtime: time.Unix(int64(in.Mtime), int64(in.MtimeNsec)),
-			Mode: mode,
-			Uid: in.Uid,
-			Gid: in.Gid,
+			Header:   m.Header(),
+			Valid:    SetattrValid(in.Valid),
+			Handle:   HandleID(in.Fh),
+			Size:     in.Size,
+			Atime:    time.Unix(int64(in.Atime), int64(in.AtimeNsec)),
+			Mtime:    time.Unix(int64(in.Mtime), int64(in.MtimeNsec)),
+			Mode:     mode,
+			Uid:      in.Uid,
+			Gid:      in.Gid,
 			Bkuptime: time.Unix(int64(in.Bkuptime), int64(in.BkuptimeNsec)),
-			Chgtime: time.Unix(int64(in.Chgtime), int64(in.ChgtimeNsec)),
-			Flags: in.Flags,
+			Chgtime:  time.Unix(int64(in.Chgtime), int64(in.ChgtimeNsec)),
+			Flags:    in.Flags,
 		}
 
 	case opReadlink:
@@ -375,8 +375,8 @@ func (c *Conn) ReadRequest() (Request, error) {
 		}
 		req = &MkdirRequest{
 			Header: m.Header(),
-			Name: string(name[:i]),
-			Mode: os.ModeDir | os.FileMode(in.Mode&0777),  // XXX
+			Name:   string(name[:i]),
+			Mode:   os.ModeDir | os.FileMode(in.Mode&0777), // XXX
 		}
 
 	case opUnlink, opRmdir:
@@ -388,7 +388,7 @@ func (c *Conn) ReadRequest() (Request, error) {
 		req = &RemoveRequest{
 			Header: m.Header(),
 			Name:   string(buf[:n-1]),
-			Dir: m.hdr.Opcode == opRmdir,
+			Dir:    m.hdr.Opcode == opRmdir,
 		}
 
 	case opRename:
@@ -430,7 +430,7 @@ func (c *Conn) ReadRequest() (Request, error) {
 			Header: m.Header(),
 			Handle: HandleID(in.Fh),
 			Offset: int64(in.Offset),
-			Flags: WriteFlags(in.WriteFlags),
+			Flags:  WriteFlags(in.WriteFlags),
 		}
 		buf := m.bytes()[unsafe.Sizeof(*in):]
 		if uint32(len(buf)) < in.Size {
@@ -610,8 +610,8 @@ func (c *Conn) ReadRequest() (Request, error) {
 		req = &CreateRequest{
 			Header: m.Header(),
 			Flags:  in.Flags,
-			Mode:   in.Mode,  // XXX
-			Name: string(name[:i]),
+			Mode:   in.Mode, // XXX
+			Name:   string(name[:i]),
 		}
 
 	case opInterrupt:
@@ -829,7 +829,6 @@ func (a *Attr) attr() (out attr) {
 	if a.Mode&os.ModeSetgid != 0 {
 		out.Mode |= syscall.S_ISGID
 	}
-fmt.Printf("MODE %#x\n", out.Mode)
 	out.Nlink = a.Nlink
 	if out.Nlink < 1 {
 		out.Nlink = 1
@@ -1038,9 +1037,9 @@ func (r *OpenResponse) String() string {
 // A CreateRequest asks to create and open a file (not a directory).
 type CreateRequest struct {
 	Header
-	Name string
+	Name  string
 	Flags uint32
-	Mode uint32
+	Mode  uint32
 }
 
 func (r *CreateRequest) String() string {
@@ -1233,8 +1232,8 @@ type WriteRequest struct {
 	Header
 	Handle HandleID
 	Offset int64
-	Data []byte
-	Flags WriteFlags
+	Data   []byte
+	Flags  WriteFlags
 }
 
 func (r *WriteRequest) String() string {
@@ -1245,7 +1244,7 @@ func (r *WriteRequest) String() string {
 func (r *WriteRequest) Respond(resp *WriteResponse) {
 	out := &writeOut{
 		outHeader: outHeader{Unique: uint64(r.ID)},
-		Size: uint32(resp.Size),
+		Size:      uint32(resp.Size),
 	}
 	r.Conn.respond(&out.outHeader, unsafe.Sizeof(*out))
 }
@@ -1267,20 +1266,20 @@ func (r *WriteResponse) String() string {
 // as indicated by Valid.
 type SetattrRequest struct {
 	Header
-	Valid SetattrValid
+	Valid  SetattrValid
 	Handle HandleID
-	Size uint64
-	Atime time.Time
-	Mtime time.Time
-	Mode os.FileMode
-	Uid uint32
-	Gid uint32
-	
+	Size   uint64
+	Atime  time.Time
+	Mtime  time.Time
+	Mode   os.FileMode
+	Uid    uint32
+	Gid    uint32
+
 	// OS X only
 	Bkuptime time.Time
-	Chgtime time.Time
-	Crtime time.Time
-	Flags uint32  // see chflags(2)
+	Chgtime  time.Time
+	Crtime   time.Time
+	Flags    uint32 // see chflags(2)
 }
 
 func (r *SetattrRequest) String() string {
@@ -1356,8 +1355,8 @@ func (r *SetattrResponse) String() string {
 // may receive multiple FlushRequests over its lifetime.
 type FlushRequest struct {
 	Header
-	Handle HandleID
-	Flags uint32
+	Handle    HandleID
+	Flags     uint32
 	LockOwner uint64
 }
 
@@ -1379,7 +1378,7 @@ func (r *FlushRequest) Respond() {
 type RemoveRequest struct {
 	Header
 	Name string // name of extended attribute
-	Dir bool  // is this rmdir?
+	Dir  bool   // is this rmdir?
 }
 
 func (r *RemoveRequest) String() string {

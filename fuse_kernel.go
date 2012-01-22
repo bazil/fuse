@@ -96,32 +96,32 @@ type fileLock struct {
 type SetattrValid uint32
 
 const (
-	SetattrMode SetattrValid = 1<<0
-	SetattrUid SetattrValid = 1<<1
-	SetattrGid SetattrValid = 1<<2
-	SetattrSize SetattrValid = 1<<3
-	SetattrAtime SetattrValid = 1<<4
-	SetattrMtime SetattrValid = 1<<5
-	SetattrHandle SetattrValid = 1<<6  // TODO: What does this mean?
-	
+	SetattrMode   SetattrValid = 1 << 0
+	SetattrUid    SetattrValid = 1 << 1
+	SetattrGid    SetattrValid = 1 << 2
+	SetattrSize   SetattrValid = 1 << 3
+	SetattrAtime  SetattrValid = 1 << 4
+	SetattrMtime  SetattrValid = 1 << 5
+	SetattrHandle SetattrValid = 1 << 6 // TODO: What does this mean?
+
 	// OS X only
-	SetattrCrtime SetattrValid = 1<<28
-	SetattrChgtime SetattrValid = 1<<29
-	SetattrBkuptime SetattrValid = 1<<30
-	SetattrFlags SetattrValid = 1<<31
+	SetattrCrtime   SetattrValid = 1 << 28
+	SetattrChgtime  SetattrValid = 1 << 29
+	SetattrBkuptime SetattrValid = 1 << 30
+	SetattrFlags    SetattrValid = 1 << 31
 )
 
-func (fl SetattrValid) Mode() bool { return fl&SetattrMode != 0 }
-func (fl SetattrValid) Uid() bool { return fl&SetattrUid != 0 }
-func (fl SetattrValid) Gid() bool { return fl&SetattrGid != 0 }
-func (fl SetattrValid) Size() bool { return fl&SetattrSize != 0 }
-func (fl SetattrValid) Atime() bool { return fl&SetattrAtime != 0 }
-func (fl SetattrValid) Mtime() bool { return fl&SetattrMtime != 0 }
-func (fl SetattrValid) Handle() bool { return fl&SetattrHandle != 0 }
-func (fl SetattrValid) Crtime() bool { return fl&SetattrCrtime != 0 }
-func (fl SetattrValid) Chgtime() bool { return fl&SetattrChgtime != 0 }
+func (fl SetattrValid) Mode() bool     { return fl&SetattrMode != 0 }
+func (fl SetattrValid) Uid() bool      { return fl&SetattrUid != 0 }
+func (fl SetattrValid) Gid() bool      { return fl&SetattrGid != 0 }
+func (fl SetattrValid) Size() bool     { return fl&SetattrSize != 0 }
+func (fl SetattrValid) Atime() bool    { return fl&SetattrAtime != 0 }
+func (fl SetattrValid) Mtime() bool    { return fl&SetattrMtime != 0 }
+func (fl SetattrValid) Handle() bool   { return fl&SetattrHandle != 0 }
+func (fl SetattrValid) Crtime() bool   { return fl&SetattrCrtime != 0 }
+func (fl SetattrValid) Chgtime() bool  { return fl&SetattrChgtime != 0 }
 func (fl SetattrValid) Bkuptime() bool { return fl&SetattrBkuptime != 0 }
-func (fl SetattrValid) Flags() bool { return fl&SetattrFlags != 0 }
+func (fl SetattrValid) Flags() bool    { return fl&SetattrFlags != 0 }
 
 func (fl SetattrValid) String() string {
 	return flagString(uint32(fl), setattrValidNames)
@@ -427,8 +427,7 @@ func (fl WriteFlags) String() string {
 	return flagString(uint32(fl), writeFlagNames)
 }
 
-var writeFlagNames = []flagName{
-}
+var writeFlagNames = []flagName{}
 
 const compatStatfsSize = 48
 
