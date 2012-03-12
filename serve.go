@@ -239,7 +239,6 @@ func (c *Conn) Serve(fs FS) error {
 	for {
 		req, err := c.ReadRequest()
 		if err != nil {
-			println("SERVE DONE", err.Error())
 			if err == io.EOF {
 				break
 			}
