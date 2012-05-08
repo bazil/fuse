@@ -81,7 +81,7 @@
 // 
 package fuse
 
-// BUG(rsc): The mount code for FreeBSD and Linux has not been written yet.
+// BUG(rsc): The mount code for FreeBSD has not been written yet.
 
 import (
 	"bytes"
@@ -250,6 +250,37 @@ func (m *message) Header() Header {
 	return Header{Conn: m.conn, ID: RequestID(h.Unique), Node: NodeID(h.Nodeid), Uid: h.Uid, Gid: h.Gid, Pid: h.Pid}
 }
 
+// fileMode returns a Go os.FileMode from a Unix mode.
+func fileMode(unixMode uint32) os.FileMode {
+	mode := os.FileMode(unixMode & 0777)
+	switch unixMode & syscall.S_IFMT {
+	case syscall.S_IFREG:
+		// nothing
+	case syscall.S_IFDIR:
+		mode |= os.ModeDir
+	case syscall.S_IFCHR:
+		mode |= os.ModeCharDevice | os.ModeDevice
+	case syscall.S_IFBLK:
+		mode |= os.ModeDevice
+	case syscall.S_IFIFO:
+		mode |= os.ModeNamedPipe
+	case syscall.S_IFLNK:
+		mode |= os.ModeSymlink
+	case syscall.S_IFSOCK:
+		mode |= os.ModeSocket
+	default:
+		// no idea
+		mode |= os.ModeDevice
+	}
+	if unixMode&syscall.S_ISUID != 0 {
+		mode |= os.ModeSetuid
+	}
+	if unixMode&syscall.S_ISGID != 0 {
+		mode |= os.ModeSetgid
+	}
+	return mode
+}
+
 func (c *Conn) ReadRequest() (Request, error) {
 	// TODO: Some kind of buffer reuse.
 	m := newMessage(c)
@@ -322,33 +353,6 @@ func (c *Conn) ReadRequest() (Request, error) {
 		if m.len() < unsafe.Sizeof(*in) {
 			goto corrupt
 		}
-		mode := os.FileMode(in.Mode & 0777)
-		switch in.Mode & syscall.S_IFMT {
-		case syscall.S_IFREG:
-			// nothing
-		case syscall.S_IFDIR:
-			mode |= os.ModeDir
-		case syscall.S_IFCHR:
-			mode |= os.ModeCharDevice | os.ModeDevice
-		case syscall.S_IFBLK:
-			mode |= os.ModeDevice
-		case syscall.S_IFIFO:
-			mode |= os.ModeNamedPipe
-		case syscall.S_IFLNK:
-			mode |= os.ModeSymlink
-		case syscall.S_IFSOCK:
-			mode |= os.ModeSocket
-		default:
-			// no idea
-			mode |= os.ModeDevice
-		}
-		if in.Mode&syscall.S_ISUID != 0 {
-			mode |= os.ModeSetuid
-		}
-		if in.Mode&syscall.S_ISGID != 0 {
-			mode |= os.ModeSetgid
-		}
-
 		req = &SetattrRequest{
 			Header:   m.Header(),
 			Valid:    SetattrValid(in.Valid),
@@ -356,20 +360,71 @@ func (c *Conn) ReadRequest() (Request, error) {
 			Size:     in.Size,
 			Atime:    time.Unix(int64(in.Atime), int64(in.AtimeNsec)),
 			Mtime:    time.Unix(int64(in.Mtime), int64(in.MtimeNsec)),
-			Mode:     mode,
+			Mode:     fileMode(in.Mode),
 			Uid:      in.Uid,
 			Gid:      in.Gid,
-			Bkuptime: time.Unix(int64(in.Bkuptime), int64(in.BkuptimeNsec)),
-			Chgtime:  time.Unix(int64(in.Chgtime), int64(in.ChgtimeNsec)),
-			Flags:    in.Flags,
+			Bkuptime: in.BkupTime(),
+			Chgtime:  in.Chgtime(),
+			Flags:    in.Flags(),
 		}
 
 	case opReadlink:
-		panic("opReadlink")
+		if len(m.bytes()) > 0 {
+			goto corrupt
+		}
+		req = &ReadlinkRequest{
+			Header: m.Header(),
+		}
+
 	case opSymlink:
-		panic("opSymlink")
+		// m.bytes() is "newName\0target\0"
+		names := m.bytes()
+		if len(names) == 0 || names[len(names)-1] != 0 {
+			goto corrupt
+		}
+		i := bytes.IndexByte(names, '\x00')
+		if i < 0 {
+			goto corrupt
+		}
+		newName, target := names[0:i], names[i+1:len(names)-1]
+		req = &SymlinkRequest{
+			Header:  m.Header(),
+			NewName: string(newName),
+			Target:  string(target),
+		}
+
+	case opLink:
+		in := (*linkIn)(m.data())
+		if m.len() < unsafe.Sizeof(*in) {
+			goto corrupt
+		}
+		newName := m.bytes()[unsafe.Sizeof(*in):]
+		if len(newName) < 2 || newName[len(newName)-1] != 0 {
+			goto corrupt
+		}
+		newName = newName[:len(newName)-1]
+		req = &LinkRequest{
+			Header:  m.Header(),
+			OldNode: NodeID(in.Oldnodeid),
+			NewName: string(newName),
+		}
+
 	case opMknod:
-		panic("opMknod")
+		in := (*mknodIn)(m.data())
+		if m.len() < unsafe.Sizeof(*in) {
+			goto corrupt
+		}
+		name := m.bytes()[unsafe.Sizeof(*in):]
+		if len(name) < 2 || name[len(name)-1] != '\x00' {
+			goto corrupt
+		}
+		name = name[:len(name)-1]
+		req = &MknodRequest{
+			Header: m.Header(),
+			Mode:   fileMode(in.Mode),
+			Rdev:   in.Rdev,
+			Name:   string(name),
+		}
 
 	case opMkdir:
 		in := (*mkdirIn)(m.data())
@@ -384,7 +439,7 @@ func (c *Conn) ReadRequest() (Request, error) {
 		req = &MkdirRequest{
 			Header: m.Header(),
 			Name:   string(name[:i]),
-			Mode:   os.ModeDir | os.FileMode(in.Mode&0777), // XXX
+			Mode:   fileMode(in.Mode) | os.ModeDir,
 		}
 
 	case opUnlink, opRmdir:
@@ -400,9 +455,31 @@ func (c *Conn) ReadRequest() (Request, error) {
 		}
 
 	case opRename:
-		panic("opRename")
-	case opLink:
-		panic("opLink")
+		in := (*renameIn)(m.data())
+		if m.len() < unsafe.Sizeof(*in) {
+			goto corrupt
+		}
+		newDirNodeID := NodeID(in.Newdir)
+		oldNew := m.bytes()[unsafe.Sizeof(*in):]
+		// oldNew should be "old\x00new\x00"
+		if len(oldNew) < 4 {
+			goto corrupt
+		}
+		if oldNew[len(oldNew)-1] != '\x00' {
+			goto corrupt
+		}
+		i := bytes.IndexByte(oldNew, '\x00')
+		if i < 0 {
+			goto corrupt
+		}
+		oldName, newName := string(oldNew[:i]), string(oldNew[i+1:len(oldNew)-1])
+		// log.Printf("RENAME: newDirNode = %d; old = %q, new = %q", newDirNodeID, oldName, newName)
+		req = &RenameRequest{
+			Header:  m.Header(),
+			NewDir:  newDirNodeID,
+			OldName: oldName,
+			NewName: newName,
+		}
 
 	case opOpendir, opOpen:
 		in := (*openIn)(m.data())
@@ -413,7 +490,7 @@ func (c *Conn) ReadRequest() (Request, error) {
 			Header: m.Header(),
 			Dir:    m.hdr.Opcode == opOpendir,
 			Flags:  in.Flags,
-			Mode:   in.Mode,
+			Mode:   fileMode(in.Mode),
 		}
 
 	case opRead, opReaddir:
@@ -467,7 +544,15 @@ func (c *Conn) ReadRequest() (Request, error) {
 		}
 
 	case opFsync:
-		panic("opFsync")
+		in := (*fsyncIn)(m.data())
+		if m.len() < unsafe.Sizeof(*in) {
+			goto corrupt
+		}
+		req = &FsyncRequest{
+			Header: m.Header(),
+			Handle: HandleID(in.Fh),
+			Flags:  in.FsyncFlags,
+		}
 
 	case opSetxattr:
 		var size uint32
@@ -618,7 +703,7 @@ func (c *Conn) ReadRequest() (Request, error) {
 		req = &CreateRequest{
 			Header: m.Header(),
 			Flags:  in.Flags,
-			Mode:   in.Mode, // XXX
+			Mode:   fileMode(in.Mode),
 			Name:   string(name[:i]),
 		}
 
@@ -639,26 +724,12 @@ func (c *Conn) ReadRequest() (Request, error) {
 		panic("opGetxtimes")
 	case opExchange:
 		panic("opExchange")
-
-		/*
-			case opUnlink:
-				if n == 0 || buf[n-1] != '\x00' {
-					goto corrupt
-				}
-				return &Unlink{Header: *hdr, Name: string(buf[:n-1])}, nil
-
-			case opRmdir:
-				if n == 0 || buf[n-1] != '\x00' {
-					goto corrupt
-				}
-				return &Rmdir{Header: *hdr, Name: string(buf[:n-1])}, nil
-			...
-		*/
 	}
 
 	return req, nil
 
 corrupt:
+	println("malformed message")
 	return nil, fmt.Errorf("fuse: malformed message")
 
 unrecognized:
@@ -676,6 +747,7 @@ func (c *Conn) respond(out *outHeader, n uintptr) {
 	nn, err := syscall.Write(c.fd, msg)
 	if nn != len(msg) || err != nil {
 		log.Printf("RESPOND WRITE: %d %v", nn, err)
+		log.Printf("with stack: %s", stack())
 	}
 }
 
@@ -818,7 +890,7 @@ func (a *Attr) attr() (out attr) {
 	out.Atime, out.AtimeNsec = unix(a.Atime)
 	out.Mtime, out.MtimeNsec = unix(a.Mtime)
 	out.Ctime, out.CtimeNsec = unix(a.Ctime)
-	out.Crtime, out.CrtimeNsec = unix(a.Crtime)
+	out.SetCrtime(unix(a.Crtime))
 	out.Mode = uint32(a.Mode) & 0777
 	switch {
 	default:
@@ -851,7 +923,7 @@ func (a *Attr) attr() (out attr) {
 	out.Uid = a.Uid
 	out.Gid = a.Gid
 	out.Rdev = a.Rdev
-	out.Flags = a.Flags
+	out.SetFlags(a.Flags)
 
 	return
 }
@@ -1022,11 +1094,11 @@ type OpenRequest struct {
 	Header
 	Dir   bool // is this Opendir?
 	Flags uint32
-	Mode  uint32
+	Mode  os.FileMode
 }
 
 func (r *OpenRequest) String() string {
-	return fmt.Sprintf("Open [%s] dir=%v fl=%v mode=%#x", &r.Header, r.Dir, r.Flags, r.Mode)
+	return fmt.Sprintf("Open [%s] dir=%v fl=%v mode=%v", &r.Header, r.Dir, r.Flags, r.Mode)
 }
 
 // Respond replies to the request with the given response.
@@ -1054,11 +1126,11 @@ type CreateRequest struct {
 	Header
 	Name  string
 	Flags uint32
-	Mode  uint32
+	Mode  os.FileMode
 }
 
 func (r *CreateRequest) String() string {
-	return fmt.Sprintf("Create [%s] %q fl=%v mode=%#x", &r.Header, r.Name, r.Flags, r.Mode)
+	return fmt.Sprintf("Create [%s] %q fl=%v mode=%v", &r.Header, r.Name, r.Flags, r.Mode)
 }
 
 // Respond replies to the request with the given response.
@@ -1212,8 +1284,7 @@ func (r *ForgetRequest) String() string {
 
 // Respond replies to the request, indicating that the forgetfulness has been recorded.
 func (r *ForgetRequest) Respond() {
-	out := &outHeader{Unique: uint64(r.ID)}
-	r.Conn.respond(out, unsafe.Sizeof(*out))
+	// Don't reply to forget messages.
 }
 
 // A Dirent represents a single directory entry.
@@ -1320,6 +1391,8 @@ func (r *SetattrRequest) String() string {
 	}
 	if r.Valid.Handle() {
 		fmt.Fprintf(&buf, " handle=%#x", r.Handle)
+	} else {
+		fmt.Fprintf(&buf, " handle=INVALID-%#x", r.Handle)
 	}
 	if r.Valid.Crtime() {
 		fmt.Fprintf(&buf, " crtime=%v", r.Crtime)
@@ -1406,6 +1479,139 @@ func (r *RemoveRequest) Respond() {
 	r.Conn.respond(out, unsafe.Sizeof(*out))
 }
 
+// A SymlinkRequest is a request to create a symlink making NewName point to Target.
+type SymlinkRequest struct {
+	Header
+	NewName, Target string
+}
+
+func (r *SymlinkRequest) String() string {
+	return fmt.Sprintf("Symlink [%s] from %q to target %q", &r.Header, r.NewName, r.Target)
+}
+
+func (r *SymlinkRequest) handle() HandleID {
+	return 0
+}
+
+// Respond replies to the request, indicating that the symlink was created.
+func (r *SymlinkRequest) Respond(resp *SymlinkResponse) {
+	out := &entryOut{
+		outHeader:      outHeader{Unique: uint64(r.ID)},
+		Nodeid:         uint64(resp.Node),
+		Generation:     resp.Generation,
+		EntryValid:     uint64(resp.EntryValid / time.Second),
+		EntryValidNsec: uint32(resp.EntryValid % time.Second / time.Nanosecond),
+		AttrValid:      uint64(resp.AttrValid / time.Second),
+		AttrValidNsec:  uint32(resp.AttrValid % time.Second / time.Nanosecond),
+		Attr:           resp.Attr.attr(),
+	}
+	r.Conn.respond(&out.outHeader, unsafe.Sizeof(*out))
+}
+
+// A SymlinkResponse is the response to a SymlinkRequest.
+type SymlinkResponse struct {
+	LookupResponse
+}
+
+// A ReadlinkRequest is a request to read a symlink's target.
+type ReadlinkRequest struct {
+	Header
+}
+
+func (r *ReadlinkRequest) String() string {
+	return fmt.Sprintf("Readlink [%s]", &r.Header)
+}
+
+func (r *ReadlinkRequest) handle() HandleID {
+	return 0
+}
+
+func (r *ReadlinkRequest) Respond(target string) {
+	out := &outHeader{Unique: uint64(r.ID)}
+	r.Conn.respondData(out, unsafe.Sizeof(*out), []byte(target))
+}
+
+// A LinkRequest is a request to create a hard link.
+type LinkRequest struct {
+	Header
+	OldNode NodeID
+	NewName string
+}
+
+func (r *LinkRequest) Respond(resp *LookupResponse) {
+	out := &entryOut{
+		outHeader:      outHeader{Unique: uint64(r.ID)},
+		Nodeid:         uint64(resp.Node),
+		Generation:     resp.Generation,
+		EntryValid:     uint64(resp.EntryValid / time.Second),
+		EntryValidNsec: uint32(resp.EntryValid % time.Second / time.Nanosecond),
+		AttrValid:      uint64(resp.AttrValid / time.Second),
+		AttrValidNsec:  uint32(resp.AttrValid % time.Second / time.Nanosecond),
+		Attr:           resp.Attr.attr(),
+	}
+	r.Conn.respond(&out.outHeader, unsafe.Sizeof(*out))
+}
+
+// A RenameRequest is a request to rename a file.
+type RenameRequest struct {
+	Header
+	NewDir           NodeID
+	OldName, NewName string
+}
+
+func (r *RenameRequest) handle() HandleID {
+	return 0
+}
+
+func (r *RenameRequest) String() string {
+	return fmt.Sprintf("Rename [%s] from %q to dirnode %d %q", &r.Header, r.OldName, r.NewDir, r.NewName)
+}
+
+func (r *RenameRequest) Respond() {
+	out := &outHeader{Unique: uint64(r.ID)}
+	r.Conn.respond(out, unsafe.Sizeof(*out))
+}
+
+type MknodRequest struct {
+	Header
+	Name string
+	Mode os.FileMode
+	Rdev uint32
+}
+
+func (r *MknodRequest) String() string {
+	return fmt.Sprintf("Mknod [%s] Name %q mode %v rdev %d", &r.Header, r.Name, r.Mode, r.Rdev)
+}
+
+func (r *MknodRequest) Respond(resp *LookupResponse) {
+	out := &entryOut{
+		outHeader:      outHeader{Unique: uint64(r.ID)},
+		Nodeid:         uint64(resp.Node),
+		Generation:     resp.Generation,
+		EntryValid:     uint64(resp.EntryValid / time.Second),
+		EntryValidNsec: uint32(resp.EntryValid % time.Second / time.Nanosecond),
+		AttrValid:      uint64(resp.AttrValid / time.Second),
+		AttrValidNsec:  uint32(resp.AttrValid % time.Second / time.Nanosecond),
+		Attr:           resp.Attr.attr(),
+	}
+	r.Conn.respond(&out.outHeader, unsafe.Sizeof(*out))
+}
+
+type FsyncRequest struct {
+	Header
+	Handle HandleID
+	Flags  uint32
+}
+
+func (r *FsyncRequest) String() string {
+	return fmt.Sprintf("Fsync [%s] Handle %v Flags %v", &r.Header, r.Handle, r.Flags)
+}
+
+func (r *FsyncRequest) Respond() {
+	out := &outHeader{Unique: uint64(r.ID)}
+	r.Conn.respond(out, unsafe.Sizeof(*out))
+}
+
 /*{
 
 // A XXXRequest xxx.
@@ -1418,7 +1624,7 @@ func (r *XXXRequest) String() string {
 	return fmt.Sprintf("XXX [%s] xxx", &r.Header)
 }
 
-func (r *XXXRequest) Handle() HandleID {
+func (r *XXXRequest) handle() HandleID {
 	return r.Handle
 }
 
@@ -1440,5 +1646,5 @@ func (r *XXXResponse) String() string {
 	return fmt.Sprintf("XXX %+v", *r)
 }
 
-}
+ }
 */

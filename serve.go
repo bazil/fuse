@@ -18,16 +18,14 @@ import (
 	"time"
 )
 
-var Debugf = nop
-
-func nop(string, ...interface{}) {}
-
 // TODO: FINISH DOCS
 
 // An Intr is a channel that signals that a request has been interrupted.
 // Being able to receive from the channel means the request has been
 // interrupted.
 type Intr chan struct{}
+
+func (Intr) String() string { return "fuse.Intr" }
 
 // An FS is the interface required of a file system.
 //
@@ -51,8 +49,10 @@ type Intr chan struct{}
 //
 // Statfs is called to obtain file system metadata.  It should write that data to resp.
 //
-//	Rename(req *RenameRequest, intr Intr) proto.Error
+//	Rename(req *RenameRequest, intr Intr) Error
 //
+// XXXX this is not implemented like this. Instead, Rename is a method
+// on the source dierctory node, and takes a newDir Node parameter. Fix it like this?
 // Rename is called to rename the file req.OldName in the directory req.OldDir to
 // become the file req.NewName in the directory req.NewDir.
 //
@@ -123,7 +123,7 @@ type FS interface {
 //
 // Link XXX
 //
-//	Lookup(name string, intr Intr) (Node, proto.Error)
+//	Lookup(name string, intr Intr) (Node, Error)
 //
 // Lookup looks up a specific entry in the receiver,
 // which must be a directory.  Lookup should return a Node
@@ -134,9 +134,11 @@ type FS interface {
 //
 //	Mkdir
 //
-// Mkdir creates 
+// Mkdir creates XXX
 //
-//	Mknod
+//	Mknod XXX
+//
+// XXX
 //
 //	Remove
 //
@@ -251,13 +253,14 @@ func (c *Conn) Serve(fs FS) error {
 }
 
 type serveConn struct {
-	meta       sync.Mutex
-	req        map[RequestID]*serveRequest
-	node       []*serveNode
-	handle     []*serveHandle
-	freeNode   []NodeID
-	freeHandle []HandleID
-	nodeGen    uint64
+	meta        sync.Mutex
+	req         map[RequestID]*serveRequest
+	node        []*serveNode
+	handle      []*serveHandle
+	freeNode    []NodeID
+	freeHandle  []HandleID
+	nodeGen     uint64
+	nodeHandles []map[HandleID]bool // open handles for a node; slice index is NodeID
 }
 
 type serveRequest struct {
@@ -293,6 +296,7 @@ type serveHandle struct {
 	readData  []byte
 	trunc     bool
 	writeData []byte
+	nodeID    NodeID
 }
 
 func (c *Conn) saveNode(name string, node Node) (id NodeID, gen uint64, sn *serveNode) {
@@ -312,9 +316,9 @@ func (c *Conn) saveNode(name string, node Node) (id NodeID, gen uint64, sn *serv
 	return
 }
 
-func (c *Conn) saveHandle(handle Handle) (id HandleID, shandle *serveHandle) {
+func (c *Conn) saveHandle(handle Handle, nodeID NodeID) (id HandleID, shandle *serveHandle) {
 	c.meta.Lock()
-	shandle = &serveHandle{handle: handle}
+	shandle = &serveHandle{handle: handle, nodeID: nodeID}
 	if n := len(c.freeHandle); n > 0 {
 		id = c.freeHandle[n-1]
 		c.freeHandle = c.freeHandle[:n-1]
@@ -323,6 +327,16 @@ func (c *Conn) saveHandle(handle Handle) (id HandleID, shandle *serveHandle) {
 		id = HandleID(len(c.handle))
 		c.handle = append(c.handle, shandle)
 	}
+
+	// Update mapping from node ID -> set of open Handle IDs.
+	for len(c.nodeHandles) <= int(nodeID) {
+		c.nodeHandles = append(c.nodeHandles, nil)
+	}
+	if c.nodeHandles[nodeID] == nil {
+		c.nodeHandles[nodeID] = make(map[HandleID]bool)
+	}
+	c.nodeHandles[nodeID][id] = true
+
 	c.meta.Unlock()
 	return
 }
@@ -330,12 +344,17 @@ func (c *Conn) saveHandle(handle Handle) (id HandleID, shandle *serveHandle) {
 func (c *Conn) dropNode(id NodeID) {
 	c.meta.Lock()
 	c.node[id] = nil
+	if len(c.nodeHandles) > int(id) {
+		c.nodeHandles[id] = nil
+	}
 	c.freeNode = append(c.freeNode, id)
 	c.meta.Unlock()
 }
 
 func (c *Conn) dropHandle(id HandleID) {
 	c.meta.Lock()
+	h := c.handle[id]
+	delete(c.nodeHandles[h.nodeID], id)
 	c.handle[id] = nil
 	c.freeHandle = append(c.freeHandle, id)
 	c.meta.Unlock()
@@ -458,13 +477,32 @@ func (c *Conn) serve(fs FS, r Request) {
 
 	case *SetattrRequest:
 		s := &SetattrResponse{}
-		if r.Valid == SetattrSize|SetattrHandle && r.Size == 0 {
-			if _, ok := handle.(interface {
+
+		// Special-case truncation, if no other bits are set
+		// and the open Handles all have a WriteAll method.
+		if r.Valid&SetattrSize != 0 && r.Size == 0 {
+			type writeAll interface {
 				WriteAll([]byte, Intr) Error
-			}); ok {
-				shandle.trunc = true
+			}
+			switch r.Valid {
+			case SetattrLockOwner | SetattrSize, SetattrSize:
+				// Seen on Linux. Handle isn't set.
+				c.meta.Lock()
+				for hid := range c.nodeHandles[hdr.Node] {
+					shandle := c.handle[hid]
+					if _, ok := shandle.handle.(writeAll); ok {
+						shandle.trunc = true
+					}
+				}
+				c.meta.Unlock()
+			case SetattrHandle | SetattrSize:
+				// Seen on OS X; the Handle is provided.
+				if _, ok := handle.(writeAll); ok {
+					shandle.trunc = true
+				}
 			}
 		}
+
 		log.Printf("setattr %v", r)
 		if n, ok := node.(interface {
 			Setattr(*SetattrRequest, *SetattrResponse, Intr) Error
@@ -486,13 +524,94 @@ func (c *Conn) serve(fs FS, r Request) {
 		done(s)
 		r.Respond(s)
 
-		/*
-			case *ReadlinkRequest, *SymlinkRequest, *MknodRequest, *MkdirRequest,
-				*UnlinkRequest, *RmdirRequest, *RenameRequest, *LinkRequest:
-				// TODO
-				done(ENOSYS)
-				r.RespondError(ENOSYS)
-		*/
+	case *SymlinkRequest:
+		s := &SymlinkResponse{}
+		n, ok := node.(interface {
+			Symlink(*SymlinkRequest, Intr) (Node, Error)
+		})
+		if !ok {
+			done(EIO) // XXX or EPERM like Mkdir?
+			r.RespondError(EIO)
+			break
+		}
+		n2, err := n.Symlink(r, intr)
+		if err != nil {
+			done(err)
+			r.RespondError(err)
+			break
+		}
+		c.saveLookup(&s.LookupResponse, snode, r.NewName, n2)
+		done(s)
+		r.Respond(s)
+
+	case *ReadlinkRequest:
+		n, ok := node.(interface {
+			Readlink(*ReadlinkRequest, Intr) (string, Error)
+		})
+		if !ok {
+			done(EIO) /// XXX or EPERM?
+			r.RespondError(EIO)
+			break
+		}
+		target, err := n.Readlink(r, intr)
+		if err != nil {
+			done(err)
+			r.RespondError(err)
+			break
+		}
+		done(target)
+		r.Respond(target)
+
+	case *LinkRequest:
+		n, ok := node.(interface {
+			Link(r *LinkRequest, old Node, intr Intr) (Node, Error)
+		})
+		if !ok {
+			log.Printf("Node %T doesn't implement fuse Link", node)
+			done(EIO) /// XXX or EPERM?
+			r.RespondError(EIO)
+			break
+		}
+		c.meta.Lock()
+		var oldNode *serveNode
+		if int(r.OldNode) < len(c.node) {
+			oldNode = c.node[r.OldNode]
+		}
+		c.meta.Unlock()
+		if oldNode == nil {
+			log.Printf("In LinkRequest, node %d not found", r.OldNode)
+			done(EIO)
+			r.RespondError(EIO)
+			break
+		}
+		n2, err := n.Link(r, oldNode.node, intr)
+		if err != nil {
+			done(err)
+			r.RespondError(err)
+			break
+		}
+		s := &LookupResponse{}
+		c.saveLookup(s, snode, r.NewName, n2)
+		done(s)
+		r.Respond(s)
+
+	case *RemoveRequest:
+		n, ok := node.(interface {
+			Remove(*RemoveRequest, Intr) Error
+		})
+		if !ok {
+			done(EIO) /// XXX or EPERM?
+			r.RespondError(EIO)
+			break
+		}
+		err := n.Remove(r, intr)
+		if err != nil {
+			done(err)
+			r.RespondError(err)
+			break
+		}
+		done(nil)
+		r.Respond()
 
 	case *AccessRequest:
 		if n, ok := node.(interface {
@@ -569,7 +688,7 @@ func (c *Conn) serve(fs FS, r Request) {
 		} else {
 			h2 = node
 		}
-		s.Handle, _ = c.saveHandle(h2)
+		s.Handle, _ = c.saveHandle(h2, hdr.Node)
 		done(s)
 		r.Respond(s)
 
@@ -591,7 +710,7 @@ func (c *Conn) serve(fs FS, r Request) {
 			break
 		}
 		c.saveLookup(&s.LookupResponse, snode, r.Name, n2)
-		h, shandle := c.saveHandle(h2)
+		h, shandle := c.saveHandle(h2, hdr.Node)
 		s.Handle = h
 		shandle.trunc = true
 		done(s)
@@ -748,16 +867,95 @@ func (c *Conn) serve(fs FS, r Request) {
 		done(nil)
 		r.Respond()
 
-		/*	case *FsyncRequest, *FsyncdirRequest:
+	case *DestroyRequest:
+		fs, ok := fs.(interface {
+			Destroy()
+		})
+		if ok {
+			fs.Destroy()
+		}
+		done(nil)
+		r.Respond()
+
+	case *RenameRequest:
+		c.meta.Lock()
+		var newDirNode *serveNode
+		if int(r.NewDir) < len(c.node) {
+			newDirNode = c.node[r.NewDir]
+		}
+		c.meta.Unlock()
+		if newDirNode == nil {
+			println("RENAME NEW DIR NODE NOT FOUND")
+			done(EIO)
+			r.RespondError(EIO)
+			break
+		}
+		n, ok := node.(interface {
+			Rename(r *RenameRequest, newDir Node, intr Intr) Error
+		})
+		if !ok {
+			log.Printf("Node %T missing Rename method", node)
+			done(EIO) // XXX or EPERM like Mkdir?
+			r.RespondError(EIO)
+			break
+		}
+		err := n.Rename(r, newDirNode.node, intr)
+		if err != nil {
+			done(err)
+			r.RespondError(err)
+			break
+		}
+		done(nil)
+		r.Respond()
+
+	case *MknodRequest:
+		n, ok := node.(interface {
+			Mknod(r *MknodRequest, intr Intr) (Node, Error)
+		})
+		if !ok {
+			log.Printf("Node %T missing Mknod method", node)
+			done(EIO)
+			r.RespondError(EIO)
+			break
+		}
+		n2, err := n.Mknod(r, intr)
+		if err != nil {
+			done(err)
+			r.RespondError(err)
+			break
+		}
+		s := &LookupResponse{}
+		c.saveLookup(s, snode, r.Name, n2)
+		done(s)
+		r.Respond(s)
+
+	case *FsyncRequest:
+		n, ok := node.(interface {
+			Fsync(r *FsyncRequest, intr Intr) Error
+		})
+		if !ok {
+			log.Printf("Node %T missing Fsync method", node)
+			done(EIO)
+			r.RespondError(EIO)
+			break
+		}
+		err := n.Fsync(r, intr)
+		if err != nil {
+			done(err)
+			r.RespondError(err)
+			break
+		}
+		done(nil)
+		r.Respond()
+
+		/*	case *FsyncdirRequest:
 				done(ENOSYS)
 				r.RespondError(ENOSYS)
 
 			case *GetlkRequest, *SetlkRequest, *SetlkwRequest:
 				done(ENOSYS)
 				r.RespondError(ENOSYS)
-		*/
 
-		/*
 			// One of a kind.
 			case *InterruptRequest:
 				c.meta.Lock()
@@ -778,16 +976,6 @@ func (c *Conn) serve(fs FS, r Request) {
 				done(ENOSYS)
 				r.RespondError(ENOSYS)
 		*/
-
-	case *DestroyRequest:
-		fs, ok := fs.(interface {
-			Destroy()
-		})
-		if ok {
-			fs.Destroy()
-		}
-		done(nil)
-		r.Respond()
 	}
 }
 
