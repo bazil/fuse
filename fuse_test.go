@@ -44,7 +44,7 @@ func TestFuse(t *testing.T) {
 	go func() {
 		err := c.Serve(testFS{})
 		if err != nil {
-			fmt.Println("SERVE ERROR: %v\n", err)
+			fmt.Printf("SERVE ERROR: %v\n", err)
 		}
 	}()
 
