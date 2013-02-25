@@ -11,7 +11,6 @@ import (
 	"hash/fnv"
 	"io"
 	"log"
-	"os"
 	"path"
 	"sync"
 	"syscall"
@@ -272,7 +271,6 @@ type serveNode struct {
 	name  string
 	node  Node
 	inode uint64
-	isDir bool
 }
 
 func (sn *serveNode) attr() (attr Attr) {
@@ -281,7 +279,6 @@ func (sn *serveNode) attr() (attr Attr) {
 		sn.inode = hash(sn.name)
 		attr.Inode = sn.inode
 	}
-	sn.isDir = attr.Mode&os.ModeDir != 0
 	return
 }
 
@@ -735,7 +732,7 @@ func (c *Conn) serve(fs FS, r Request) {
 	// Handle operations.
 	case *ReadRequest:
 		s := &ReadResponse{Data: make([]byte, 0, r.Size)}
-		if snode.isDir {
+		if r.Dir {
 			if h, ok := handle.(interface {
 				ReadDir(Intr) ([]Dirent, Error)
 			}); ok {
@@ -784,20 +781,20 @@ func (c *Conn) serve(fs FS, r Request) {
 				r.Respond(s)
 				break
 			}
-		}
-		h, ok := handle.(interface {
-			Read(*ReadRequest, *ReadResponse, Intr) Error
-		})
-		if !ok {
-			fmt.Printf("NO READ FOR %T\n", handle)
-			done(EIO)
-			r.RespondError(EIO)
-			break
-		}
-		if err := h.Read(r, s, intr); err != nil {
-			done(err)
-			r.RespondError(err)
-			break
+			h, ok := handle.(interface {
+				Read(*ReadRequest, *ReadResponse, Intr) Error
+			})
+			if !ok {
+				fmt.Printf("NO READ FOR %T\n", handle)
+				done(EIO)
+				r.RespondError(EIO)
+				break
+			}
+			if err := h.Read(r, s, intr); err != nil {
+				done(err)
+				r.RespondError(err)
+				break
+			}
 		}
 		done(s)
 		r.Respond(s)
