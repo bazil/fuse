@@ -737,7 +737,6 @@ func (c *Conn) serve(fs FS, r Request) {
 				ReadDir(Intr) ([]Dirent, Error)
 			}); ok {
 				if shandle.readData == nil {
-					attr := snode.attr()
 					dirs, err := h.ReadDir(intr)
 					if err != nil {
 						done(err)
@@ -745,8 +744,6 @@ func (c *Conn) serve(fs FS, r Request) {
 						break
 					}
 					var data []byte
-					data = AppendDirent(data, Dirent{Inode: attr.Inode, Name: "."})
-					data = AppendDirent(data, Dirent{Inode: attr.Inode, Name: ".."})
 					for _, dir := range dirs {
 						if dir.Inode == 0 {
 							dir.Inode = hash(path.Join(snode.name, dir.Name))
