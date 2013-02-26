@@ -60,7 +60,7 @@ func (Dir) Lookup(name string, intr fuse.Intr) (fuse.Node, fuse.Error) {
 }
 
 var dirDirs = []fuse.Dirent{
-	{Inode: 2, Name: "hello", Type: 0},
+	{Inode: 2, Name: "hello", Type: fuse.DT_File},
 }
 
 func (Dir) ReadDir(intr fuse.Intr) ([]fuse.Dirent, fuse.Error) {

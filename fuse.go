@@ -1289,9 +1289,64 @@ func (r *ForgetRequest) Respond() {
 
 // A Dirent represents a single directory entry.
 type Dirent struct {
-	Inode uint64 // inode this entry names
-	Type  uint32 // ?
-	Name  string // name of entry
+	// Inode this entry names.
+	Inode uint64
+
+	// Type of the entry, for example DT_File.
+	//
+	// Setting this is optional. The zero value (DT_Unknown) means
+	// callers will just need to do a Getattr when the type is
+	// needed. Providing a type can speed up operations
+	// significantly.
+	Type DirentType
+
+	// Name of the entry
+	Name string
+}
+
+// Type of an entry in a directory listing.
+type DirentType uint32
+
+const (
+	// These don't quite match os.FileMode; especially there's an
+	// explicit unknown, instead of zero value meaning file. They
+	// are also not quite syscall.DT_*; nothing says the FUSE
+	// protocol follows those, and even if they were, we don't
+	// want each fs to fiddle with syscall.
+
+	// The shift by 12 is hardcoded in the FUSE userspace
+	// low-level C library, so it's safe here.
+
+	DT_Unknown DirentType = 0
+	DT_Socket  DirentType = syscall.S_IFSOCK >> 12
+	DT_Link    DirentType = syscall.S_IFLNK >> 12
+	DT_File    DirentType = syscall.S_IFREG >> 12
+	DT_Block   DirentType = syscall.S_IFBLK >> 12
+	DT_Dir     DirentType = syscall.S_IFDIR >> 12
+	DT_Char    DirentType = syscall.S_IFCHR >> 12
+	DT_FIFO    DirentType = syscall.S_IFIFO >> 12
+)
+
+func (t DirentType) String() string {
+	switch t {
+	case DT_Unknown:
+		return "unknown"
+	case DT_Socket:
+		return "socket"
+	case DT_Link:
+		return "link"
+	case DT_File:
+		return "file"
+	case DT_Block:
+		return "block"
+	case DT_Dir:
+		return "dir"
+	case DT_Char:
+		return "char"
+	case DT_FIFO:
+		return "fifo"
+	}
+	return "invalid"
 }
 
 // AppendDirent appends the encoded form of a directory entry to data
@@ -1300,7 +1355,7 @@ func AppendDirent(data []byte, dir Dirent) []byte {
 	de := dirent{
 		Ino:     dir.Inode,
 		Namelen: uint32(len(dir.Name)),
-		Type:    dir.Type,
+		Type:    uint32(dir.Type),
 	}
 	de.Off = uint64(len(data) + direntSize + (len(dir.Name)+7)&^7)
 	data = append(data, (*[direntSize]byte)(unsafe.Pointer(&de))[:]...)
