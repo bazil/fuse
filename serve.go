@@ -163,7 +163,7 @@ type Node interface {
 
 var startTime = time.Now()
 
-func nodeAttr(inode uint64, n Node) (attr Attr) {
+func nodeAttr(n Node) (attr Attr) {
 	attr = n.Attr()
 	if attr.Nlink == 0 {
 		attr.Nlink = 1
@@ -179,9 +179,6 @@ func nodeAttr(inode uint64, n Node) (attr Attr) {
 	}
 	if attr.Crtime.IsZero() {
 		attr.Crtime = startTime
-	}
-	if attr.Inode == 0 {
-		attr.Inode = inode
 	}
 	return
 }
@@ -270,14 +267,12 @@ type serveRequest struct {
 type serveNode struct {
 	name  string
 	node  Node
-	inode uint64
 }
 
 func (sn *serveNode) attr() (attr Attr) {
-	attr = nodeAttr(sn.inode, sn.node)
+	attr = nodeAttr(sn.node)
 	if attr.Inode == 0 {
-		sn.inode = hash(sn.name)
-		attr.Inode = sn.inode
+		attr.Inode = hash(sn.name)
 	}
 	return
 }
