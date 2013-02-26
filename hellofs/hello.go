@@ -49,7 +49,7 @@ func (FS) Root() (fuse.Node, fuse.Error) {
 type Dir struct{}
 
 func (Dir) Attr() fuse.Attr {
-	return fuse.Attr{Mode: os.ModeDir | 0555}
+	return fuse.Attr{Inode: 1, Mode: os.ModeDir | 0555}
 }
 
 func (Dir) Lookup(name string, intr fuse.Intr) (fuse.Node, fuse.Error) {
