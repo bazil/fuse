@@ -9,7 +9,7 @@ import (
 	"log"
 	"os"
 
-	"code.google.com/p/rsc/fuse"
+	"bazil.org/fuse"
 )
 
 func main() {
