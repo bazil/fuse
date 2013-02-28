@@ -205,7 +205,7 @@ func nodeAttr(n Node) (attr Attr) {
 //
 //	Read
 //
-//	Readdir
+//	ReadDir
 //
 //	Release
 //
