@@ -265,8 +265,8 @@ type serveRequest struct {
 }
 
 type serveNode struct {
-	name  string
-	node  Node
+	name string
+	node Node
 }
 
 func (sn *serveNode) attr() (attr Attr) {

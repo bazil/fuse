@@ -109,7 +109,6 @@ var fuseTests = []struct {
 //	Write(*WriteRequest, *WriteResponse)
 //	Flush(*FlushRequest, *FlushResponse)
 
-
 // Test Stat of root.
 
 type root struct {
@@ -117,7 +116,7 @@ type root struct {
 }
 
 func (f *root) test(path string, t *testing.T) {
-	fi, err := os.Stat(path+"/..")
+	fi, err := os.Stat(path + "/..")
 	if err != nil {
 		t.Fatalf("root getattr failed with %v", err)
 	}
