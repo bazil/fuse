@@ -704,7 +704,12 @@ func (c *Conn) serve(fs FS, r Request) {
 		c.saveLookup(&s.LookupResponse, snode, r.Name, n2)
 		h, shandle := c.saveHandle(h2, hdr.Node)
 		s.Handle = h
-		shandle.trunc = true
+		type writeAll interface {
+			WriteAll([]byte, Intr) Error
+		}
+		if _, ok := shandle.handle.(writeAll); ok {
+			shandle.trunc = true
+		}
 		done(s)
 		r.Respond(s)
 

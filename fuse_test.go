@@ -91,6 +91,7 @@ var fuseTests = []struct {
 	{"mkdir1", &mkdir1{}},
 	{"create1", &create1{}},
 	{"create2", &create2{}},
+	{"create3", &create3{}},
 	{"symlink1", &symlink1{}},
 	{"link1", &link1{}},
 	{"rename1", &rename1{}},
@@ -396,6 +397,58 @@ func (f *create2) test(path string, t *testing.T) {
 	}
 	if string(f.f.data) != hi {
 		t.Fatalf("create2 writeAll = %q, want %q", f.f.data, hi)
+	}
+
+	f.fooExists = true
+	log.Printf("pre-Remove")
+	err = os.Remove(path + "/foo")
+	if err != nil {
+		t.Fatalf("Remove: %v", err)
+	}
+	err = os.Remove(path + "/foo")
+	if err == nil {
+		t.Fatalf("second Remove = nil; want some error")
+	}
+}
+
+// Test Create + WriteAll + Remove
+
+type create3 struct {
+	dir
+	name      string
+	f         *write
+	fooExists bool
+}
+
+func (f *create3) Create(req *CreateRequest, resp *CreateResponse, intr Intr) (Node, Handle, Error) {
+	f.name = req.Name
+	f.f = &write{}
+	return f.f, f.f, nil
+}
+
+func (f *create3) Lookup(name string, intr Intr) (Node, Error) {
+	if f.fooExists && name == "foo" {
+		return file{}, nil
+	}
+	return nil, ENOENT
+}
+
+func (f *create3) Remove(r *RemoveRequest, intr Intr) Error {
+	if f.fooExists && r.Name == "foo" && !r.Dir {
+		f.fooExists = false
+		return nil
+	}
+	return ENOENT
+}
+
+func (f *create3) test(path string, t *testing.T) {
+	f.name = ""
+	err := ioutil.WriteFile(path+"/foo", []byte(hi), 0666)
+	if err != nil {
+		t.Fatalf("create3 WriteFile: %v", err)
+	}
+	if string(f.f.data) != hi {
+		t.Fatalf("create3 writeAll = %q, want %q", f.f.data, hi)
 	}
 
 	f.fooExists = true
