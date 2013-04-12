@@ -1011,6 +1011,6 @@ type dataHandle struct {
 	data []byte
 }
 
-func (d *dataHandle) Read(intr Intr) ([]byte, Error) {
+func (d *dataHandle) ReadAll(intr Intr) ([]byte, Error) {
 	return d.data, nil
 }
