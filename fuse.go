@@ -716,6 +716,7 @@ func (c *Conn) ReadRequest() (Request, error) {
 			Header: m.Header(),
 			IntrID: RequestID(in.Unique),
 		}
+
 	case opBmap:
 		panic("opBmap")
 
