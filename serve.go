@@ -960,18 +960,6 @@ func (c *Conn) serve(fs FS, r Request) {
 				done(ENOSYS)
 				r.RespondError(ENOSYS)
 
-			// One of a kind.
-			case *InterruptRequest:
-				c.meta.Lock()
-				ireq := c.req[r.OldID]
-				if ireq != nil && ireq.Intr != nil {
-					close(ireq.Intr)
-					ireq.Intr = nil
-				}
-				c.meta.Unlock()
-				done(nil)
-				r.Respond()
-
 			case *BmapRequest:
 				done(ENOSYS)
 				r.RespondError(ENOSYS)
