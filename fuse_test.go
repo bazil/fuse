@@ -96,6 +96,7 @@ var fuseTests = []struct {
 	{"link1", &link1{}},
 	{"rename1", &rename1{}},
 	{"mknod1", &mknod1{}},
+	{"dataHandle", dataHandleTest{}},
 }
 
 // TO TEST:
@@ -680,4 +681,25 @@ func (testFS) ReadDir(intr Intr) ([]Dirent, Error) {
 		}
 	}
 	return dirs, nil
+}
+
+// Test Read served with DataHandle.
+
+type dataHandleTest struct {
+	file
+}
+
+func (dataHandleTest) Open(*OpenRequest, *OpenResponse, Intr) (Handle, Error) {
+	return DataHandle([]byte(hi)), nil
+}
+
+func (dataHandleTest) test(path string, t *testing.T) {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		t.Errorf("readAll: %v", err)
+		return
+	}
+	if string(data) != hi {
+		t.Errorf("readAll = %q, want %q", data, hi)
+	}
 }
