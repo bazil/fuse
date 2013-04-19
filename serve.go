@@ -389,7 +389,6 @@ func (c *Conn) serve(fs FS, r Request) {
 		}
 		handle = shandle.handle
 	}
-	intr = make(chan struct{})
 	if c.req[hdr.ID] != nil {
 		// This happens with OSXFUSE.  Assume it's okay and
 		// that we'll never see an interrupt for this one.
@@ -939,6 +938,17 @@ func (c *Conn) serve(fs FS, r Request) {
 			r.RespondError(err)
 			break
 		}
+		done(nil)
+		r.Respond()
+
+	case *InterruptRequest:
+		c.meta.Lock()
+		ireq := c.req[r.IntrID]
+		if ireq != nil && ireq.Intr != nil {
+			close(ireq.Intr)
+			ireq.Intr = nil
+		}
+		c.meta.Unlock()
 		done(nil)
 		r.Respond()
 

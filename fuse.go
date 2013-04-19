@@ -708,7 +708,14 @@ func (c *Conn) ReadRequest() (Request, error) {
 		}
 
 	case opInterrupt:
-		panic("opInterrupt")
+		in := (*interruptIn)(m.data())
+		if m.len() < unsafe.Sizeof(*in) {
+			goto corrupt
+		}
+		req = &InterruptRequest{
+			Header: m.Header(),
+			IntrID: RequestID(in.Unique),
+		}
 	case opBmap:
 		panic("opBmap")
 
@@ -1665,6 +1672,21 @@ func (r *FsyncRequest) String() string {
 func (r *FsyncRequest) Respond() {
 	out := &outHeader{Unique: uint64(r.ID)}
 	r.Conn.respond(out, unsafe.Sizeof(*out))
+}
+
+// An InterruptRequest is a request to interrupt another pending request. The
+// reponse to that request should return an error status of EINTR.
+type InterruptRequest struct {
+	Header
+	IntrID RequestID // ID of the request to be interrupt.
+}
+
+func (r *InterruptRequest) Respond() {
+	// nothing to do here
+}
+
+func (r *InterruptRequest) String() string {
+	return fmt.Sprintf("Interrupt [%s] ID %v", &r.Header, r.IntrID)
 }
 
 /*{
