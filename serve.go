@@ -221,18 +221,16 @@ type Handle interface {
 // Serve serves the FUSE connection by making calls to the methods
 // of fs and the Nodes and Handles it makes available.  It returns only
 // when the connection has been closed or an unexpected error occurs.
-func (c *Conn) Serve(fs FS) error {
-	if c.req != nil {
-		panic("fuse: Serve called twice")
-	}
-	c.req = map[RequestID]*serveRequest{}
+func Serve(c *Conn, fs FS) error {
+	sc := serveConn{}
+	sc.req = map[RequestID]*serveRequest{}
 
 	root, err := fs.Root()
 	if err != nil {
 		return fmt.Errorf("cannot obtain root node: %v", syscall.Errno(err.(Errno)).Error())
 	}
-	c.node = append(c.node, nil, &serveNode{name: "/", node: root})
-	c.handle = append(c.handle, nil)
+	sc.node = append(sc.node, nil, &serveNode{name: "/", node: root})
+	sc.handle = append(sc.handle, nil)
 
 	for {
 		req, err := c.ReadRequest()
@@ -243,7 +241,7 @@ func (c *Conn) Serve(fs FS) error {
 			return err
 		}
 
-		go c.serve(fs, req)
+		go sc.serve(fs, req)
 	}
 	return nil
 }
@@ -291,7 +289,7 @@ type serveHandle struct {
 	nodeID    NodeID
 }
 
-func (c *Conn) saveNode(name string, node Node) (id NodeID, gen uint64, sn *serveNode) {
+func (c *serveConn) saveNode(name string, node Node) (id NodeID, gen uint64, sn *serveNode) {
 	sn = &serveNode{name: name, node: node}
 	c.meta.Lock()
 	if n := len(c.freeNode); n > 0 {
@@ -308,7 +306,7 @@ func (c *Conn) saveNode(name string, node Node) (id NodeID, gen uint64, sn *serv
 	return
 }
 
-func (c *Conn) saveHandle(handle Handle, nodeID NodeID) (id HandleID, shandle *serveHandle) {
+func (c *serveConn) saveHandle(handle Handle, nodeID NodeID) (id HandleID, shandle *serveHandle) {
 	c.meta.Lock()
 	shandle = &serveHandle{handle: handle, nodeID: nodeID}
 	if n := len(c.freeHandle); n > 0 {
@@ -333,7 +331,7 @@ func (c *Conn) saveHandle(handle Handle, nodeID NodeID) (id HandleID, shandle *s
 	return
 }
 
-func (c *Conn) dropNode(id NodeID) {
+func (c *serveConn) dropNode(id NodeID) {
 	c.meta.Lock()
 	c.node[id] = nil
 	if len(c.nodeHandles) > int(id) {
@@ -343,7 +341,7 @@ func (c *Conn) dropNode(id NodeID) {
 	c.meta.Unlock()
 }
 
-func (c *Conn) dropHandle(id HandleID) {
+func (c *serveConn) dropHandle(id HandleID) {
 	c.meta.Lock()
 	h := c.handle[id]
 	delete(c.nodeHandles[h.nodeID], id)
@@ -352,7 +350,7 @@ func (c *Conn) dropHandle(id HandleID) {
 	c.meta.Unlock()
 }
 
-func (c *Conn) serve(fs FS, r Request) {
+func (c *serveConn) serve(fs FS, r Request) {
 	intr := make(Intr)
 	req := &serveRequest{Request: r, Intr: intr}
 
@@ -971,7 +969,7 @@ func (c *Conn) serve(fs FS, r Request) {
 	}
 }
 
-func (c *Conn) saveLookup(s *LookupResponse, snode *serveNode, elem string, n2 Node) {
+func (c *serveConn) saveLookup(s *LookupResponse, snode *serveNode, elem string, n2 Node) {
 	name := path.Join(snode.name, elem)
 	var sn *serveNode
 	s.Node, s.Generation, sn = c.saveNode(name, n2)

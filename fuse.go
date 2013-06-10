@@ -102,8 +102,6 @@ type Conn struct {
 	fd  int
 	buf []byte
 	wio sync.Mutex
-
-	serveConn
 }
 
 // Mount mounts a new FUSE connection on the named directory

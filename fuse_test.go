@@ -42,7 +42,7 @@ func TestFuse(t *testing.T) {
 	defer umount(dir)
 
 	go func() {
-		err := c.Serve(testFS{})
+		err := Serve(c, testFS{})
 		if err != nil {
 			fmt.Printf("SERVE ERROR: %v\n", err)
 		}
