@@ -350,15 +350,26 @@ func (c *serveConn) dropHandle(id HandleID) {
 	c.meta.Unlock()
 }
 
+// Returns nil for invalid handles.
+func (c *serveConn) getHandle(id HandleID) (shandle *serveHandle) {
+	c.meta.Lock()
+	defer c.meta.Unlock()
+	if id < HandleID(len(c.handle)) {
+		shandle = c.handle[uint(id)]
+	}
+	if shandle == nil {
+		println("missing handle", id, len(c.handle), shandle)
+	}
+	return
+}
+
 func (c *serveConn) serve(fs FS, r Request) {
 	intr := make(Intr)
 	req := &serveRequest{Request: r, Intr: intr}
 
 	Debugf("<- %s", req)
 	var node Node
-	var handle Handle
 	var snode *serveNode
-	var shandle *serveHandle
 	c.meta.Lock()
 	hdr := r.Hdr()
 	if id := hdr.Node; id != 0 {
@@ -373,19 +384,6 @@ func (c *serveConn) serve(fs FS, r Request) {
 			return
 		}
 		node = snode.node
-	}
-	if id := r.handle(); id != 0 {
-		if id < HandleID(len(c.handle)) {
-			shandle = c.handle[uint(id)]
-		}
-		if shandle == nil {
-			println("missing handle", id, len(c.handle), shandle)
-			c.meta.Unlock()
-			Debugf("-> %#x %v", hdr.ID, ESTALE)
-			r.RespondError(ESTALE)
-			return
-		}
-		handle = shandle.handle
 	}
 	if c.req[hdr.ID] != nil {
 		// This happens with OSXFUSE.  Assume it's okay and
@@ -494,7 +492,13 @@ func (c *serveConn) serve(fs FS, r Request) {
 				c.meta.Unlock()
 			case SetattrHandle | SetattrSize:
 				// Seen on OS X; the Handle is provided.
-				if _, ok := handle.(writeAll); ok {
+				shandle := c.getHandle(r.Handle)
+				if shandle == nil {
+					Debugf("-> %#x %v", hdr.ID, ESTALE)
+					r.RespondError(ESTALE)
+					return
+				}
+				if _, ok := shandle.handle.(writeAll); ok {
 					shandle.trunc = true
 				}
 			}
@@ -736,6 +740,14 @@ func (c *serveConn) serve(fs FS, r Request) {
 
 	// Handle operations.
 	case *ReadRequest:
+		shandle := c.getHandle(r.Handle)
+		if shandle == nil {
+			Debugf("-> %#x %v", hdr.ID, ESTALE)
+			r.RespondError(ESTALE)
+			return
+		}
+		handle := shandle.handle
+
 		s := &ReadResponse{Data: make([]byte, 0, r.Size)}
 		if r.Dir {
 			if h, ok := handle.(interface {
@@ -802,6 +814,13 @@ func (c *serveConn) serve(fs FS, r Request) {
 		r.Respond(s)
 
 	case *WriteRequest:
+		shandle := c.getHandle(r.Handle)
+		if shandle == nil {
+			Debugf("-> %#x %v", hdr.ID, ESTALE)
+			r.RespondError(ESTALE)
+			return
+		}
+
 		s := &WriteResponse{}
 		if shandle.trunc && r.Offset == int64(len(shandle.writeData)) {
 			shandle.writeData = append(shandle.writeData, r.Data...)
@@ -810,7 +829,7 @@ func (c *serveConn) serve(fs FS, r Request) {
 			r.Respond(s)
 			break
 		}
-		if h, ok := handle.(interface {
+		if h, ok := shandle.handle.(interface {
 			Write(*WriteRequest, *WriteResponse, Intr) Error
 		}); ok {
 			if err := h.Write(r, s, intr); err != nil {
@@ -827,6 +846,14 @@ func (c *serveConn) serve(fs FS, r Request) {
 		r.RespondError(EIO)
 
 	case *FlushRequest:
+		shandle := c.getHandle(r.Handle)
+		if shandle == nil {
+			Debugf("-> %#x %v", hdr.ID, ESTALE)
+			r.RespondError(ESTALE)
+			return
+		}
+		handle := shandle.handle
+
 		if shandle.trunc {
 			h := handle.(interface {
 				WriteAll([]byte, Intr) Error
@@ -852,8 +879,17 @@ func (c *serveConn) serve(fs FS, r Request) {
 		r.Respond()
 
 	case *ReleaseRequest:
+		shandle := c.getHandle(r.Handle)
+		if shandle == nil {
+			Debugf("-> %#x %v", hdr.ID, ESTALE)
+			r.RespondError(ESTALE)
+			return
+		}
+		handle := shandle.handle
+
 		// No matter what, release the handle.
-		c.dropHandle(r.handle())
+		c.dropHandle(r.Handle)
+
 		if h, ok := handle.(interface {
 			Release(*ReleaseRequest, Intr) Error
 		}); ok {

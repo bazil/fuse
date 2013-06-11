@@ -127,9 +127,6 @@ type Request interface {
 	RespondError(Error)
 
 	String() string
-
-	// handle returns the HandleID for the request, or 0.
-	handle() HandleID
 }
 
 // A RequestID identifies an active FUSE request.
@@ -163,10 +160,6 @@ func (h *Header) String() string {
 
 func (h *Header) Hdr() *Header {
 	return h
-}
-
-func (h *Header) handle() HandleID {
-	return 0
 }
 
 // An Error is a FUSE error.
@@ -1213,10 +1206,6 @@ type ReadRequest struct {
 	Size   int
 }
 
-func (r *ReadRequest) handle() HandleID {
-	return r.Handle
-}
-
 func (r *ReadRequest) String() string {
 	return fmt.Sprintf("Read [%s] %#x %d @%#x dir=%v", &r.Header, r.Handle, r.Size, r.Offset, r.Dir)
 }
@@ -1244,10 +1233,6 @@ type ReleaseRequest struct {
 	Flags        uint32 // flags from OpenRequest
 	ReleaseFlags ReleaseFlags
 	LockOwner    uint32
-}
-
-func (r *ReleaseRequest) handle() HandleID {
-	return r.Handle
 }
 
 func (r *ReleaseRequest) String() string {
@@ -1396,10 +1381,6 @@ func (r *WriteRequest) Respond(resp *WriteResponse) {
 	r.Conn.respond(&out.outHeader, unsafe.Sizeof(*out))
 }
 
-func (r *WriteRequest) handle() HandleID {
-	return r.Handle
-}
-
 // A WriteResponse replies to a write indicating how many bytes were written.
 type WriteResponse struct {
 	Size int
@@ -1470,13 +1451,6 @@ func (r *SetattrRequest) String() string {
 	return buf.String()
 }
 
-func (r *SetattrRequest) handle() HandleID {
-	if r.Valid.Handle() {
-		return r.Handle
-	}
-	return 0
-}
-
 // Respond replies to the request with the given response,
 // giving the updated attributes.
 func (r *SetattrRequest) Respond(resp *SetattrResponse) {
@@ -1513,10 +1487,6 @@ func (r *FlushRequest) String() string {
 	return fmt.Sprintf("Flush [%s] %#x fl=%#x lk=%#x", &r.Header, r.Handle, r.Flags, r.LockOwner)
 }
 
-func (r *FlushRequest) handle() HandleID {
-	return r.Handle
-}
-
 // Respond replies to the request, indicating that the flush succeeded.
 func (r *FlushRequest) Respond() {
 	out := &outHeader{Unique: uint64(r.ID)}
@@ -1550,10 +1520,6 @@ func (r *SymlinkRequest) String() string {
 	return fmt.Sprintf("Symlink [%s] from %q to target %q", &r.Header, r.NewName, r.Target)
 }
 
-func (r *SymlinkRequest) handle() HandleID {
-	return 0
-}
-
 // Respond replies to the request, indicating that the symlink was created.
 func (r *SymlinkRequest) Respond(resp *SymlinkResponse) {
 	out := &entryOut{
@@ -1581,10 +1547,6 @@ type ReadlinkRequest struct {
 
 func (r *ReadlinkRequest) String() string {
 	return fmt.Sprintf("Readlink [%s]", &r.Header)
-}
-
-func (r *ReadlinkRequest) handle() HandleID {
-	return 0
 }
 
 func (r *ReadlinkRequest) Respond(target string) {
@@ -1618,10 +1580,6 @@ type RenameRequest struct {
 	Header
 	NewDir           NodeID
 	OldName, NewName string
-}
-
-func (r *RenameRequest) handle() HandleID {
-	return 0
 }
 
 func (r *RenameRequest) String() string {
@@ -1698,10 +1656,6 @@ type XXXRequest struct {
 
 func (r *XXXRequest) String() string {
 	return fmt.Sprintf("XXX [%s] xxx", &r.Header)
-}
-
-func (r *XXXRequest) handle() HandleID {
-	return r.Handle
 }
 
 // Respond replies to the request with the given response.

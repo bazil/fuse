@@ -82,7 +82,7 @@ const (
 	SetattrSize   SetattrValid = 1 << 3
 	SetattrAtime  SetattrValid = 1 << 4
 	SetattrMtime  SetattrValid = 1 << 5
-	SetattrHandle SetattrValid = 1 << 6 // TODO: What does this mean?
+	SetattrHandle SetattrValid = 1 << 6
 
 	// Linux only(?)
 	SetattrAtimeNow  SetattrValid = 1 << 7
