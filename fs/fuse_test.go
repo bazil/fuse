@@ -19,6 +19,7 @@ import (
 
 import (
 	"bazil.org/fuse"
+	"bazil.org/fuse/fuseutil"
 )
 
 var fuseRun = flag.String("fuserun", "", "which fuse test to run. runs all if empty.")
@@ -218,7 +219,7 @@ func (readAll) test(path string, t *testing.T) {
 type readAll1 struct{ file }
 
 func (readAll1) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, intr Intr) fuse.Error {
-	HandleRead(req, resp, []byte(hi))
+	fuseutil.HandleRead(req, resp, []byte(hi))
 	return nil
 }
 
@@ -761,7 +762,7 @@ type interrupt struct {
 
 func (it *interrupt) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, intr Intr) fuse.Error {
 	if it.hanging == nil {
-		HandleRead(req, resp, []byte("don't read this outside of the test"))
+		fuseutil.HandleRead(req, resp, []byte("don't read this outside of the test"))
 		return nil
 	}
 

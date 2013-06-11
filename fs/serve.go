@@ -19,6 +19,7 @@ import (
 
 import (
 	"bazil.org/fuse"
+	"bazil.org/fuse/fuseutil"
 )
 
 // TODO: FINISH DOCS
@@ -773,7 +774,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 					}
 					shandle.readData = data
 				}
-				HandleRead(r, s, shandle.readData)
+				fuseutil.HandleRead(r, s, shandle.readData)
 				done(s)
 				r.Respond(s)
 				break
@@ -794,7 +795,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 					}
 					shandle.readData = data
 				}
-				HandleRead(r, s, shandle.readData)
+				fuseutil.HandleRead(r, s, shandle.readData)
 				done(s)
 				r.Respond(s)
 				break
@@ -1028,21 +1029,6 @@ func (c *serveConn) saveLookup(s *fuse.LookupResponse, snode *serveNode, elem st
 		s.AttrValid = 1 * time.Minute
 	}
 	s.Attr = sn.attr()
-}
-
-// HandleRead handles a read request assuming that data is the entire file content.
-// It adjusts the amount returned in resp according to req.Offset and req.Size.
-func HandleRead(req *fuse.ReadRequest, resp *fuse.ReadResponse, data []byte) {
-	if req.Offset >= int64(len(data)) {
-		data = nil
-	} else {
-		data = data[req.Offset:]
-	}
-	if len(data) > req.Size {
-		data = data[:req.Size]
-	}
-	n := copy(resp.Data[:req.Size], data)
-	resp.Data = resp.Data[:n]
 }
 
 // DataHandle returns a read-only Handle that satisfies reads
