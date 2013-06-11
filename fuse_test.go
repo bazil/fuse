@@ -27,6 +27,42 @@ func umount(dir string) {
 	}
 }
 
+type badRootFS struct{}
+
+func (badRootFS) Root() (Node, Error) {
+	// pick a really distinct error, to identify it later
+	return nil, Errno(syscall.EUCLEAN)
+}
+
+func TestRootErr(t *testing.T) {
+	Debugf = log.Printf
+	dir, err := ioutil.TempDir("", "fusetest")
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.MkdirAll(dir, 0777)
+
+	c, err := Mount(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer umount(dir)
+
+	ch := make(chan error, 1)
+	go func() {
+		ch <- Serve(c, badRootFS{})
+	}()
+
+	select {
+	case err := <-ch:
+		if err.Error() != "cannot obtain root node: structure needs cleaning" {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	case <-time.After(1 * time.Second):
+		t.Fatal("Serve did not return an error as expected, aborting")
+	}
+}
+
 func TestFuse(t *testing.T) {
 	Debugf = log.Printf
 	dir, err := ioutil.TempDir("", "fusetest")
