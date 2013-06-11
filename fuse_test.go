@@ -134,6 +134,11 @@ var fuseTests = []struct {
 	{"mknod1", &mknod1{}},
 	{"dataHandle", dataHandleTest{}},
 	{"interrupt", &interrupt{}},
+	{"truncate42", &truncate{toSize: 42}},
+	{"truncate0", &truncate{toSize: 0}},
+	{"ftruncate42", &ftruncate{toSize: 42}},
+	{"ftruncate0", &ftruncate{toSize: 0}},
+	{"truncateWithOpen", &truncateWithOpen{}},
 }
 
 // TO TEST:
@@ -810,4 +815,127 @@ func (it *interrupt) test(path string, t *testing.T) {
 	default:
 		t.Logf("interrupt: this platform has no test coverage")
 	}
+}
+
+// Test truncate
+
+type truncate struct {
+	toSize int64
+
+	file
+	gotr *SetattrRequest
+}
+
+// present purely to trigger bugs in WriteAll logic
+func (*truncate) WriteAll(data []byte, intr Intr) Error {
+	return nil
+}
+
+func (f *truncate) Setattr(req *SetattrRequest, resp *SetattrResponse, intr Intr) Error {
+	f.gotr = req
+	return nil
+}
+
+func (f *truncate) test(path string, t *testing.T) {
+	err := os.Truncate(path, f.toSize)
+	if err != nil {
+		t.Fatalf("Truncate: %v", err)
+	}
+	if f.gotr == nil {
+		t.Fatalf("no recorded SetattrRequest")
+	}
+	if g, e := f.gotr.Size, uint64(f.toSize); g != e {
+		t.Errorf("got Size = %q; want %q", g, e)
+	}
+	if g, e := f.gotr.Valid&^SetattrLockOwner, SetattrSize; g != e {
+		t.Errorf("got Valid = %q; want %q", g, e)
+	}
+	t.Logf("Got request: %#v", f.gotr)
+}
+
+// Test ftruncate
+
+type ftruncate struct {
+	toSize int64
+
+	file
+	gotr *SetattrRequest
+}
+
+// present purely to trigger bugs in WriteAll logic
+func (*ftruncate) WriteAll(data []byte, intr Intr) Error {
+	return nil
+}
+
+func (f *ftruncate) Setattr(req *SetattrRequest, resp *SetattrResponse, intr Intr) Error {
+	f.gotr = req
+	return nil
+}
+
+func (f *ftruncate) test(path string, t *testing.T) {
+	{
+		fil, err := os.OpenFile(path, os.O_WRONLY, 0666)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		defer fil.Close()
+
+		err = fil.Truncate(f.toSize)
+		if err != nil {
+			t.Fatalf("Ftruncate: %v", err)
+		}
+	}
+	if f.gotr == nil {
+		t.Fatalf("no recorded SetattrRequest")
+	}
+	if g, e := f.gotr.Size, uint64(f.toSize); g != e {
+		t.Errorf("got Size = %q; want %q", g, e)
+	}
+	if g, e := f.gotr.Valid&^SetattrLockOwner, SetattrHandle|SetattrSize; g != e {
+		t.Errorf("got Valid = %q; want %q", g, e)
+	}
+	t.Logf("Got request: %#v", f.gotr)
+}
+
+// Test opening existing file truncates
+
+type truncateWithOpen struct {
+	file
+	gotr *SetattrRequest
+}
+
+// present purely to trigger bugs in WriteAll logic
+func (*truncateWithOpen) WriteAll(data []byte, intr Intr) Error {
+	return nil
+}
+
+func (f *truncateWithOpen) Setattr(req *SetattrRequest, resp *SetattrResponse, intr Intr) Error {
+	f.gotr = req
+	return nil
+}
+
+func (f *truncateWithOpen) test(path string, t *testing.T) {
+	{
+		fil, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC, 0666)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		fil.Close()
+
+		if err != nil {
+			t.Fatalf("TruncateWithOpen: %v", err)
+		}
+	}
+	if f.gotr == nil {
+		t.Fatalf("no recorded SetattrRequest")
+	}
+	if g, e := f.gotr.Size, uint64(0); g != e {
+		t.Errorf("got Size = %q; want %q", g, e)
+	}
+	if g, e := f.gotr.Valid&^SetattrLockOwner, SetattrSize; g != e {
+		t.Errorf("got Valid = %q; want %q", g, e)
+	}
+	t.Logf("Got request: %#v", f.gotr)
 }

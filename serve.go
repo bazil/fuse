@@ -469,6 +469,9 @@ func (c *serveConn) serve(fs FS, r Request) {
 
 		// Special-case truncation, if no other bits are set
 		// and the open Handles all have a WriteAll method.
+		//
+		// TODO WriteAll mishandles all kinds of cases, e.g.
+		// truncating to non-zero size, noncontiguous writes, etc
 		if r.Valid&SetattrSize != 0 && r.Size == 0 {
 			type writeAll interface {
 				WriteAll([]byte, Intr) Error
@@ -477,10 +480,15 @@ func (c *serveConn) serve(fs FS, r Request) {
 			case SetattrLockOwner | SetattrSize, SetattrSize:
 				// Seen on Linux. Handle isn't set.
 				c.meta.Lock()
-				for hid := range c.nodeHandles[hdr.Node] {
-					shandle := c.handle[hid]
-					if _, ok := shandle.handle.(writeAll); ok {
-						shandle.trunc = true
+				// it is not safe to assume any handles are open for
+				// this node; calls to truncate(2) can happen at any
+				// time
+				if len(c.nodeHandles) > int(hdr.Node) {
+					for hid := range c.nodeHandles[hdr.Node] {
+						shandle := c.handle[hid]
+						if _, ok := shandle.handle.(writeAll); ok {
+							shandle.trunc = true
+						}
 					}
 				}
 				c.meta.Unlock()
