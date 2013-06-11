@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package fuse
+package fs
 
 import (
 	"flag"
@@ -17,6 +17,10 @@ import (
 	"time"
 )
 
+import (
+	"bazil.org/fuse"
+)
+
 var fuseRun = flag.String("fuserun", "", "which fuse test to run. runs all if empty.")
 
 // umount tries its best to unmount dir.
@@ -29,20 +33,20 @@ func umount(dir string) {
 
 type badRootFS struct{}
 
-func (badRootFS) Root() (Node, Error) {
+func (badRootFS) Root() (Node, fuse.Error) {
 	// pick a really distinct error, to identify it later
-	return nil, Errno(syscall.EUCLEAN)
+	return nil, fuse.Errno(syscall.EUCLEAN)
 }
 
 func TestRootErr(t *testing.T) {
-	Debugf = log.Printf
+	fuse.Debugf = log.Printf
 	dir, err := ioutil.TempDir("", "fusetest")
 	if err != nil {
 		t.Fatal(err)
 	}
 	os.MkdirAll(dir, 0777)
 
-	c, err := Mount(dir)
+	c, err := fuse.Mount(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,14 +68,14 @@ func TestRootErr(t *testing.T) {
 }
 
 func TestFuse(t *testing.T) {
-	Debugf = log.Printf
+	fuse.Debugf = log.Printf
 	dir, err := ioutil.TempDir("", "fusetest")
 	if err != nil {
 		t.Fatal(err)
 	}
 	os.MkdirAll(dir, 0777)
 
-	c, err := Mount(dir)
+	c, err := fuse.Mount(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +198,7 @@ type readAll struct{ file }
 
 const hi = "hello, world"
 
-func (readAll) ReadAll(intr Intr) ([]byte, Error) {
+func (readAll) ReadAll(intr Intr) ([]byte, fuse.Error) {
 	return []byte(hi), nil
 }
 
@@ -213,7 +217,7 @@ func (readAll) test(path string, t *testing.T) {
 
 type readAll1 struct{ file }
 
-func (readAll1) Read(req *ReadRequest, resp *ReadResponse, intr Intr) Error {
+func (readAll1) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, intr Intr) fuse.Error {
 	HandleRead(req, resp, []byte(hi))
 	return nil
 }
@@ -230,13 +234,13 @@ type write struct {
 	gotfsync bool
 }
 
-func (w *write) Write(req *WriteRequest, resp *WriteResponse, intr Intr) Error {
+func (w *write) Write(req *fuse.WriteRequest, resp *fuse.WriteResponse, intr Intr) fuse.Error {
 	w.data = append(w.data, req.Data...)
 	resp.Size = len(req.Data)
 	return nil
 }
 
-func (w *write) Fsync(r *FsyncRequest, intr Intr) Error {
+func (w *write) Fsync(r *fuse.FsyncRequest, intr Intr) fuse.Error {
 	w.gotfsync = true
 	return nil
 }
@@ -283,12 +287,12 @@ type writeAll struct {
 	gotfsync bool
 }
 
-func (w *writeAll) Fsync(r *FsyncRequest, intr Intr) Error {
+func (w *writeAll) Fsync(r *fuse.FsyncRequest, intr Intr) fuse.Error {
 	w.gotfsync = true
 	return nil
 }
 
-func (w *writeAll) WriteAll(data []byte, intr Intr) Error {
+func (w *writeAll) WriteAll(data []byte, intr Intr) fuse.Error {
 	w.data = data
 	return nil
 }
@@ -313,17 +317,17 @@ type writeAll2 struct {
 	flush   bool
 }
 
-func (w *writeAll2) Setattr(req *SetattrRequest, resp *SetattrResponse, intr Intr) Error {
+func (w *writeAll2) Setattr(req *fuse.SetattrRequest, resp *fuse.SetattrResponse, intr Intr) fuse.Error {
 	w.setattr = true
 	return nil
 }
 
-func (w *writeAll2) Flush(req *FlushRequest, intr Intr) Error {
+func (w *writeAll2) Flush(req *fuse.FlushRequest, intr Intr) fuse.Error {
 	w.flush = true
 	return nil
 }
 
-func (w *writeAll2) Write(req *WriteRequest, resp *WriteResponse, intr Intr) Error {
+func (w *writeAll2) Write(req *fuse.WriteRequest, resp *fuse.WriteResponse, intr Intr) fuse.Error {
 	w.data = append(w.data, req.Data...)
 	resp.Size = len(req.Data)
 	return nil
@@ -347,7 +351,7 @@ type mkdir1 struct {
 	name string
 }
 
-func (f *mkdir1) Mkdir(req *MkdirRequest, intr Intr) (Node, Error) {
+func (f *mkdir1) Mkdir(req *fuse.MkdirRequest, intr Intr) (Node, fuse.Error) {
 	f.name = req.Name
 	return &mkdir1{}, nil
 }
@@ -373,7 +377,7 @@ type create1 struct {
 	f    *writeAll
 }
 
-func (f *create1) Create(req *CreateRequest, resp *CreateResponse, intr Intr) (Node, Handle, Error) {
+func (f *create1) Create(req *fuse.CreateRequest, resp *fuse.CreateResponse, intr Intr) (Node, Handle, fuse.Error) {
 	f.name = req.Name
 	f.f = &writeAll{}
 	return f.f, f.f, nil
@@ -411,25 +415,25 @@ type create2 struct {
 	fooExists bool
 }
 
-func (f *create2) Create(req *CreateRequest, resp *CreateResponse, intr Intr) (Node, Handle, Error) {
+func (f *create2) Create(req *fuse.CreateRequest, resp *fuse.CreateResponse, intr Intr) (Node, Handle, fuse.Error) {
 	f.name = req.Name
 	f.f = &writeAll{}
 	return f.f, f.f, nil
 }
 
-func (f *create2) Lookup(name string, intr Intr) (Node, Error) {
+func (f *create2) Lookup(name string, intr Intr) (Node, fuse.Error) {
 	if f.fooExists && name == "foo" {
 		return file{}, nil
 	}
-	return nil, ENOENT
+	return nil, fuse.ENOENT
 }
 
-func (f *create2) Remove(r *RemoveRequest, intr Intr) Error {
+func (f *create2) Remove(r *fuse.RemoveRequest, intr Intr) fuse.Error {
 	if f.fooExists && r.Name == "foo" && !r.Dir {
 		f.fooExists = false
 		return nil
 	}
-	return ENOENT
+	return fuse.ENOENT
 }
 
 func (f *create2) test(path string, t *testing.T) {
@@ -463,25 +467,25 @@ type create3 struct {
 	fooExists bool
 }
 
-func (f *create3) Create(req *CreateRequest, resp *CreateResponse, intr Intr) (Node, Handle, Error) {
+func (f *create3) Create(req *fuse.CreateRequest, resp *fuse.CreateResponse, intr Intr) (Node, Handle, fuse.Error) {
 	f.name = req.Name
 	f.f = &write{}
 	return f.f, f.f, nil
 }
 
-func (f *create3) Lookup(name string, intr Intr) (Node, Error) {
+func (f *create3) Lookup(name string, intr Intr) (Node, fuse.Error) {
 	if f.fooExists && name == "foo" {
 		return file{}, nil
 	}
-	return nil, ENOENT
+	return nil, fuse.ENOENT
 }
 
-func (f *create3) Remove(r *RemoveRequest, intr Intr) Error {
+func (f *create3) Remove(r *fuse.RemoveRequest, intr Intr) fuse.Error {
 	if f.fooExists && r.Name == "foo" && !r.Dir {
 		f.fooExists = false
 		return nil
 	}
-	return ENOENT
+	return fuse.ENOENT
 }
 
 func (f *create3) test(path string, t *testing.T) {
@@ -513,7 +517,7 @@ type symlink1 struct {
 	newName, target string
 }
 
-func (f *symlink1) Symlink(req *SymlinkRequest, intr Intr) (Node, Error) {
+func (f *symlink1) Symlink(req *fuse.SymlinkRequest, intr Intr) (Node, fuse.Error) {
 	f.newName = req.NewName
 	f.target = req.Target
 	return symlink{target: req.Target}, nil
@@ -552,14 +556,14 @@ type link1 struct {
 	newName string
 }
 
-func (f *link1) Lookup(name string, intr Intr) (Node, Error) {
+func (f *link1) Lookup(name string, intr Intr) (Node, fuse.Error) {
 	if name == "old" {
 		return file{}, nil
 	}
-	return nil, ENOENT
+	return nil, fuse.ENOENT
 }
 
-func (f *link1) Link(r *LinkRequest, old Node, intr Intr) (Node, Error) {
+func (f *link1) Link(r *fuse.LinkRequest, old Node, intr Intr) (Node, fuse.Error) {
 	f.newName = r.NewName
 	return file{}, nil
 }
@@ -581,19 +585,19 @@ type rename1 struct {
 	renames int
 }
 
-func (f *rename1) Lookup(name string, intr Intr) (Node, Error) {
+func (f *rename1) Lookup(name string, intr Intr) (Node, fuse.Error) {
 	if name == "old" {
 		return file{}, nil
 	}
-	return nil, ENOENT
+	return nil, fuse.ENOENT
 }
 
-func (f *rename1) Rename(r *RenameRequest, newDir Node, intr Intr) Error {
+func (f *rename1) Rename(r *fuse.RenameRequest, newDir Node, intr Intr) fuse.Error {
 	if r.OldName == "old" && r.NewName == "new" && newDir == f {
 		f.renames++
 		return nil
 	}
-	return EIO
+	return fuse.EIO
 }
 
 func (f *rename1) test(path string, t *testing.T) {
@@ -617,7 +621,7 @@ type release struct {
 	did bool
 }
 
-func (r *release) Release(*ReleaseRequest, Intr) Error {
+func (r *release) Release(*fuse.ReleaseRequest, Intr) fuse.Error {
 	r.did = true
 	return nil
 }
@@ -640,10 +644,10 @@ func (r *release) test(path string, t *testing.T) {
 
 type mknod1 struct {
 	dir
-	gotr *MknodRequest
+	gotr *fuse.MknodRequest
 }
 
-func (f *mknod1) Mknod(r *MknodRequest, intr Intr) (Node, Error) {
+func (f *mknod1) Mknod(r *fuse.MknodRequest, intr Intr) (Node, fuse.Error) {
 	f.gotr = r
 	return fifo{}, nil
 }
@@ -686,40 +690,40 @@ type symlink struct {
 	target string
 }
 
-func (f file) Attr() Attr    { return Attr{Mode: 0666} }
-func (f dir) Attr() Attr     { return Attr{Mode: os.ModeDir | 0777} }
-func (f fifo) Attr() Attr    { return Attr{Mode: os.ModeNamedPipe | 0666} }
-func (f symlink) Attr() Attr { return Attr{Mode: os.ModeSymlink | 0666} }
+func (f file) Attr() fuse.Attr    { return fuse.Attr{Mode: 0666} }
+func (f dir) Attr() fuse.Attr     { return fuse.Attr{Mode: os.ModeDir | 0777} }
+func (f fifo) Attr() fuse.Attr    { return fuse.Attr{Mode: os.ModeNamedPipe | 0666} }
+func (f symlink) Attr() fuse.Attr { return fuse.Attr{Mode: os.ModeSymlink | 0666} }
 
-func (f symlink) Readlink(*ReadlinkRequest, Intr) (string, Error) {
+func (f symlink) Readlink(*fuse.ReadlinkRequest, Intr) (string, fuse.Error) {
 	return f.target, nil
 }
 
 type testFS struct{}
 
-func (testFS) Root() (Node, Error) {
+func (testFS) Root() (Node, fuse.Error) {
 	return testFS{}, nil
 }
 
-func (testFS) Attr() Attr {
-	return Attr{Inode: 1, Mode: os.ModeDir | 0555}
+func (testFS) Attr() fuse.Attr {
+	return fuse.Attr{Inode: 1, Mode: os.ModeDir | 0555}
 }
 
-func (testFS) Lookup(name string, intr Intr) (Node, Error) {
+func (testFS) Lookup(name string, intr Intr) (Node, fuse.Error) {
 	for _, tt := range fuseTests {
 		if tt.name == name {
 			return tt.node, nil
 		}
 	}
-	return nil, ENOENT
+	return nil, fuse.ENOENT
 }
 
-func (testFS) ReadDir(intr Intr) ([]Dirent, Error) {
-	var dirs []Dirent
+func (testFS) ReadDir(intr Intr) ([]fuse.Dirent, fuse.Error) {
+	var dirs []fuse.Dirent
 	for _, tt := range fuseTests {
 		if *fuseRun == "" || *fuseRun == tt.name {
 			log.Printf("Readdir; adding %q", tt.name)
-			dirs = append(dirs, Dirent{Name: tt.name})
+			dirs = append(dirs, fuse.Dirent{Name: tt.name})
 		}
 	}
 	return dirs, nil
@@ -731,7 +735,7 @@ type dataHandleTest struct {
 	file
 }
 
-func (dataHandleTest) Open(*OpenRequest, *OpenResponse, Intr) (Handle, Error) {
+func (dataHandleTest) Open(*fuse.OpenRequest, *fuse.OpenResponse, Intr) (Handle, fuse.Error) {
 	return DataHandle([]byte(hi)), nil
 }
 
@@ -755,7 +759,7 @@ type interrupt struct {
 	hanging chan struct{}
 }
 
-func (it *interrupt) Read(req *ReadRequest, resp *ReadResponse, intr Intr) Error {
+func (it *interrupt) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, intr Intr) fuse.Error {
 	if it.hanging == nil {
 		HandleRead(req, resp, []byte("don't read this outside of the test"))
 		return nil
@@ -763,7 +767,7 @@ func (it *interrupt) Read(req *ReadRequest, resp *ReadResponse, intr Intr) Error
 
 	close(it.hanging)
 	<-intr
-	return Errno(syscall.EINTR)
+	return fuse.Errno(syscall.EINTR)
 }
 
 func (it *interrupt) test(path string, t *testing.T) {
@@ -823,15 +827,15 @@ type truncate struct {
 	toSize int64
 
 	file
-	gotr *SetattrRequest
+	gotr *fuse.SetattrRequest
 }
 
 // present purely to trigger bugs in WriteAll logic
-func (*truncate) WriteAll(data []byte, intr Intr) Error {
+func (*truncate) WriteAll(data []byte, intr Intr) fuse.Error {
 	return nil
 }
 
-func (f *truncate) Setattr(req *SetattrRequest, resp *SetattrResponse, intr Intr) Error {
+func (f *truncate) Setattr(req *fuse.SetattrRequest, resp *fuse.SetattrResponse, intr Intr) fuse.Error {
 	f.gotr = req
 	return nil
 }
@@ -847,7 +851,7 @@ func (f *truncate) test(path string, t *testing.T) {
 	if g, e := f.gotr.Size, uint64(f.toSize); g != e {
 		t.Errorf("got Size = %q; want %q", g, e)
 	}
-	if g, e := f.gotr.Valid&^SetattrLockOwner, SetattrSize; g != e {
+	if g, e := f.gotr.Valid&^fuse.SetattrLockOwner, fuse.SetattrSize; g != e {
 		t.Errorf("got Valid = %q; want %q", g, e)
 	}
 	t.Logf("Got request: %#v", f.gotr)
@@ -859,15 +863,15 @@ type ftruncate struct {
 	toSize int64
 
 	file
-	gotr *SetattrRequest
+	gotr *fuse.SetattrRequest
 }
 
 // present purely to trigger bugs in WriteAll logic
-func (*ftruncate) WriteAll(data []byte, intr Intr) Error {
+func (*ftruncate) WriteAll(data []byte, intr Intr) fuse.Error {
 	return nil
 }
 
-func (f *ftruncate) Setattr(req *SetattrRequest, resp *SetattrResponse, intr Intr) Error {
+func (f *ftruncate) Setattr(req *fuse.SetattrRequest, resp *fuse.SetattrResponse, intr Intr) fuse.Error {
 	f.gotr = req
 	return nil
 }
@@ -892,7 +896,7 @@ func (f *ftruncate) test(path string, t *testing.T) {
 	if g, e := f.gotr.Size, uint64(f.toSize); g != e {
 		t.Errorf("got Size = %q; want %q", g, e)
 	}
-	if g, e := f.gotr.Valid&^SetattrLockOwner, SetattrHandle|SetattrSize; g != e {
+	if g, e := f.gotr.Valid&^fuse.SetattrLockOwner, fuse.SetattrHandle|fuse.SetattrSize; g != e {
 		t.Errorf("got Valid = %q; want %q", g, e)
 	}
 	t.Logf("Got request: %#v", f.gotr)
@@ -902,15 +906,15 @@ func (f *ftruncate) test(path string, t *testing.T) {
 
 type truncateWithOpen struct {
 	file
-	gotr *SetattrRequest
+	gotr *fuse.SetattrRequest
 }
 
 // present purely to trigger bugs in WriteAll logic
-func (*truncateWithOpen) WriteAll(data []byte, intr Intr) Error {
+func (*truncateWithOpen) WriteAll(data []byte, intr Intr) fuse.Error {
 	return nil
 }
 
-func (f *truncateWithOpen) Setattr(req *SetattrRequest, resp *SetattrResponse, intr Intr) Error {
+func (f *truncateWithOpen) Setattr(req *fuse.SetattrRequest, resp *fuse.SetattrResponse, intr Intr) fuse.Error {
 	f.gotr = req
 	return nil
 }
@@ -934,7 +938,7 @@ func (f *truncateWithOpen) test(path string, t *testing.T) {
 	if g, e := f.gotr.Size, uint64(0); g != e {
 		t.Errorf("got Size = %q; want %q", g, e)
 	}
-	if g, e := f.gotr.Valid&^SetattrLockOwner, SetattrSize; g != e {
+	if g, e := f.gotr.Valid&^fuse.SetattrLockOwner, fuse.SetattrSize; g != e {
 		t.Errorf("got Valid = %q; want %q", g, e)
 	}
 	t.Logf("Got request: %#v", f.gotr)

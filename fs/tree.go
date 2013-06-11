@@ -4,7 +4,7 @@
 
 // FUSE directory tree, for servers that wish to use it with the service loop.
 
-package fuse
+package fs
 
 import (
 	"os"
@@ -12,12 +12,16 @@ import (
 	"strings"
 )
 
+import (
+	"bazil.org/fuse"
+)
+
 // A Tree implements a basic directory tree for FUSE.
 type Tree struct {
 	tree
 }
 
-func (t *Tree) Root() (Node, Error) {
+func (t *Tree) Root() (Node, fuse.Error) {
 	return &t.tree, nil
 }
 
@@ -72,22 +76,22 @@ func (t *tree) add(name string, n Node) {
 	t.dir = append(t.dir, treeDir{name, n})
 }
 
-func (t *tree) Attr() Attr {
-	return Attr{Mode: os.ModeDir | 0555}
+func (t *tree) Attr() fuse.Attr {
+	return fuse.Attr{Mode: os.ModeDir | 0555}
 }
 
-func (t *tree) Lookup(name string, intr Intr) (Node, Error) {
+func (t *tree) Lookup(name string, intr Intr) (Node, fuse.Error) {
 	n := t.lookup(name)
 	if n != nil {
 		return n, nil
 	}
-	return nil, ENOENT
+	return nil, fuse.ENOENT
 }
 
-func (t *tree) ReadDir(intr Intr) ([]Dirent, Error) {
-	var out []Dirent
+func (t *tree) ReadDir(intr Intr) ([]fuse.Dirent, fuse.Error) {
+	var out []fuse.Dirent
 	for _, d := range t.dir {
-		out = append(out, Dirent{Name: d.name})
+		out = append(out, fuse.Dirent{Name: d.name})
 	}
 	return out, nil
 }

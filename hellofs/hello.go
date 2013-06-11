@@ -12,6 +12,7 @@ import (
 	"os"
 
 	"bazil.org/fuse"
+	"bazil.org/fuse/fs"
 )
 
 var Usage = func() {
@@ -35,13 +36,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	c.Serve(FS{})
+	fs.Serve(c, FS{})
 }
 
 // FS implements the hello world file system.
 type FS struct{}
 
-func (FS) Root() (fuse.Node, fuse.Error) {
+func (FS) Root() (fs.Node, fuse.Error) {
 	return Dir{}, nil
 }
 
@@ -52,7 +53,7 @@ func (Dir) Attr() fuse.Attr {
 	return fuse.Attr{Inode: 1, Mode: os.ModeDir | 0555}
 }
 
-func (Dir) Lookup(name string, intr fuse.Intr) (fuse.Node, fuse.Error) {
+func (Dir) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
 	if name == "hello" {
 		return File{}, nil
 	}
@@ -63,7 +64,7 @@ var dirDirs = []fuse.Dirent{
 	{Inode: 2, Name: "hello", Type: fuse.DT_File},
 }
 
-func (Dir) ReadDir(intr fuse.Intr) ([]fuse.Dirent, fuse.Error) {
+func (Dir) ReadDir(intr fs.Intr) ([]fuse.Dirent, fuse.Error) {
 	return dirDirs, nil
 }
 
@@ -74,6 +75,6 @@ func (File) Attr() fuse.Attr {
 	return fuse.Attr{Mode: 0444}
 }
 
-func (File) ReadAll(intr fuse.Intr) ([]byte, fuse.Error) {
+func (File) ReadAll(intr fs.Intr) ([]byte, fuse.Error) {
 	return []byte("hello, world\n"), nil
 }
