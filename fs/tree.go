@@ -16,7 +16,8 @@ import (
 	"bazil.org/fuse"
 )
 
-// A Tree implements a basic directory tree for FUSE.
+// A Tree implements a basic read-only directory tree for FUSE.
+// The Nodes contained in it may still be writable.
 type Tree struct {
 	tree
 }
@@ -28,6 +29,8 @@ func (t *Tree) Root() (Node, fuse.Error) {
 // Add adds the path to the tree, resolving to the given node.
 // If path or a prefix of path has already been added to the tree,
 // Add panics.
+//
+// Add is only safe to call before starting to serve requests.
 func (t *Tree) Add(path string, node Node) {
 	path = pathpkg.Clean("/" + path)[1:]
 	elems := strings.Split(path, "/")
