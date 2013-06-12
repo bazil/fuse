@@ -33,35 +33,30 @@ func (Intr) String() string { return "fuse.Intr" }
 
 // An FS is the interface required of a file system.
 //
-//	Root() (Node, Error)
-//
-// Root is called to obtain the Node for the file system root.
-//
-// Optional Methods
-//
-// An FS implementation may implement
-// additional methods to handle the corresponding FUSE requests:
-//
-//	Init(req *InitRequest, resp *InitResponse) Error
-//
-// Init is called to initialize the FUSE connection.
-// It can inspect the request and adjust the response as desired.
-// The default response sets MaxReadahead to 0 and MaxWrite to 4096.
-// Init must return promptly.
-//
-//	Statfs(resp *StatfsResponse, intr Intr) Error
-//
-// Statfs is called to obtain file system metadata.  It should write that data to resp.
-//
-//	Rename(req *RenameRequest, intr Intr) Error
-//
-// XXXX this is not implemented like this. Instead, Rename is a method
-// on the source dierctory node, and takes a newDir Node parameter. Fix it like this?
-// Rename is called to rename the file req.OldName in the directory req.OldDir to
-// become the file req.NewName in the directory req.NewDir.
-//
+// Other FUSE requests can be handled by implementing methods from the
+// FS* interfaces, for example FSIniter.
 type FS interface {
+	// Root is called to obtain the Node for the file system root.
 	Root() (Node, fuse.Error)
+}
+
+type FSIniter interface {
+	// Init is called to initialize the FUSE connection.
+	// It can inspect the request and adjust the response as desired.
+	// The default response sets MaxReadahead to 0 and MaxWrite to 4096.
+	// Init must return promptly.
+	Init(*fuse.InitRequest, *fuse.InitResponse, Intr) fuse.Error
+}
+
+type FSStatfser interface {
+	// Statfs is called to obtain file system metadata.
+	// It should write that data to resp.
+	Statfs(*fuse.StatfsRequest, *fuse.StatfsResponse, Intr) fuse.Error
+}
+
+type FSDestroyer interface {
+	// Destroy is called when the file system is shutting down.
+	Destroy()
 }
 
 // A Node is the interface required of a file or directory.
@@ -423,9 +418,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		s := &fuse.InitResponse{
 			MaxWrite: 4096,
 		}
-		if fs, ok := fs.(interface {
-			Init(*fuse.InitRequest, *fuse.InitResponse, Intr) fuse.Error
-		}); ok {
+		if fs, ok := fs.(FSIniter); ok {
 			if err := fs.Init(r, s, intr); err != nil {
 				done(err)
 				r.RespondError(err)
@@ -437,9 +430,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 
 	case *fuse.StatfsRequest:
 		s := &fuse.StatfsResponse{}
-		if fs, ok := fs.(interface {
-			Statfs(*fuse.StatfsRequest, *fuse.StatfsResponse, Intr) fuse.Error
-		}); ok {
+		if fs, ok := fs.(FSStatfser); ok {
 			if err := fs.Statfs(r, s, intr); err != nil {
 				done(err)
 				r.RespondError(err)
@@ -908,10 +899,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		r.Respond()
 
 	case *fuse.DestroyRequest:
-		fs, ok := fs.(interface {
-			Destroy()
-		})
-		if ok {
+		if fs, ok := fs.(FSDestroyer); ok {
 			fs.Destroy()
 		}
 		done(nil)
