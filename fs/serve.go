@@ -187,25 +187,13 @@ func nodeAttr(n Node) (attr fuse.Attr) {
 // See the documentation for type FS for general information
 // pertaining to all methods.
 //
-//	Flush
-//
-// Flush is called each time the file or directory is closed.  Because there can be
-// multiple file descriptors referring to a single opened file, Flush can be called
-// multiple times.
-//
-// Optional Methods
-//
-// A Handle implementation may implement additional methods to handle
-// the corresponding FUSE requests.  The most common to implement are
-// Read, ReadDir, and Write.
+// Other FUSE requests can be handled by implementing methods from the
+// Node* interfaces. The most common to implement are
+// HandleReader, HandleReadDirer, and HandleWriter.
 //
 //	Fsync
 //
 //	Getlk
-//
-//	Read
-//
-//	ReadDir
 //
 //	Release
 //
@@ -213,9 +201,38 @@ func nodeAttr(n Node) (attr fuse.Attr) {
 //
 //	Setlkw
 //
-//	Write
-//
 type Handle interface {
+}
+
+type HandleFlusher interface {
+	// Flush is called each time the file or directory is closed.
+	// Because there can be multiple file descriptors referring to a
+	// single opened file, Flush can be called multiple times.
+	Flush(*fuse.FlushRequest, Intr) fuse.Error
+}
+
+type HandleReadAller interface {
+	ReadAll(Intr) ([]byte, fuse.Error)
+}
+
+type HandleReadDirer interface {
+	ReadDir(Intr) ([]fuse.Dirent, fuse.Error)
+}
+
+type HandleReader interface {
+	Read(*fuse.ReadRequest, *fuse.ReadResponse, Intr) fuse.Error
+}
+
+type HandleWriteAller interface {
+	WriteAll([]byte, Intr) fuse.Error
+}
+
+type HandleWriter interface {
+	Write(*fuse.WriteRequest, *fuse.WriteResponse, Intr) fuse.Error
+}
+
+type HandleReleaser interface {
+	Release(*fuse.ReleaseRequest, Intr) fuse.Error
 }
 
 // Serve serves the FUSE connection by making calls to the methods
@@ -746,9 +763,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 
 		s := &fuse.ReadResponse{Data: make([]byte, 0, r.Size)}
 		if r.Dir {
-			if h, ok := handle.(interface {
-				ReadDir(Intr) ([]fuse.Dirent, fuse.Error)
-			}); ok {
+			if h, ok := handle.(HandleReadDirer); ok {
 				if shandle.readData == nil {
 					dirs, err := h.ReadDir(intr)
 					if err != nil {
@@ -771,9 +786,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 				break
 			}
 		} else {
-			if h, ok := handle.(interface {
-				ReadAll(Intr) ([]byte, fuse.Error)
-			}); ok {
+			if h, ok := handle.(HandleReadAller); ok {
 				if shandle.readData == nil {
 					data, err := h.ReadAll(intr)
 					if err != nil {
@@ -791,9 +804,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 				r.Respond(s)
 				break
 			}
-			h, ok := handle.(interface {
-				Read(*fuse.ReadRequest, *fuse.ReadResponse, Intr) fuse.Error
-			})
+			h, ok := handle.(HandleReader)
 			if !ok {
 				fmt.Printf("NO READ FOR %T\n", handle)
 				done(fuse.EIO)
@@ -825,9 +836,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 			r.Respond(s)
 			break
 		}
-		if h, ok := shandle.handle.(interface {
-			Write(*fuse.WriteRequest, *fuse.WriteResponse, Intr) fuse.Error
-		}); ok {
+		if h, ok := shandle.handle.(HandleWriter); ok {
 			if err := h.Write(r, s, intr); err != nil {
 				done(err)
 				r.RespondError(err)
@@ -851,9 +860,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		handle := shandle.handle
 
 		if shandle.trunc {
-			h := handle.(interface {
-				WriteAll([]byte, Intr) fuse.Error
-			})
+			h := handle.(HandleWriteAller)
 			if err := h.WriteAll(shandle.writeData, intr); err != nil {
 				done(err)
 				r.RespondError(err)
@@ -862,9 +869,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 			shandle.writeData = nil
 			shandle.trunc = false
 		}
-		if h, ok := handle.(interface {
-			Flush(*fuse.FlushRequest, Intr) fuse.Error
-		}); ok {
+		if h, ok := handle.(HandleFlusher); ok {
 			if err := h.Flush(r, intr); err != nil {
 				done(err)
 				r.RespondError(err)
@@ -886,9 +891,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		// No matter what, release the handle.
 		c.dropHandle(r.Handle)
 
-		if h, ok := handle.(interface {
-			Release(*fuse.ReleaseRequest, Intr) fuse.Error
-		}); ok {
+		if h, ok := handle.(HandleReleaser); ok {
 			if err := h.Release(r, intr); err != nil {
 				done(err)
 				r.RespondError(err)
