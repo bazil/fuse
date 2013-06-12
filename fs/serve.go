@@ -63,102 +63,123 @@ type FSDestroyer interface {
 // See the documentation for type FS for general information
 // pertaining to all methods.
 //
-//	Getattr(resp *GetattrResponse, intr Intr) fuse.Error
+// Other FUSE requests can be handled by implementing methods from the
+// Node* interfaces, for example NodeOpener.
 //
-// Getattr obtains the standard metadata for the receiver.
-// It should store that metadata in resp.
-//
-//	Open(xxx, intr Intr) (Handle, fuse.Error)
-//
-// Open opens the receiver.
-// XXX note about access.  XXX OpenFlags.
-// XXX note that the Node may be a file or directory.
-//
-// Optional Methods
-//
-// An Node implementation may implement additional methods
-// to handle the corresponding FUSE requests.
-//
-// These optional requests can be called for both file and directory nodes:
-//
-//	Access
-//
-// Access checks whether the calling context has permission for
-// the given operations on the receiver.  If so, Access should return nil.  If not, Access should
-// return EPERM.  Note that this call affects the result of the access(2) system call
-// but not the open(2) system call.  If Access is not implemented, the Node behaves
-// as if it always returns nil (permission granted), relying on checks in Open instead.
-//
-//	Getxattr
+// TODO implement methods
 //
 // Getxattr obtains an extended attribute for the receiver.
 // XXX
 //
-//	Listxattr
-// 
 // Listxattr lists the extended attributes recorded for the receiver.
-//
-//	Removexattr
 //
 // Removexattr removes an extended attribute from the receiver.
 //
-//	Setattr
-//
-// Setattr sets the standard metadata for the receiver.
-//
-//	Setxattr
-//
 // Setxattr sets an extended attribute for the receiver.
-//
-// Optional Directory Methods
-//
-// These optional requests will be called only for directory nodes:
-//
-//	Create(xxx)
-//
-// Create creates 
-//
-//	Link(xxx)
-//
-// Link XXX
-//
-//	Lookup(name string, intr Intr) (Node, Error)
-//
-// Lookup looks up a specific entry in the receiver,
-// which must be a directory.  Lookup should return a Node
-// corresponding to the entry.  If the name does not exist in
-// the directory, Lookup should return nil, err.
-//
-// Lookup need not to handle the names "." and "..".
-//
-//	Mkdir
-//
-// Mkdir creates XXX
-//
-//	Mknod XXX
-//
-// XXX
-//
-//	Remove
-//
-// Remove removes the entry with the given name from
-// the receiver, which must be a directory.  The entry to be removed
-// may correspond to a file (unlink) or to a directory (rmdir).
-//
-//	Symlink
-//
-// Symlink creates a new symbolic link in the receiver, which must be a directory.
-// The entry 
-//
-// Optional Symlink Methods
-//
-// This optional request will be called only for symbolic link nodes:
-//
-//	Readlink
-//
-// Readlink reads a symbolic link.
 type Node interface {
 	Attr() fuse.Attr
+}
+
+type NodeGetattrer interface {
+	// Getattr obtains the standard metadata for the receiver.
+	// It should store that metadata in resp.
+	//
+	// If this method is not implemented, the attributes will be
+	// generated based on Attr(), with zero values filled in.
+	Getattr(*fuse.GetattrRequest, *fuse.GetattrResponse, Intr) fuse.Error
+}
+
+type NodeSetattrer interface {
+	// Setattr sets the standard metadata for the receiver.
+	Setattr(*fuse.SetattrRequest, *fuse.SetattrResponse, Intr) fuse.Error
+}
+
+type NodeSymlinker interface {
+	// Symlink creates a new symbolic link in the receiver, which must be a directory.
+	//
+	// TODO is the above true about directories?
+	Symlink(*fuse.SymlinkRequest, Intr) (Node, fuse.Error)
+}
+
+// This optional request will be called only for symbolic link nodes.
+type NodeReadlinker interface {
+	// Readlink reads a symbolic link.
+	Readlink(*fuse.ReadlinkRequest, Intr) (string, fuse.Error)
+}
+
+type NodeLinker interface {
+	// Link creates a new directory entry in the receiver based on an
+	// existing Node. Receiver must be a directory.
+	Link(r *fuse.LinkRequest, old Node, intr Intr) (Node, fuse.Error)
+}
+
+type NodeRemover interface {
+	// Remove removes the entry with the given name from
+	// the receiver, which must be a directory.  The entry to be removed
+	// may correspond to a file (unlink) or to a directory (rmdir).
+	Remove(*fuse.RemoveRequest, Intr) fuse.Error
+}
+
+type NodeAccesser interface {
+	// Access checks whether the calling context has permission for
+	// the given operations on the receiver. If so, Access should
+	// return nil. If not, Access should return EPERM.
+	//
+	// Note that this call affects the result of the access(2) system
+	// call but not the open(2) system call. If Access is not
+	// implemented, the Node behaves as if it always returns nil
+	// (permission granted), relying on checks in Open instead.
+	Access(*fuse.AccessRequest, Intr) fuse.Error
+}
+
+type NodeStringLookuper interface {
+	// Lookup looks up a specific entry in the receiver,
+	// which must be a directory.  Lookup should return a Node
+	// corresponding to the entry.  If the name does not exist in
+	// the directory, Lookup should return nil, err.
+	//
+	// Lookup need not to handle the names "." and "..".
+	Lookup(string, Intr) (Node, fuse.Error)
+}
+
+type NodeRequestLookuper interface {
+	// Lookup looks up a specific entry in the receiver.
+	// See NodeStringLookuper for more.
+	Lookup(*fuse.LookupRequest, *fuse.LookupResponse, Intr) (Node, fuse.Error)
+}
+
+type NodeMkdirer interface {
+	Mkdir(*fuse.MkdirRequest, Intr) (Node, fuse.Error)
+}
+
+type NodeOpener interface {
+	// Open opens the receiver.
+	// XXX note about access.  XXX OpenFlags.
+	// XXX note that the Node may be a file or directory.
+	Open(*fuse.OpenRequest, *fuse.OpenResponse, Intr) (Handle, fuse.Error)
+}
+
+type NodeCreater interface {
+	// Create creates a new directory entry in the receiver, which
+	// must be a directory.
+	Create(*fuse.CreateRequest, *fuse.CreateResponse, Intr) (Node, Handle, fuse.Error)
+}
+
+type NodeForgetter interface {
+	Forget()
+}
+
+type NodeRenamer interface {
+	Rename(r *fuse.RenameRequest, newDir Node, intr Intr) fuse.Error
+}
+
+type NodeMknoder interface {
+	Mknod(r *fuse.MknodRequest, intr Intr) (Node, fuse.Error)
+}
+
+// TODO this should be on Handle not Node
+type NodeFsyncer interface {
+	Fsync(r *fuse.FsyncRequest, intr Intr) fuse.Error
 }
 
 var startTime = time.Now()
@@ -191,16 +212,7 @@ func nodeAttr(n Node) (attr fuse.Attr) {
 // Node* interfaces. The most common to implement are
 // HandleReader, HandleReadDirer, and HandleWriter.
 //
-//	Fsync
-//
-//	Getlk
-//
-//	Release
-//
-//	Setlk
-//
-//	Setlkw
-//
+// TODO implement methods: Getlk, Setlk, Setlkw
 type Handle interface {
 }
 
@@ -460,9 +472,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 	// Node operations.
 	case *fuse.GetattrRequest:
 		s := &fuse.GetattrResponse{}
-		if n, ok := node.(interface {
-			Getattr(*fuse.GetattrRequest, *fuse.GetattrResponse, Intr) fuse.Error
-		}); ok {
+		if n, ok := node.(NodeGetattrer); ok {
 			if err := n.Getattr(r, s, intr); err != nil {
 				done(err)
 				r.RespondError(err)
@@ -518,9 +528,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		}
 
 		log.Printf("setattr %v", r)
-		if n, ok := node.(interface {
-			Setattr(*fuse.SetattrRequest, *fuse.SetattrResponse, Intr) fuse.Error
-		}); ok {
+		if n, ok := node.(NodeSetattrer); ok {
 			if err := n.Setattr(r, s, intr); err != nil {
 				done(err)
 				r.RespondError(err)
@@ -540,9 +548,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 
 	case *fuse.SymlinkRequest:
 		s := &fuse.SymlinkResponse{}
-		n, ok := node.(interface {
-			Symlink(*fuse.SymlinkRequest, Intr) (Node, fuse.Error)
-		})
+		n, ok := node.(NodeSymlinker)
 		if !ok {
 			done(fuse.EIO) // XXX or EPERM like Mkdir?
 			r.RespondError(fuse.EIO)
@@ -559,9 +565,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		r.Respond(s)
 
 	case *fuse.ReadlinkRequest:
-		n, ok := node.(interface {
-			Readlink(*fuse.ReadlinkRequest, Intr) (string, fuse.Error)
-		})
+		n, ok := node.(NodeReadlinker)
 		if !ok {
 			done(fuse.EIO) /// XXX or EPERM?
 			r.RespondError(fuse.EIO)
@@ -577,9 +581,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		r.Respond(target)
 
 	case *fuse.LinkRequest:
-		n, ok := node.(interface {
-			Link(r *fuse.LinkRequest, old Node, intr Intr) (Node, fuse.Error)
-		})
+		n, ok := node.(NodeLinker)
 		if !ok {
 			log.Printf("Node %T doesn't implement fuse Link", node)
 			done(fuse.EIO) /// XXX or EPERM?
@@ -610,9 +612,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		r.Respond(s)
 
 	case *fuse.RemoveRequest:
-		n, ok := node.(interface {
-			Remove(*fuse.RemoveRequest, Intr) fuse.Error
-		})
+		n, ok := node.(NodeRemover)
 		if !ok {
 			done(fuse.EIO) /// XXX or EPERM?
 			r.RespondError(fuse.EIO)
@@ -628,9 +628,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		r.Respond()
 
 	case *fuse.AccessRequest:
-		if n, ok := node.(interface {
-			Access(*fuse.AccessRequest, Intr) fuse.Error
-		}); ok {
+		if n, ok := node.(NodeAccesser); ok {
 			if err := n.Access(r, intr); err != nil {
 				done(err)
 				r.RespondError(err)
@@ -644,13 +642,9 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		var n2 Node
 		var err fuse.Error
 		s := &fuse.LookupResponse{}
-		if n, ok := node.(interface {
-			Lookup(string, Intr) (Node, fuse.Error)
-		}); ok {
+		if n, ok := node.(NodeStringLookuper); ok {
 			n2, err = n.Lookup(r.Name, intr)
-		} else if n, ok := node.(interface {
-			Lookup(*fuse.LookupRequest, *fuse.LookupResponse, Intr) (Node, fuse.Error)
-		}); ok {
+		} else if n, ok := node.(NodeRequestLookuper); ok {
 			n2, err = n.Lookup(r, s, intr)
 		} else {
 			done(fuse.ENOENT)
@@ -668,9 +662,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 
 	case *fuse.MkdirRequest:
 		s := &fuse.MkdirResponse{}
-		n, ok := node.(interface {
-			Mkdir(*fuse.MkdirRequest, Intr) (Node, fuse.Error)
-		})
+		n, ok := node.(NodeMkdirer)
 		if !ok {
 			done(fuse.EPERM)
 			r.RespondError(fuse.EPERM)
@@ -689,9 +681,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 	case *fuse.OpenRequest:
 		s := &fuse.OpenResponse{Flags: fuse.OpenDirectIO}
 		var h2 Handle
-		if n, ok := node.(interface {
-			Open(*fuse.OpenRequest, *fuse.OpenResponse, Intr) (Handle, fuse.Error)
-		}); ok {
+		if n, ok := node.(NodeOpener); ok {
 			hh, err := n.Open(r, s, intr)
 			if err != nil {
 				done(err)
@@ -707,9 +697,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		r.Respond(s)
 
 	case *fuse.CreateRequest:
-		n, ok := node.(interface {
-			Create(*fuse.CreateRequest, *fuse.CreateResponse, Intr) (Node, Handle, fuse.Error)
-		})
+		n, ok := node.(NodeCreater)
 		if !ok {
 			// If we send back ENOSYS, FUSE will try mknod+open.
 			done(fuse.EPERM)
@@ -741,9 +729,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		r.RespondError(fuse.ENOSYS)
 
 	case *fuse.ForgetRequest:
-		n, ok := node.(interface {
-			Forget()
-		})
+		n, ok := node.(NodeForgetter)
 		if ok {
 			n.Forget()
 		}
@@ -921,9 +907,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 			r.RespondError(fuse.EIO)
 			break
 		}
-		n, ok := node.(interface {
-			Rename(r *fuse.RenameRequest, newDir Node, intr Intr) fuse.Error
-		})
+		n, ok := node.(NodeRenamer)
 		if !ok {
 			log.Printf("Node %T missing Rename method", node)
 			done(fuse.EIO) // XXX or EPERM like Mkdir?
@@ -940,9 +924,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		r.Respond()
 
 	case *fuse.MknodRequest:
-		n, ok := node.(interface {
-			Mknod(r *fuse.MknodRequest, intr Intr) (Node, fuse.Error)
-		})
+		n, ok := node.(NodeMknoder)
 		if !ok {
 			log.Printf("Node %T missing Mknod method", node)
 			done(fuse.EIO)
@@ -961,9 +943,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		r.Respond(s)
 
 	case *fuse.FsyncRequest:
-		n, ok := node.(interface {
-			Fsync(r *fuse.FsyncRequest, intr Intr) fuse.Error
-		})
+		n, ok := node.(NodeFsyncer)
 		if !ok {
 			log.Printf("Node %T missing Fsync method", node)
 			done(fuse.EIO)
