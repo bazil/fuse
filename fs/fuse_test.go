@@ -1068,7 +1068,9 @@ type ftruncate struct {
 	toSize int64
 
 	file
-	gotr *fuse.SetattrRequest
+	seen struct {
+		gotr chan *fuse.SetattrRequest
+	}
 }
 
 // present purely to trigger bugs in WriteAll logic
@@ -1077,8 +1079,12 @@ func (*ftruncate) WriteAll(data []byte, intr Intr) fuse.Error {
 }
 
 func (f *ftruncate) Setattr(req *fuse.SetattrRequest, resp *fuse.SetattrResponse, intr Intr) fuse.Error {
-	f.gotr = req
+	f.seen.gotr <- req
 	return nil
+}
+
+func (f *ftruncate) setup(t *testing.T) {
+	f.seen.gotr = make(chan *fuse.SetattrRequest, 1)
 }
 
 func (f *ftruncate) test(path string, t *testing.T) {
@@ -1095,16 +1101,17 @@ func (f *ftruncate) test(path string, t *testing.T) {
 			t.Fatalf("Ftruncate: %v", err)
 		}
 	}
-	if f.gotr == nil {
+	gotr := <-f.seen.gotr
+	if gotr == nil {
 		t.Fatalf("no recorded SetattrRequest")
 	}
-	if g, e := f.gotr.Size, uint64(f.toSize); g != e {
+	if g, e := gotr.Size, uint64(f.toSize); g != e {
 		t.Errorf("got Size = %q; want %q", g, e)
 	}
-	if g, e := f.gotr.Valid&^fuse.SetattrLockOwner, fuse.SetattrHandle|fuse.SetattrSize; g != e {
+	if g, e := gotr.Valid&^fuse.SetattrLockOwner, fuse.SetattrHandle|fuse.SetattrSize; g != e {
 		t.Errorf("got Valid = %q; want %q", g, e)
 	}
-	t.Logf("Got request: %#v", f.gotr)
+	t.Logf("Got request: %#v", gotr)
 }
 
 // Test opening existing file truncates
