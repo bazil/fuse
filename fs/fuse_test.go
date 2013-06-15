@@ -1139,18 +1139,13 @@ func (f *truncateWithOpen) setup(t *testing.T) {
 }
 
 func (f *truncateWithOpen) test(path string, t *testing.T) {
-	{
-		fil, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC, 0666)
-		if err != nil {
-			t.Error(err)
-			return
-		}
-		fil.Close()
-
-		if err != nil {
-			t.Fatalf("TruncateWithOpen: %v", err)
-		}
+	fil, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC, 0666)
+	if err != nil {
+		t.Error(err)
+		return
 	}
+	fil.Close()
+
 	gotr := <-f.seen.gotr
 	if gotr == nil {
 		t.Fatalf("no recorded SetattrRequest")
