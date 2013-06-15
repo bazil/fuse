@@ -407,18 +407,30 @@ func (w *write) test(path string, t *testing.T) {
 
 type writeAll struct {
 	file
-	data     []byte
-	gotfsync bool
+	seen struct {
+		data  chan []byte
+		fsync chan bool
+	}
 }
 
 func (w *writeAll) Fsync(r *fuse.FsyncRequest, intr Intr) fuse.Error {
-	w.gotfsync = true
+	w.seen.fsync <- true
 	return nil
 }
 
 func (w *writeAll) WriteAll(data []byte, intr Intr) fuse.Error {
-	w.data = data
+	w.seen.data <- data
 	return nil
+}
+
+func (w *writeAll) Release(r *fuse.ReleaseRequest, intr Intr) fuse.Error {
+	close(w.seen.data)
+	return nil
+}
+
+func (w *writeAll) setup(t *testing.T) {
+	w.seen.data = make(chan []byte, 10)
+	w.seen.fsync = make(chan bool, 1)
 }
 
 func (w *writeAll) test(path string, t *testing.T) {
@@ -427,8 +439,8 @@ func (w *writeAll) test(path string, t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 		return
 	}
-	if string(w.data) != hi {
-		t.Errorf("writeAll = %q, want %q", w.data, hi)
+	if got := string(gather(w.seen.data)); got != hi {
+		t.Errorf("writeAll = %q, want %q", got, hi)
 	}
 }
 
@@ -497,18 +509,22 @@ func (f *mkdir1) test(path string, t *testing.T) {
 
 type create1 struct {
 	dir
-	name string
-	f    *writeAll
+	f writeAll
 }
 
 func (f *create1) Create(req *fuse.CreateRequest, resp *fuse.CreateResponse, intr Intr) (Node, Handle, fuse.Error) {
-	f.name = req.Name
-	f.f = &writeAll{}
-	return f.f, f.f, nil
+	if req.Name != "foo" {
+		log.Printf("ERROR create1.Create unexpected name: %q\n", req.Name)
+		return nil, nil, fuse.EPERM
+	}
+	return &f.f, &f.f, nil
+}
+
+func (f *create1) setup(t *testing.T) {
+	f.f.setup(t)
 }
 
 func (f *create1) test(path string, t *testing.T) {
-	f.name = ""
 	ff, err := os.Create(path + "/foo")
 	if err != nil {
 		t.Errorf("create1 WriteFile: %v", err)
@@ -520,29 +536,27 @@ func (f *create1) test(path string, t *testing.T) {
 		t.Fatalf("Fsync = %v", err)
 	}
 
-	if !f.f.gotfsync {
+	if !<-f.f.seen.fsync {
 		t.Errorf("never received expected fsync call")
 	}
 
 	ff.Close()
-	if f.name != "foo" {
-		t.Errorf("create1 name=%q want foo", f.name)
-	}
 }
 
 // Test Create + WriteAll + Remove
 
 type create2 struct {
 	dir
-	name      string
-	f         *writeAll
+	f         writeAll
 	fooExists bool
 }
 
 func (f *create2) Create(req *fuse.CreateRequest, resp *fuse.CreateResponse, intr Intr) (Node, Handle, fuse.Error) {
-	f.name = req.Name
-	f.f = &writeAll{}
-	return f.f, f.f, nil
+	if req.Name != "foo" {
+		log.Printf("ERROR create2.Create unexpected name: %q\n", req.Name)
+		return nil, nil, fuse.EPERM
+	}
+	return &f.f, &f.f, nil
 }
 
 func (f *create2) Lookup(name string, intr Intr) (Node, fuse.Error) {
@@ -560,14 +574,17 @@ func (f *create2) Remove(r *fuse.RemoveRequest, intr Intr) fuse.Error {
 	return fuse.ENOENT
 }
 
+func (f *create2) setup(t *testing.T) {
+	f.f.setup(t)
+}
+
 func (f *create2) test(path string, t *testing.T) {
-	f.name = ""
 	err := ioutil.WriteFile(path+"/foo", []byte(hi), 0666)
 	if err != nil {
 		t.Fatalf("create2 WriteFile: %v", err)
 	}
-	if string(f.f.data) != hi {
-		t.Fatalf("create2 writeAll = %q, want %q", f.f.data, hi)
+	if got := string(gather(f.f.seen.data)); got != hi {
+		t.Fatalf("create2 writeAll = %q, want %q", got, hi)
 	}
 
 	f.fooExists = true
