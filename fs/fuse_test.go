@@ -782,16 +782,21 @@ func (f *rename1) test(path string, t *testing.T) {
 
 type release struct {
 	file
-	did bool
+	seen struct {
+		did chan bool
+	}
 }
 
 func (r *release) Release(*fuse.ReleaseRequest, Intr) fuse.Error {
-	r.did = true
+	r.seen.did <- true
 	return nil
 }
 
+func (r *release) setup(t *testing.T) {
+	r.seen.did = make(chan bool, 1)
+}
+
 func (r *release) test(path string, t *testing.T) {
-	r.did = false
 	f, err := os.Open(path)
 	if err != nil {
 		t.Error(err)
@@ -799,7 +804,7 @@ func (r *release) test(path string, t *testing.T) {
 	}
 	f.Close()
 	time.Sleep(1 * time.Second)
-	if !r.did {
+	if !<-r.seen.did {
 		t.Error("Close did not Release")
 	}
 }
