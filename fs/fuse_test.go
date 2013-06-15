@@ -832,12 +832,18 @@ func (r *release) test(path string, t *testing.T) {
 
 type mknod1 struct {
 	dir
-	gotr *fuse.MknodRequest
+	seen struct {
+		gotr chan *fuse.MknodRequest
+	}
 }
 
 func (f *mknod1) Mknod(r *fuse.MknodRequest, intr Intr) (Node, fuse.Error) {
-	f.gotr = r
+	f.seen.gotr <- r
 	return fifo{}, nil
+}
+
+func (f *mknod1) setup(t *testing.T) {
+	f.seen.gotr = make(chan *fuse.MknodRequest, 1)
 }
 
 func (f *mknod1) test(path string, t *testing.T) {
@@ -850,13 +856,14 @@ func (f *mknod1) test(path string, t *testing.T) {
 	if err != nil {
 		t.Fatalf("Mknod: %v", err)
 	}
-	if f.gotr == nil {
+	gotr := <-f.seen.gotr
+	if gotr == nil {
 		t.Fatalf("no recorded MknodRequest")
 	}
-	if g, e := f.gotr.Name, "node"; g != e {
+	if g, e := gotr.Name, "node"; g != e {
 		t.Errorf("got Name = %q; want %q", g, e)
 	}
-	if g, e := f.gotr.Rdev, uint32(123); g != e {
+	if g, e := gotr.Rdev, uint32(123); g != e {
 		if runtime.GOOS == "linux" {
 			// Linux fuse doesn't echo back the rdev if the node
 			// isn't a device (we're using a FIFO here, as that
@@ -865,10 +872,10 @@ func (f *mknod1) test(path string, t *testing.T) {
 			t.Errorf("got Rdev = %v; want %v", g, e)
 		}
 	}
-	if g, e := f.gotr.Mode, os.FileMode(os.ModeNamedPipe|0666); g != e {
+	if g, e := gotr.Mode, os.FileMode(os.ModeNamedPipe|0666); g != e {
 		t.Errorf("got Mode = %v; want %v", g, e)
 	}
-	t.Logf("Got request: %#v", f.gotr)
+	t.Logf("Got request: %#v", gotr)
 }
 
 type file struct{}
