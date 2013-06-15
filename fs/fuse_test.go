@@ -555,13 +555,15 @@ func (f *create2) test(path string, t *testing.T) {
 
 type create3 struct {
 	dir
-	name      string
 	f         *write
 	fooExists bool
 }
 
 func (f *create3) Create(req *fuse.CreateRequest, resp *fuse.CreateResponse, intr Intr) (Node, Handle, fuse.Error) {
-	f.name = req.Name
+	if req.Name != "foo" {
+		log.Printf("ERROR create3.Create unexpected name: %q\n", req.Name)
+		return nil, nil, fuse.EPERM
+	}
 	f.f = &write{}
 	return f.f, f.f, nil
 }
@@ -582,7 +584,6 @@ func (f *create3) Remove(r *fuse.RemoveRequest, intr Intr) fuse.Error {
 }
 
 func (f *create3) test(path string, t *testing.T) {
-	f.name = ""
 	err := ioutil.WriteFile(path+"/foo", []byte(hi), 0666)
 	if err != nil {
 		t.Fatalf("create3 WriteFile: %v", err)
