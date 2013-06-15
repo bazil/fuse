@@ -729,7 +729,9 @@ func (f *symlink1) test(path string, t *testing.T) {
 
 type link1 struct {
 	dir
-	newName string
+	seen struct {
+		newName chan string
+	}
 }
 
 func (f *link1) Lookup(name string, intr Intr) (Node, fuse.Error) {
@@ -740,8 +742,12 @@ func (f *link1) Lookup(name string, intr Intr) (Node, fuse.Error) {
 }
 
 func (f *link1) Link(r *fuse.LinkRequest, old Node, intr Intr) (Node, fuse.Error) {
-	f.newName = r.NewName
+	f.seen.newName <- r.NewName
 	return file{}, nil
+}
+
+func (f *link1) setup(t *testing.T) {
+	f.seen.newName = make(chan string, 1)
 }
 
 func (f *link1) test(path string, t *testing.T) {
@@ -749,8 +755,8 @@ func (f *link1) test(path string, t *testing.T) {
 	if err != nil {
 		t.Fatalf("Link: %v", err)
 	}
-	if f.newName != "new" {
-		t.Fatalf("saw Link for newName %q; want %q", f.newName, "new")
+	if got := <-f.seen.newName; got != "new" {
+		t.Fatalf("saw Link for newName %q; want %q", got, "new")
 	}
 }
 
