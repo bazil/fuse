@@ -503,22 +503,27 @@ func (w *writeAll2) test(path string, t *testing.T) {
 
 type mkdir1 struct {
 	dir
-	name string
+	seen struct {
+		name chan string
+	}
 }
 
 func (f *mkdir1) Mkdir(req *fuse.MkdirRequest, intr Intr) (Node, fuse.Error) {
-	f.name = req.Name
+	f.seen.name <- req.Name
 	return &mkdir1{}, nil
 }
 
+func (f *mkdir1) setup(t *testing.T) {
+	f.seen.name = make(chan string, 1)
+}
+
 func (f *mkdir1) test(path string, t *testing.T) {
-	f.name = ""
 	err := os.Mkdir(path+"/foo", 0777)
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	if f.name != "foo" {
+	if <-f.seen.name != "foo" {
 		t.Error(err)
 		return
 	}
