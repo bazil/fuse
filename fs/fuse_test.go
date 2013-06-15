@@ -32,6 +32,14 @@ func umount(dir string) {
 	}
 }
 
+func gather(ch chan []byte) []byte {
+	var buf []byte
+	for b := range ch {
+		buf = append(buf, b...)
+	}
+	return buf
+}
+
 type badRootFS struct{}
 
 func (badRootFS) Root() (Node, fuse.Error) {
@@ -151,6 +159,17 @@ func TestFuse(t *testing.T) {
 		t.Fatal(err)
 	}
 	os.MkdirAll(dir, 0777)
+
+	for _, tt := range fuseTests {
+		if *fuseRun == "" || *fuseRun == tt.name {
+			if st, ok := tt.node.(interface {
+				setup(*testing.T)
+			}); ok {
+				t.Logf("setting up %T", tt.node)
+				st.setup(t)
+			}
+		}
+	}
 
 	c, err := fuse.Mount(dir)
 	if err != nil {
@@ -323,19 +342,31 @@ func (readAll1) test(path string, t *testing.T) {
 
 type write struct {
 	file
-	data     []byte
-	gotfsync bool
+	seen struct {
+		data  chan []byte
+		fsync chan bool
+	}
 }
 
 func (w *write) Write(req *fuse.WriteRequest, resp *fuse.WriteResponse, intr Intr) fuse.Error {
-	w.data = append(w.data, req.Data...)
+	w.seen.data <- req.Data
 	resp.Size = len(req.Data)
 	return nil
 }
 
 func (w *write) Fsync(r *fuse.FsyncRequest, intr Intr) fuse.Error {
-	w.gotfsync = true
+	w.seen.fsync <- true
 	return nil
+}
+
+func (w *write) Release(r *fuse.ReleaseRequest, intr Intr) fuse.Error {
+	close(w.seen.data)
+	return nil
+}
+
+func (w *write) setup(t *testing.T) {
+	w.seen.data = make(chan []byte, 10)
+	w.seen.fsync = make(chan bool, 1)
 }
 
 func (w *write) test(path string, t *testing.T) {
@@ -357,7 +388,7 @@ func (w *write) test(path string, t *testing.T) {
 	if err != nil {
 		t.Fatalf("Fsync = %v", err)
 	}
-	if !w.gotfsync {
+	if !<-w.seen.fsync {
 		t.Errorf("never received expected fsync call")
 	}
 
@@ -367,8 +398,8 @@ func (w *write) test(path string, t *testing.T) {
 		t.Fatalf("Close: %v", err)
 	}
 	log.Printf("post-write Close")
-	if string(w.data) != hi {
-		t.Errorf("writeAll = %q, want %q", w.data, hi)
+	if got := string(gather(w.seen.data)); got != hi {
+		t.Errorf("writeAll = %q, want %q", got, hi)
 	}
 }
 
@@ -555,7 +586,7 @@ func (f *create2) test(path string, t *testing.T) {
 
 type create3 struct {
 	dir
-	f         *write
+	f         write
 	fooExists bool
 }
 
@@ -564,8 +595,7 @@ func (f *create3) Create(req *fuse.CreateRequest, resp *fuse.CreateResponse, int
 		log.Printf("ERROR create3.Create unexpected name: %q\n", req.Name)
 		return nil, nil, fuse.EPERM
 	}
-	f.f = &write{}
-	return f.f, f.f, nil
+	return &f.f, &f.f, nil
 }
 
 func (f *create3) Lookup(name string, intr Intr) (Node, fuse.Error) {
@@ -583,13 +613,17 @@ func (f *create3) Remove(r *fuse.RemoveRequest, intr Intr) fuse.Error {
 	return fuse.ENOENT
 }
 
+func (f *create3) setup(t *testing.T) {
+	f.f.setup(t)
+}
+
 func (f *create3) test(path string, t *testing.T) {
 	err := ioutil.WriteFile(path+"/foo", []byte(hi), 0666)
 	if err != nil {
 		t.Fatalf("create3 WriteFile: %v", err)
 	}
-	if string(f.f.data) != hi {
-		t.Fatalf("create3 writeAll = %q, want %q", f.f.data, hi)
+	if got := string(gather(f.f.seen.data)); got != hi {
+		t.Fatalf("create3 writeAll = %q, want %q", got, hi)
 	}
 
 	f.fooExists = true
