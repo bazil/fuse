@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -764,7 +765,7 @@ func (f *link1) test(path string, t *testing.T) {
 
 type rename1 struct {
 	dir
-	renames int
+	renames int32
 }
 
 func (f *rename1) Lookup(name string, intr Intr) (Node, fuse.Error) {
@@ -776,7 +777,7 @@ func (f *rename1) Lookup(name string, intr Intr) (Node, fuse.Error) {
 
 func (f *rename1) Rename(r *fuse.RenameRequest, newDir Node, intr Intr) fuse.Error {
 	if r.OldName == "old" && r.NewName == "new" && newDir == f {
-		f.renames++
+		atomic.AddInt32(&f.renames, 1)
 		return nil
 	}
 	return fuse.EIO
@@ -787,7 +788,7 @@ func (f *rename1) test(path string, t *testing.T) {
 	if err != nil {
 		t.Fatalf("Rename: %v", err)
 	}
-	if f.renames != 1 {
+	if atomic.LoadInt32(&f.renames) != 1 {
 		t.Fatalf("expected rename didn't happen")
 	}
 	err = os.Rename(path+"/old2", path+"/new2")
