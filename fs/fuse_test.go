@@ -965,8 +965,11 @@ func (it *interrupt) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, intr I
 	return fuse.Errno(syscall.EINTR)
 }
 
-func (it *interrupt) test(path string, t *testing.T) {
+func (it *interrupt) setup(t *testing.T) {
 	it.hanging = make(chan struct{})
+}
+
+func (it *interrupt) test(path string, t *testing.T) {
 
 	// start a subprocess that can hang until signaled
 	cmd := exec.Command("cat", path)
