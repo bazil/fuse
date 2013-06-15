@@ -683,13 +683,18 @@ func (f *create3) test(path string, t *testing.T) {
 
 type symlink1 struct {
 	dir
-	newName, target string
+	seen struct {
+		req chan *fuse.SymlinkRequest
+	}
 }
 
 func (f *symlink1) Symlink(req *fuse.SymlinkRequest, intr Intr) (Node, fuse.Error) {
-	f.newName = req.NewName
-	f.target = req.Target
+	f.seen.req <- req
 	return symlink{target: req.Target}, nil
+}
+
+func (f *symlink1) setup(t *testing.T) {
+	f.seen.req = make(chan *fuse.SymlinkRequest, 1)
 }
 
 func (f *symlink1) test(path string, t *testing.T) {
@@ -701,11 +706,13 @@ func (f *symlink1) test(path string, t *testing.T) {
 		return
 	}
 
-	if f.newName != "symlink.file" {
-		t.Errorf("symlink newName = %q; want %q", f.newName, "symlink.file")
+	req := <-f.seen.req
+
+	if req.NewName != "symlink.file" {
+		t.Errorf("symlink newName = %q; want %q", req.NewName, "symlink.file")
 	}
-	if f.target != target {
-		t.Errorf("symlink target = %q; want %q", f.target, target)
+	if req.Target != target {
+		t.Errorf("symlink target = %q; want %q", req.Target, target)
 	}
 
 	gotName, err := os.Readlink(path + "/symlink.file")
