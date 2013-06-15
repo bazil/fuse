@@ -257,6 +257,7 @@ var fuseTests = []struct {
 	{"ftruncate42", &ftruncate{toSize: 42}},
 	{"ftruncate0", &ftruncate{toSize: 0}},
 	{"truncateWithOpen", &truncateWithOpen{}},
+	{"readdir", &readdir{}},
 }
 
 // TO TEST:
@@ -1161,4 +1162,46 @@ func (f *truncateWithOpen) test(path string, t *testing.T) {
 		t.Errorf("got Valid = %q; want %q", g, e)
 	}
 	t.Logf("Got request: %#v", gotr)
+}
+
+// Test readdir
+
+type readdir struct {
+	dir
+}
+
+func (d *readdir) ReadDir(intr Intr) ([]fuse.Dirent, fuse.Error) {
+	return []fuse.Dirent{
+		{Name: "one", Inode: 11, Type: fuse.DT_Dir},
+		{Name: "three", Inode: 13},
+		{Name: "two", Inode: 12, Type: fuse.DT_File},
+	}, nil
+}
+
+func (f *readdir) test(path string, t *testing.T) {
+	fil, err := os.Open(path)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer fil.Close()
+
+	// go Readdir is just Readdirnames + Lstat, there's no point in
+	// testing that here; we have no consumption API for the real
+	// dirent data
+	names, err := fil.Readdirnames(100)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	t.Logf("Got readdir: %q", names)
+
+	if len(names) != 3 ||
+		names[0] != "one" ||
+		names[1] != "three" ||
+		names[2] != "two" {
+		t.Errorf(`expected 3 entries of "one", "three", "two", got: %q`, names)
+		return
+	}
 }
