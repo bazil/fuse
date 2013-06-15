@@ -448,25 +448,38 @@ func (w *writeAll) test(path string, t *testing.T) {
 
 type writeAll2 struct {
 	file
-	data    []byte
-	setattr bool
-	flush   bool
+	seen struct {
+		data    chan []byte
+		setattr chan bool
+		flush   chan bool
+	}
 }
 
 func (w *writeAll2) Setattr(req *fuse.SetattrRequest, resp *fuse.SetattrResponse, intr Intr) fuse.Error {
-	w.setattr = true
+	w.seen.setattr <- true
 	return nil
 }
 
 func (w *writeAll2) Flush(req *fuse.FlushRequest, intr Intr) fuse.Error {
-	w.flush = true
+	w.seen.flush <- true
 	return nil
 }
 
 func (w *writeAll2) Write(req *fuse.WriteRequest, resp *fuse.WriteResponse, intr Intr) fuse.Error {
-	w.data = append(w.data, req.Data...)
+	w.seen.data <- req.Data
 	resp.Size = len(req.Data)
 	return nil
+}
+
+func (w *writeAll2) Release(r *fuse.ReleaseRequest, intr Intr) fuse.Error {
+	close(w.seen.data)
+	return nil
+}
+
+func (w *writeAll2) setup(t *testing.T) {
+	w.seen.data = make(chan []byte, 100)
+	w.seen.setattr = make(chan bool, 1)
+	w.seen.flush = make(chan bool, 1)
 }
 
 func (w *writeAll2) test(path string, t *testing.T) {
@@ -475,8 +488,14 @@ func (w *writeAll2) test(path string, t *testing.T) {
 		t.Errorf("WriteFile: %v", err)
 		return
 	}
-	if !w.setattr || string(w.data) != hi || !w.flush {
-		t.Errorf("writeAll = %v, %q, %v, want %v, %q, %v", w.setattr, string(w.data), w.flush, true, hi, true)
+	if !<-w.seen.setattr {
+		t.Errorf("writeAll expected Setattr")
+	}
+	if !<-w.seen.flush {
+		t.Errorf("writeAll expected Setattr")
+	}
+	if got := string(gather(w.seen.data)); got != hi {
+		t.Errorf("writeAll = %q, want %q", got, hi)
 	}
 }
 
