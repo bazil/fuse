@@ -96,17 +96,20 @@ const (
 	SetattrFlags    SetattrValid = 1 << 31
 )
 
-func (fl SetattrValid) Mode() bool     { return fl&SetattrMode != 0 }
-func (fl SetattrValid) Uid() bool      { return fl&SetattrUid != 0 }
-func (fl SetattrValid) Gid() bool      { return fl&SetattrGid != 0 }
-func (fl SetattrValid) Size() bool     { return fl&SetattrSize != 0 }
-func (fl SetattrValid) Atime() bool    { return fl&SetattrAtime != 0 }
-func (fl SetattrValid) Mtime() bool    { return fl&SetattrMtime != 0 }
-func (fl SetattrValid) Handle() bool   { return fl&SetattrHandle != 0 }
-func (fl SetattrValid) Crtime() bool   { return fl&SetattrCrtime != 0 }
-func (fl SetattrValid) Chgtime() bool  { return fl&SetattrChgtime != 0 }
-func (fl SetattrValid) Bkuptime() bool { return fl&SetattrBkuptime != 0 }
-func (fl SetattrValid) Flags() bool    { return fl&SetattrFlags != 0 }
+func (fl SetattrValid) Mode() bool      { return fl&SetattrMode != 0 }
+func (fl SetattrValid) Uid() bool       { return fl&SetattrUid != 0 }
+func (fl SetattrValid) Gid() bool       { return fl&SetattrGid != 0 }
+func (fl SetattrValid) Size() bool      { return fl&SetattrSize != 0 }
+func (fl SetattrValid) Atime() bool     { return fl&SetattrAtime != 0 }
+func (fl SetattrValid) Mtime() bool     { return fl&SetattrMtime != 0 }
+func (fl SetattrValid) Handle() bool    { return fl&SetattrHandle != 0 }
+func (fl SetattrValid) AtimeNow() bool  { return fl&SetattrAtimeNow != 0 }
+func (fl SetattrValid) MtimeNow() bool  { return fl&SetattrMtimeNow != 0 }
+func (fl SetattrValid) LockOwner() bool { return fl&SetattrLockOwner != 0 }
+func (fl SetattrValid) Crtime() bool    { return fl&SetattrCrtime != 0 }
+func (fl SetattrValid) Chgtime() bool   { return fl&SetattrChgtime != 0 }
+func (fl SetattrValid) Bkuptime() bool  { return fl&SetattrBkuptime != 0 }
+func (fl SetattrValid) Flags() bool     { return fl&SetattrFlags != 0 }
 
 func (fl SetattrValid) String() string {
 	return flagString(uint32(fl), setattrValidNames)
@@ -120,6 +123,9 @@ var setattrValidNames = []flagName{
 	{uint32(SetattrAtime), "SetattrAtime"},
 	{uint32(SetattrMtime), "SetattrMtime"},
 	{uint32(SetattrHandle), "SetattrHandle"},
+	{uint32(SetattrAtimeNow), "SetattrAtimeNow"},
+	{uint32(SetattrMtimeNow), "SetattrMtimeNow"},
+	{uint32(SetattrLockOwner), "SetattrLockOwner"},
 	{uint32(SetattrCrtime), "SetattrCrtime"},
 	{uint32(SetattrChgtime), "SetattrChgtime"},
 	{uint32(SetattrBkuptime), "SetattrBkuptime"},
