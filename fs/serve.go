@@ -493,7 +493,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		//
 		// TODO WriteAll mishandles all kinds of cases, e.g.
 		// truncating to non-zero size, noncontiguous writes, etc
-		if r.Valid&fuse.SetattrSize != 0 && r.Size == 0 {
+		if r.Valid.Size() && r.Size == 0 {
 			type writeAll interface {
 				WriteAll([]byte, Intr) fuse.Error
 			}
