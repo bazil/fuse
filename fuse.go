@@ -1428,13 +1428,22 @@ func (r *SetattrRequest) String() string {
 	if r.Valid.Atime() {
 		fmt.Fprintf(&buf, " atime=%v", r.Atime)
 	}
+	if r.Valid.AtimeNow() {
+		fmt.Fprintf(&buf, " atime=now")
+	}
 	if r.Valid.Mtime() {
 		fmt.Fprintf(&buf, " mtime=%v", r.Mtime)
+	}
+	if r.Valid.MtimeNow() {
+		fmt.Fprintf(&buf, " mtime=now")
 	}
 	if r.Valid.Handle() {
 		fmt.Fprintf(&buf, " handle=%#x", r.Handle)
 	} else {
 		fmt.Fprintf(&buf, " handle=INVALID-%#x", r.Handle)
+	}
+	if r.Valid.LockOwner() {
+		fmt.Fprintf(&buf, " lockowner")
 	}
 	if r.Valid.Crtime() {
 		fmt.Fprintf(&buf, " crtime=%v", r.Crtime)
