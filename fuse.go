@@ -1226,7 +1226,7 @@ type ReadResponse struct {
 }
 
 func (r *ReadResponse) String() string {
-	return fmt.Sprintf("Read %x", r.Data)
+	return fmt.Sprintf("Read %d", len(r.Data))
 }
 
 // A ReleaseRequest asks to release (close) an open file handle.
