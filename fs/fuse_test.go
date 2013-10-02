@@ -241,7 +241,7 @@ var fuseTests = []struct {
 	{"release", &release{}},
 	{"write", &write{}},
 	{"writeAll", &writeAll{}},
-	{"writeAll2", &writeAll2{}},
+	{"writeTruncateFlush", &writeTruncateFlush{}},
 	{"mkdir1", &mkdir1{}},
 	{"create1", &create1{}},
 	{"create2", &create2{}},
@@ -448,7 +448,7 @@ func (w *writeAll) test(path string, t *testing.T) {
 
 // Test Write calling Setattr+Write+Flush.
 
-type writeAll2 struct {
+type writeTruncateFlush struct {
 	file
 	seen struct {
 		data    chan []byte
@@ -457,47 +457,47 @@ type writeAll2 struct {
 	}
 }
 
-func (w *writeAll2) Setattr(req *fuse.SetattrRequest, resp *fuse.SetattrResponse, intr Intr) fuse.Error {
+func (w *writeTruncateFlush) Setattr(req *fuse.SetattrRequest, resp *fuse.SetattrResponse, intr Intr) fuse.Error {
 	w.seen.setattr <- true
 	return nil
 }
 
-func (w *writeAll2) Flush(req *fuse.FlushRequest, intr Intr) fuse.Error {
+func (w *writeTruncateFlush) Flush(req *fuse.FlushRequest, intr Intr) fuse.Error {
 	w.seen.flush <- true
 	return nil
 }
 
-func (w *writeAll2) Write(req *fuse.WriteRequest, resp *fuse.WriteResponse, intr Intr) fuse.Error {
+func (w *writeTruncateFlush) Write(req *fuse.WriteRequest, resp *fuse.WriteResponse, intr Intr) fuse.Error {
 	w.seen.data <- req.Data
 	resp.Size = len(req.Data)
 	return nil
 }
 
-func (w *writeAll2) Release(r *fuse.ReleaseRequest, intr Intr) fuse.Error {
+func (w *writeTruncateFlush) Release(r *fuse.ReleaseRequest, intr Intr) fuse.Error {
 	close(w.seen.data)
 	return nil
 }
 
-func (w *writeAll2) setup(t *testing.T) {
+func (w *writeTruncateFlush) setup(t *testing.T) {
 	w.seen.data = make(chan []byte, 100)
 	w.seen.setattr = make(chan bool, 1)
 	w.seen.flush = make(chan bool, 1)
 }
 
-func (w *writeAll2) test(path string, t *testing.T) {
+func (w *writeTruncateFlush) test(path string, t *testing.T) {
 	err := ioutil.WriteFile(path, []byte(hi), 0666)
 	if err != nil {
 		t.Errorf("WriteFile: %v", err)
 		return
 	}
 	if !<-w.seen.setattr {
-		t.Errorf("writeAll expected Setattr")
+		t.Errorf("writeTruncateFlush expected Setattr")
 	}
 	if !<-w.seen.flush {
-		t.Errorf("writeAll expected Setattr")
+		t.Errorf("writeTruncateFlush expected Setattr")
 	}
 	if got := string(gather(w.seen.data)); got != hi {
-		t.Errorf("writeAll = %q, want %q", got, hi)
+		t.Errorf("writeTruncateFlush = %q, want %q", got, hi)
 	}
 }
 
