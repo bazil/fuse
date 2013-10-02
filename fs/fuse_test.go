@@ -535,7 +535,7 @@ func (f *mkdir1) test(path string, t *testing.T) {
 
 type create1 struct {
 	dir
-	f writeAll
+	f write
 }
 
 func (f *create1) Create(req *fuse.CreateRequest, resp *fuse.CreateResponse, intr Intr) (Node, Handle, fuse.Error) {
