@@ -240,11 +240,9 @@ var fuseTests = []struct {
 	{"readAll1", &readAll1{}},
 	{"release", &release{}},
 	{"write", &write{}},
-	{"writeAll", &writeAll{}},
 	{"writeTruncateFlush", &writeTruncateFlush{}},
 	{"mkdir1", &mkdir1{}},
 	{"create1", &create1{}},
-	{"create2", &create2{}},
 	{"create3", &create3{}},
 	{"symlink1", &symlink1{}},
 	{"link1", &link1{}},
@@ -405,47 +403,6 @@ func (w *write) test(path string, t *testing.T) {
 	}
 }
 
-// Test Write calling WriteAll.
-
-type writeAll struct {
-	file
-	seen struct {
-		data  chan []byte
-		fsync chan bool
-	}
-}
-
-func (w *writeAll) Fsync(r *fuse.FsyncRequest, intr Intr) fuse.Error {
-	w.seen.fsync <- true
-	return nil
-}
-
-func (w *writeAll) WriteAll(data []byte, intr Intr) fuse.Error {
-	w.seen.data <- data
-	return nil
-}
-
-func (w *writeAll) Release(r *fuse.ReleaseRequest, intr Intr) fuse.Error {
-	close(w.seen.data)
-	return nil
-}
-
-func (w *writeAll) setup(t *testing.T) {
-	w.seen.data = make(chan []byte, 10)
-	w.seen.fsync = make(chan bool, 1)
-}
-
-func (w *writeAll) test(path string, t *testing.T) {
-	err := ioutil.WriteFile(path, []byte(hi), 0666)
-	if err != nil {
-		t.Fatalf("WriteFile: %v", err)
-		return
-	}
-	if got := string(gather(w.seen.data)); got != hi {
-		t.Errorf("writeAll = %q, want %q", got, hi)
-	}
-}
-
 // Test Write calling Setattr+Write+Flush.
 
 type writeTruncateFlush struct {
@@ -567,62 +524,6 @@ func (f *create1) test(path string, t *testing.T) {
 	}
 
 	ff.Close()
-}
-
-// Test Create + WriteAll + Remove
-
-type create2 struct {
-	dir
-	f         writeAll
-	fooExists bool
-}
-
-func (f *create2) Create(req *fuse.CreateRequest, resp *fuse.CreateResponse, intr Intr) (Node, Handle, fuse.Error) {
-	if req.Name != "foo" {
-		log.Printf("ERROR create2.Create unexpected name: %q\n", req.Name)
-		return nil, nil, fuse.EPERM
-	}
-	return &f.f, &f.f, nil
-}
-
-func (f *create2) Lookup(name string, intr Intr) (Node, fuse.Error) {
-	if f.fooExists && name == "foo" {
-		return file{}, nil
-	}
-	return nil, fuse.ENOENT
-}
-
-func (f *create2) Remove(r *fuse.RemoveRequest, intr Intr) fuse.Error {
-	if f.fooExists && r.Name == "foo" && !r.Dir {
-		f.fooExists = false
-		return nil
-	}
-	return fuse.ENOENT
-}
-
-func (f *create2) setup(t *testing.T) {
-	f.f.setup(t)
-}
-
-func (f *create2) test(path string, t *testing.T) {
-	err := ioutil.WriteFile(path+"/foo", []byte(hi), 0666)
-	if err != nil {
-		t.Fatalf("create2 WriteFile: %v", err)
-	}
-	if got := string(gather(f.f.seen.data)); got != hi {
-		t.Fatalf("create2 writeAll = %q, want %q", got, hi)
-	}
-
-	f.fooExists = true
-	log.Printf("pre-Remove")
-	err = os.Remove(path + "/foo")
-	if err != nil {
-		t.Fatalf("Remove: %v", err)
-	}
-	err = os.Remove(path + "/foo")
-	if err == nil {
-		t.Fatalf("second Remove = nil; want some error")
-	}
 }
 
 // Test Create + WriteAll + Remove

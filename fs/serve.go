@@ -235,10 +235,6 @@ type HandleReader interface {
 	Read(*fuse.ReadRequest, *fuse.ReadResponse, Intr) fuse.Error
 }
 
-type HandleWriteAller interface {
-	WriteAll([]byte, Intr) fuse.Error
-}
-
 type HandleWriter interface {
 	Write(*fuse.WriteRequest, *fuse.WriteResponse, Intr) fuse.Error
 }
@@ -275,15 +271,16 @@ func Serve(c *fuse.Conn, fs FS) error {
 	return nil
 }
 
+type nothing struct{}
+
 type serveConn struct {
-	meta        sync.Mutex
-	req         map[fuse.RequestID]*serveRequest
-	node        []*serveNode
-	handle      []*serveHandle
-	freeNode    []fuse.NodeID
-	freeHandle  []fuse.HandleID
-	nodeGen     uint64
-	nodeHandles []map[fuse.HandleID]bool // open handles for a node; slice index is NodeID
+	meta       sync.Mutex
+	req        map[fuse.RequestID]*serveRequest
+	node       []*serveNode
+	handle     []*serveHandle
+	freeNode   []fuse.NodeID
+	freeHandle []fuse.HandleID
+	nodeGen    uint64
 }
 
 type serveRequest struct {
@@ -311,11 +308,9 @@ func hash(s string) uint64 {
 }
 
 type serveHandle struct {
-	handle    Handle
-	readData  []byte
-	trunc     bool
-	writeData []byte
-	nodeID    fuse.NodeID
+	handle   Handle
+	readData []byte
+	nodeID   fuse.NodeID
 }
 
 func (c *serveConn) saveNode(name string, node Node) (id fuse.NodeID, gen uint64, sn *serveNode) {
@@ -346,16 +341,6 @@ func (c *serveConn) saveHandle(handle Handle, nodeID fuse.NodeID) (id fuse.Handl
 		id = fuse.HandleID(len(c.handle))
 		c.handle = append(c.handle, shandle)
 	}
-
-	// Update mapping from node ID -> set of open Handle IDs.
-	for len(c.nodeHandles) <= int(nodeID) {
-		c.nodeHandles = append(c.nodeHandles, nil)
-	}
-	if c.nodeHandles[nodeID] == nil {
-		c.nodeHandles[nodeID] = make(map[fuse.HandleID]bool)
-	}
-	c.nodeHandles[nodeID][id] = true
-
 	c.meta.Unlock()
 	return
 }
@@ -363,17 +348,12 @@ func (c *serveConn) saveHandle(handle Handle, nodeID fuse.NodeID) (id fuse.Handl
 func (c *serveConn) dropNode(id fuse.NodeID) {
 	c.meta.Lock()
 	c.node[id] = nil
-	if len(c.nodeHandles) > int(id) {
-		c.nodeHandles[id] = nil
-	}
 	c.freeNode = append(c.freeNode, id)
 	c.meta.Unlock()
 }
 
 func (c *serveConn) dropHandle(id fuse.HandleID) {
 	c.meta.Lock()
-	h := c.handle[id]
-	delete(c.nodeHandles[h.nodeID], id)
 	c.handle[id] = nil
 	c.freeHandle = append(c.freeHandle, id)
 	c.meta.Unlock()
@@ -487,46 +467,6 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 
 	case *fuse.SetattrRequest:
 		s := &fuse.SetattrResponse{}
-
-		// Special-case truncation, if no other bits are set
-		// and the open Handles all have a WriteAll method.
-		//
-		// TODO WriteAll mishandles all kinds of cases, e.g.
-		// truncating to non-zero size, noncontiguous writes, etc
-		if r.Valid.Size() && r.Size == 0 {
-			type writeAll interface {
-				WriteAll([]byte, Intr) fuse.Error
-			}
-			switch r.Valid {
-			case fuse.SetattrLockOwner | fuse.SetattrSize, fuse.SetattrSize:
-				// Seen on Linux. Handle isn't set.
-				c.meta.Lock()
-				// it is not safe to assume any handles are open for
-				// this node; calls to truncate(2) can happen at any
-				// time
-				if len(c.nodeHandles) > int(hdr.Node) {
-					for hid := range c.nodeHandles[hdr.Node] {
-						shandle := c.handle[hid]
-						if _, ok := shandle.handle.(writeAll); ok {
-							shandle.trunc = true
-						}
-					}
-				}
-				c.meta.Unlock()
-			case fuse.SetattrHandle | fuse.SetattrSize:
-				// Seen on OS X; the Handle is provided.
-				shandle := c.getHandle(r.Handle)
-				if shandle == nil {
-					fuse.Debugf("-> %#x %v", hdr.ID, fuse.ESTALE)
-					r.RespondError(fuse.ESTALE)
-					return
-				}
-				if _, ok := shandle.handle.(writeAll); ok {
-					shandle.trunc = true
-				}
-			}
-		}
-
 		log.Printf("setattr %v", r)
 		if n, ok := node.(NodeSetattrer); ok {
 			if err := n.Setattr(r, s, intr); err != nil {
@@ -712,14 +652,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 			break
 		}
 		c.saveLookup(&s.LookupResponse, snode, r.Name, n2)
-		h, shandle := c.saveHandle(h2, hdr.Node)
-		s.Handle = h
-		type writeAll interface {
-			WriteAll([]byte, Intr) fuse.Error
-		}
-		if _, ok := shandle.handle.(writeAll); ok {
-			shandle.trunc = true
-		}
+		s.Handle, _ = c.saveHandle(h2, hdr.Node)
 		done(s)
 		r.Respond(s)
 
@@ -815,13 +748,6 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		}
 
 		s := &fuse.WriteResponse{}
-		if shandle.trunc && r.Offset == int64(len(shandle.writeData)) {
-			shandle.writeData = append(shandle.writeData, r.Data...)
-			s.Size = len(r.Data)
-			done(s)
-			r.Respond(s)
-			break
-		}
 		if h, ok := shandle.handle.(HandleWriter); ok {
 			if err := h.Write(r, s, intr); err != nil {
 				done(err)
@@ -845,16 +771,6 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		}
 		handle := shandle.handle
 
-		if shandle.trunc {
-			h := handle.(HandleWriteAller)
-			if err := h.WriteAll(shandle.writeData, intr); err != nil {
-				done(err)
-				r.RespondError(err)
-				break
-			}
-			shandle.writeData = nil
-			shandle.trunc = false
-		}
 		if h, ok := handle.(HandleFlusher); ok {
 			if err := h.Flush(r, intr); err != nil {
 				done(err)
