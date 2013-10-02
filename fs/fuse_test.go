@@ -401,7 +401,7 @@ func (w *write) test(path string, t *testing.T) {
 	}
 	log.Printf("post-write Close")
 	if got := string(gather(w.seen.data)); got != hi {
-		t.Errorf("writeAll = %q, want %q", got, hi)
+		t.Errorf("write = %q, want %q", got, hi)
 	}
 }
 
@@ -666,7 +666,7 @@ func (f *create3) test(path string, t *testing.T) {
 		t.Fatalf("create3 WriteFile: %v", err)
 	}
 	if got := string(gather(f.f.seen.data)); got != hi {
-		t.Fatalf("create3 writeAll = %q, want %q", got, hi)
+		t.Fatalf("create3 write = %q, want %q", got, hi)
 	}
 
 	f.fooExists = true
