@@ -330,9 +330,9 @@ func (c *serveConn) saveNode(name string, node Node) (id fuse.NodeID, gen uint64
 	return
 }
 
-func (c *serveConn) saveHandle(handle Handle, nodeID fuse.NodeID) (id fuse.HandleID, shandle *serveHandle) {
+func (c *serveConn) saveHandle(handle Handle, nodeID fuse.NodeID) (id fuse.HandleID) {
 	c.meta.Lock()
-	shandle = &serveHandle{handle: handle, nodeID: nodeID}
+	shandle := &serveHandle{handle: handle, nodeID: nodeID}
 	if n := len(c.freeHandle); n > 0 {
 		id = c.freeHandle[n-1]
 		c.freeHandle = c.freeHandle[:n-1]
@@ -632,7 +632,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		} else {
 			h2 = node
 		}
-		s.Handle, _ = c.saveHandle(h2, hdr.Node)
+		s.Handle = c.saveHandle(h2, hdr.Node)
 		done(s)
 		r.Respond(s)
 
@@ -652,7 +652,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 			break
 		}
 		c.saveLookup(&s.LookupResponse, snode, r.Name, n2)
-		s.Handle, _ = c.saveHandle(h2, hdr.Node)
+		s.Handle = c.saveHandle(h2, hdr.Node)
 		done(s)
 		r.Respond(s)
 
