@@ -1645,7 +1645,7 @@ func (r *FsyncRequest) Respond() {
 }
 
 // An InterruptRequest is a request to interrupt another pending request. The
-// reponse to that request should return an error status of EINTR.
+// response to that request should return an error status of EINTR.
 type InterruptRequest struct {
 	Header
 	IntrID RequestID // ID of the request to be interrupt.
