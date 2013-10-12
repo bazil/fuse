@@ -963,7 +963,7 @@ func (it *interrupt) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, intr I
 
 	close(it.hanging)
 	<-intr
-	return fuse.Errno(syscall.EINTR)
+	return fuse.EINTR
 }
 
 func (it *interrupt) setup(t *testing.T) {

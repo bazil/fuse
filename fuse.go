@@ -177,6 +177,10 @@ const (
 	ENOENT = Errno(syscall.ENOENT)
 	EIO    = Errno(syscall.EIO)
 	EPERM  = Errno(syscall.EPERM)
+
+	// EINTR indicates request was interrupted by an InterruptRequest.
+	// See also fs.Intr.
+	EINTR = Errno(syscall.EINTR)
 )
 
 type errno int
