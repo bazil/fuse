@@ -314,9 +314,45 @@ type serveHandle struct {
 	nodeID   fuse.NodeID
 }
 
+// NodeRef can be embedded in a Node to recognize the same Node being
+// returned from multiple Lookup, Create etc calls.
+//
+// Without this, each Node will get a new NodeID, causing spurious
+// cache invalidations, extra lookups and aliasing anomalies. This may
+// not matter for a simple, read-only filesystem.
+type NodeRef struct {
+	id         fuse.NodeID
+	generation uint64
+}
+
+// nodeRef is only ever accessed while holding serveConn.meta
+func (n *NodeRef) nodeRef() *NodeRef {
+	return n
+}
+
+type nodeRef interface {
+	nodeRef() *NodeRef
+}
+
 func (c *serveConn) saveNode(name string, node Node) (id fuse.NodeID, gen uint64, sn *serveNode) {
-	sn = &serveNode{name: name, node: node, refs: 1}
 	c.meta.Lock()
+	defer c.meta.Unlock()
+
+	var ref *NodeRef
+	if nodeRef, ok := node.(nodeRef); ok {
+		ref = nodeRef.nodeRef()
+
+		if ref.id != 0 {
+			// dropNode guarantees that NodeRef is zeroed at the same
+			// time as the NodeID is removed from serveConn.node, as
+			// guarded by c.meta; this means sn cannot be nil here
+			sn = c.node[ref.id]
+			sn.refs++
+			return ref.id, ref.generation, sn
+		}
+	}
+
+	sn = &serveNode{name: name, node: node, refs: 1}
 	if n := len(c.freeNode); n > 0 {
 		id = c.freeNode[n-1]
 		c.freeNode = c.freeNode[:n-1]
@@ -327,7 +363,10 @@ func (c *serveConn) saveNode(name string, node Node) (id fuse.NodeID, gen uint64
 		c.node = append(c.node, sn)
 	}
 	gen = c.nodeGen
-	c.meta.Unlock()
+	if ref != nil {
+		ref.id = id
+		ref.generation = gen
+	}
 	return
 }
 
@@ -370,6 +409,10 @@ func (c *serveConn) dropNode(id fuse.NodeID, n uint64) (forget bool) {
 	snode.refs -= n
 	if snode.refs == 0 {
 		c.node[id] = nil
+		if nodeRef, ok := snode.node.(nodeRef); ok {
+			ref := nodeRef.nodeRef()
+			*ref = NodeRef{}
+		}
 		c.freeNode = append(c.freeNode, id)
 		return true
 	}
