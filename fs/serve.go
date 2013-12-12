@@ -254,7 +254,7 @@ func Serve(c *fuse.Conn, fs FS) error {
 	if err != nil {
 		return fmt.Errorf("cannot obtain root node: %v", syscall.Errno(err.(fuse.Errno)).Error())
 	}
-	sc.node = append(sc.node, nil, &serveNode{name: "/", node: root})
+	sc.node = append(sc.node, nil, &serveNode{name: "/", node: root, refs: 1})
 	sc.handle = append(sc.handle, nil)
 
 	for {
@@ -291,6 +291,7 @@ type serveRequest struct {
 type serveNode struct {
 	name string
 	node Node
+	refs uint64
 }
 
 func (sn *serveNode) attr() (attr fuse.Attr) {
@@ -314,7 +315,7 @@ type serveHandle struct {
 }
 
 func (c *serveConn) saveNode(name string, node Node) (id fuse.NodeID, gen uint64, sn *serveNode) {
-	sn = &serveNode{name: name, node: node}
+	sn = &serveNode{name: name, node: node, refs: 1}
 	c.meta.Lock()
 	if n := len(c.freeNode); n > 0 {
 		id = c.freeNode[n-1]
@@ -345,11 +346,34 @@ func (c *serveConn) saveHandle(handle Handle, nodeID fuse.NodeID) (id fuse.Handl
 	return
 }
 
-func (c *serveConn) dropNode(id fuse.NodeID) {
+func (c *serveConn) dropNode(id fuse.NodeID, n uint64) (forget bool) {
 	c.meta.Lock()
-	c.node[id] = nil
-	c.freeNode = append(c.freeNode, id)
-	c.meta.Unlock()
+	defer c.meta.Unlock()
+	snode := c.node[id]
+
+	if snode == nil {
+		// this should only happen if refcounts kernel<->us disagree
+		// *and* two ForgetRequests for the same node race each other;
+		// this indicates a bug somewhere
+		fuse.Debugf("bug: trying to drop %d references to non-existent %v", n, id)
+
+		// we may end up triggering Forget twice, but that's better
+		// than not even once, and that's the best we can do
+		return true
+	}
+
+	if n > snode.refs {
+		fuse.Debugf("bug: trying to drop %d of %d references to %v", n, snode.refs, id)
+		n = snode.refs
+	}
+
+	snode.refs -= n
+	if snode.refs == 0 {
+		c.node[id] = nil
+		c.freeNode = append(c.freeNode, id)
+		return true
+	}
+	return false
 }
 
 func (c *serveConn) dropHandle(id fuse.HandleID) {
@@ -662,11 +686,13 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		r.RespondError(fuse.ENOSYS)
 
 	case *fuse.ForgetRequest:
-		n, ok := node.(NodeForgetter)
-		if ok {
-			n.Forget()
+		forget := c.dropNode(hdr.Node, r.N)
+		if forget {
+			n, ok := node.(NodeForgetter)
+			if ok {
+				n.Forget()
+			}
 		}
-		c.dropNode(hdr.Node)
 		done(r)
 		r.Respond()
 
