@@ -22,6 +22,11 @@ import (
 	"bazil.org/fuse/fuseutil"
 )
 
+const (
+	attrValidTime  = 1 * time.Minute
+	entryValidTime = 1 * time.Minute
+)
+
 // TODO: FINISH DOCS
 
 // An Intr is a channel that signals that a request has been interrupted.
@@ -526,7 +531,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 				break
 			}
 		} else {
-			s.AttrValid = 1 * time.Minute
+			s.AttrValid = attrValidTime
 			s.Attr = snode.attr()
 		}
 		done(s)
@@ -547,7 +552,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		}
 
 		if s.AttrValid == 0 {
-			s.AttrValid = 1 * time.Minute
+			s.AttrValid = attrValidTime
 		}
 		s.Attr = snode.attr()
 		done(s)
@@ -979,10 +984,10 @@ func (c *serveConn) saveLookup(s *fuse.LookupResponse, snode *serveNode, elem st
 	var sn *serveNode
 	s.Node, s.Generation, sn = c.saveNode(name, n2)
 	if s.EntryValid == 0 {
-		s.EntryValid = 1 * time.Minute
+		s.EntryValid = entryValidTime
 	}
 	if s.AttrValid == 0 {
-		s.AttrValid = 1 * time.Minute
+		s.AttrValid = attrValidTime
 	}
 	s.Attr = sn.attr()
 }
