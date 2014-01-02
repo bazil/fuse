@@ -85,6 +85,7 @@ package fuse
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -1229,6 +1230,17 @@ func (r *ReadResponse) String() string {
 	return fmt.Sprintf("Read %d", len(r.Data))
 }
 
+type jsonReadResponse struct {
+	Len uint64
+}
+
+func (r *ReadResponse) MarshalJSON() ([]byte, error) {
+	j := jsonReadResponse{
+		Len: uint64(len(r.Data)),
+	}
+	return json.Marshal(j)
+}
+
 // A ReleaseRequest asks to release (close) an open file handle.
 type ReleaseRequest struct {
 	Header       `json:"-"`
@@ -1374,6 +1386,23 @@ type WriteRequest struct {
 
 func (r *WriteRequest) String() string {
 	return fmt.Sprintf("Write [%s] %#x %d @%d fl=%v", &r.Header, r.Handle, len(r.Data), r.Offset, r.Flags)
+}
+
+type jsonWriteRequest struct {
+	Handle HandleID
+	Offset int64
+	Len    uint64
+	Flags  WriteFlags
+}
+
+func (r *WriteRequest) MarshalJSON() ([]byte, error) {
+	j := jsonWriteRequest{
+		Handle: r.Handle,
+		Offset: r.Offset,
+		Len:    uint64(len(r.Data)),
+		Flags:  r.Flags,
+	}
+	return json.Marshal(j)
 }
 
 // Respond replies to the request with the given response.
