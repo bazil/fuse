@@ -184,6 +184,15 @@ const (
 	EINTR = Errno(syscall.EINTR)
 )
 
+var errnoNames = map[Errno]string{
+	ENOSYS: "ENOSYS",
+	ESTALE: "ESTALE",
+	ENOENT: "ENOENT",
+	EIO:    "EIO",
+	EPERM:  "EPERM",
+	EINTR:  "EINTR",
+}
+
 type errno int
 
 func (e errno) errno() int32 {
@@ -199,6 +208,14 @@ func (e Errno) errno() int32 {
 
 func (e Errno) String() string {
 	return syscall.Errno(e).Error()
+}
+
+func (e Errno) MarshalText() ([]byte, error) {
+	s := errnoNames[e]
+	if s == "" {
+		s = fmt.Sprint(e.errno())
+	}
+	return []byte(s), nil
 }
 
 func (h *Header) RespondError(err Error) {
