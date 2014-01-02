@@ -146,7 +146,7 @@ const RootID NodeID = rootID
 
 // A Header describes the basic information sent in every request.
 type Header struct {
-	Conn *Conn     // connection this request was received on
+	Conn *Conn     `json:"-"` // connection this request was received on
 	ID   RequestID // unique ID for request
 	Node NodeID    // file or directory the request is about
 	Uid  uint32    // user ID of process making request
@@ -767,7 +767,7 @@ func (c *Conn) respondData(out *outHeader, n uintptr, data []byte) {
 
 // An InitRequest is the first request sent on a FUSE file system.
 type InitRequest struct {
-	Header
+	Header       `json:"-"`
 	Major        uint32
 	Minor        uint32
 	MaxReadahead uint32
@@ -804,7 +804,7 @@ func (r *InitRequest) Respond(resp *InitResponse) {
 
 // A StatfsRequest requests information about the mounted file system.
 type StatfsRequest struct {
-	Header
+	Header `json:"-"`
 }
 
 func (r *StatfsRequest) String() string {
@@ -847,8 +847,8 @@ func (r *StatfsResponse) String() string {
 // An AccessRequest asks whether the file can be accessed
 // for the purpose specified by the mask.
 type AccessRequest struct {
-	Header
-	Mask uint32
+	Header `json:"-"`
+	Mask   uint32
 }
 
 func (r *AccessRequest) String() string {
@@ -933,7 +933,7 @@ func (a *Attr) attr() (out attr) {
 
 // A GetattrRequest asks for the metadata for the file denoted by r.Node.
 type GetattrRequest struct {
-	Header
+	Header `json:"-"`
 }
 
 func (r *GetattrRequest) String() string {
@@ -963,7 +963,7 @@ func (r *GetattrResponse) String() string {
 
 // A GetxattrRequest asks for the extended attributes associated with r.Node.
 type GetxattrRequest struct {
-	Header
+	Header   `json:"-"`
 	Size     uint32 // maximum size to return
 	Position uint32 // offset within extended attributes
 }
@@ -992,7 +992,7 @@ func (r *GetxattrResponse) String() string {
 
 // A ListxattrRequest asks to list the extended attributes associated with r.Node.
 type ListxattrRequest struct {
-	Header
+	Header   `json:"-"`
 	Size     uint32 // maximum size to return
 	Position uint32 // offset within attribute list
 }
@@ -1021,8 +1021,8 @@ func (r *ListxattrResponse) String() string {
 
 // A RemovexattrRequest asks to remove an extended attribute associated with r.Node.
 type RemovexattrRequest struct {
-	Header
-	Name string // name of extended attribute
+	Header `json:"-"`
+	Name   string // name of extended attribute
 }
 
 func (r *RemovexattrRequest) String() string {
@@ -1037,7 +1037,7 @@ func (r *RemovexattrRequest) Respond() {
 
 // A SetxattrRequest asks to set an extended attribute associated with a file.
 type SetxattrRequest struct {
-	Header
+	Header   `json:"-"`
 	Flags    uint32
 	Position uint32 // OS X only
 	Name     string
@@ -1056,8 +1056,8 @@ func (r *SetxattrRequest) Respond() {
 
 // A LookupRequest asks to look up the given name in the directory named by r.Node.
 type LookupRequest struct {
-	Header
-	Name string
+	Header `json:"-"`
+	Name   string
 }
 
 func (r *LookupRequest) String() string {
@@ -1094,10 +1094,10 @@ func (r *LookupResponse) String() string {
 
 // An OpenRequest asks to open a file or directory
 type OpenRequest struct {
-	Header
-	Dir   bool // is this Opendir?
-	Flags uint32
-	Mode  os.FileMode
+	Header `json:"-"`
+	Dir    bool // is this Opendir?
+	Flags  uint32
+	Mode   os.FileMode
 }
 
 func (r *OpenRequest) String() string {
@@ -1126,10 +1126,10 @@ func (r *OpenResponse) String() string {
 
 // A CreateRequest asks to create and open a file (not a directory).
 type CreateRequest struct {
-	Header
-	Name  string
-	Flags uint32
-	Mode  os.FileMode
+	Header `json:"-"`
+	Name   string
+	Flags  uint32
+	Mode   os.FileMode
 }
 
 func (r *CreateRequest) String() string {
@@ -1168,9 +1168,9 @@ func (r *CreateResponse) String() string {
 
 // A MkdirRequest asks to create (but not open) a directory.
 type MkdirRequest struct {
-	Header
-	Name string
-	Mode os.FileMode
+	Header `json:"-"`
+	Name   string
+	Mode   os.FileMode
 }
 
 func (r *MkdirRequest) String() string {
@@ -1203,7 +1203,7 @@ func (r *MkdirResponse) String() string {
 
 // A ReadRequest asks to read from an open file.
 type ReadRequest struct {
-	Header
+	Header `json:"-"`
 	Dir    bool // is this Readdir?
 	Handle HandleID
 	Offset int64
@@ -1231,7 +1231,7 @@ func (r *ReadResponse) String() string {
 
 // A ReleaseRequest asks to release (close) an open file handle.
 type ReleaseRequest struct {
-	Header
+	Header       `json:"-"`
 	Dir          bool // is this Releasedir?
 	Handle       HandleID
 	Flags        uint32 // flags from OpenRequest
@@ -1253,7 +1253,7 @@ func (r *ReleaseRequest) Respond() {
 // No more requests will be received after this one, but it should still be
 // responded to.
 type DestroyRequest struct {
-	Header
+	Header `json:"-"`
 }
 
 func (r *DestroyRequest) String() string {
@@ -1269,8 +1269,8 @@ func (r *DestroyRequest) Respond() {
 // A ForgetRequest is sent by the kernel when forgetting about r.Node
 // as returned by r.N lookup requests.
 type ForgetRequest struct {
-	Header
-	N uint64
+	Header `json:"-"`
+	N      uint64
 }
 
 func (r *ForgetRequest) String() string {
@@ -1397,7 +1397,7 @@ func (r *WriteResponse) String() string {
 // A SetattrRequest asks to change one or more attributes associated with a file,
 // as indicated by Valid.
 type SetattrRequest struct {
-	Header
+	Header `json:"-"`
 	Valid  SetattrValid
 	Handle HandleID
 	Size   uint64
@@ -1490,7 +1490,7 @@ func (r *SetattrResponse) String() string {
 // to storage, as when a file descriptor is being closed.  A single opened Handle
 // may receive multiple FlushRequests over its lifetime.
 type FlushRequest struct {
-	Header
+	Header    `json:"-"`
 	Handle    HandleID
 	Flags     uint32
 	LockOwner uint64
@@ -1508,9 +1508,9 @@ func (r *FlushRequest) Respond() {
 
 // A RemoveRequest asks to remove a file or directory.
 type RemoveRequest struct {
-	Header
-	Name string // name of extended attribute
-	Dir  bool   // is this rmdir?
+	Header `json:"-"`
+	Name   string // name of extended attribute
+	Dir    bool   // is this rmdir?
 }
 
 func (r *RemoveRequest) String() string {
@@ -1525,7 +1525,7 @@ func (r *RemoveRequest) Respond() {
 
 // A SymlinkRequest is a request to create a symlink making NewName point to Target.
 type SymlinkRequest struct {
-	Header
+	Header          `json:"-"`
 	NewName, Target string
 }
 
@@ -1555,7 +1555,7 @@ type SymlinkResponse struct {
 
 // A ReadlinkRequest is a request to read a symlink's target.
 type ReadlinkRequest struct {
-	Header
+	Header `json:"-"`
 }
 
 func (r *ReadlinkRequest) String() string {
@@ -1569,7 +1569,7 @@ func (r *ReadlinkRequest) Respond(target string) {
 
 // A LinkRequest is a request to create a hard link.
 type LinkRequest struct {
-	Header
+	Header  `json:"-"`
 	OldNode NodeID
 	NewName string
 }
@@ -1590,7 +1590,7 @@ func (r *LinkRequest) Respond(resp *LookupResponse) {
 
 // A RenameRequest is a request to rename a file.
 type RenameRequest struct {
-	Header
+	Header           `json:"-"`
 	NewDir           NodeID
 	OldName, NewName string
 }
@@ -1605,10 +1605,10 @@ func (r *RenameRequest) Respond() {
 }
 
 type MknodRequest struct {
-	Header
-	Name string
-	Mode os.FileMode
-	Rdev uint32
+	Header `json:"-"`
+	Name   string
+	Mode   os.FileMode
+	Rdev   uint32
 }
 
 func (r *MknodRequest) String() string {
@@ -1630,7 +1630,7 @@ func (r *MknodRequest) Respond(resp *LookupResponse) {
 }
 
 type FsyncRequest struct {
-	Header
+	Header `json:"-"`
 	Handle HandleID
 	Flags  uint32
 }
@@ -1647,7 +1647,7 @@ func (r *FsyncRequest) Respond() {
 // An InterruptRequest is a request to interrupt another pending request. The
 // response to that request should return an error status of EINTR.
 type InterruptRequest struct {
-	Header
+	Header `json:"-"`
 	IntrID RequestID // ID of the request to be interrupt.
 }
 
@@ -1663,7 +1663,7 @@ func (r *InterruptRequest) String() string {
 
 // A XXXRequest xxx.
 type XXXRequest struct {
-	Header
+	Header `json:"-"`
 	xxx
 }
 
