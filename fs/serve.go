@@ -12,6 +12,8 @@ import (
 	"io"
 	"log"
 	"path"
+	"reflect"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -444,11 +446,43 @@ func (c *serveConn) getHandle(id fuse.HandleID) (shandle *serveHandle) {
 	return
 }
 
+type request struct {
+	Op      string
+	Request *fuse.Header
+	In      interface{} `json:",omitempty"`
+}
+
+type logResponseHeader struct {
+	ID fuse.RequestID
+}
+
+type response struct {
+	Op      string
+	Request logResponseHeader
+	Out     interface{} `json:",omitempty"`
+	Error   fuse.Error  `json:",omitempty"`
+}
+
+type logMissingNode struct {
+	MaxNode fuse.NodeID
+}
+
+func opName(req fuse.Request) string {
+	t := reflect.Indirect(reflect.ValueOf(req)).Type()
+	s := t.Name()
+	s = strings.TrimSuffix(s, "Request")
+	return s
+}
+
 func (c *serveConn) serve(fs FS, r fuse.Request) {
 	intr := make(Intr)
 	req := &serveRequest{Request: r, Intr: intr}
 
-	fuse.Debugf("<- %s", req)
+	fuse.Debug(request{
+		Op:      opName(r),
+		Request: r.Hdr(),
+		In:      r,
+	})
 	var node Node
 	var snode *serveNode
 	c.meta.Lock()
@@ -459,8 +493,17 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		}
 		if snode == nil {
 			c.meta.Unlock()
-			println("missing node", id, len(c.node), snode)
-			fuse.Debugf("-> %#x %v", hdr.ID, fuse.ESTALE)
+			fuse.Debug(response{
+				Op:      opName(r),
+				Request: logResponseHeader{ID: hdr.ID},
+				Error:   fuse.ESTALE,
+				// this is the only place that sets both Error and
+				// Out; not sure if i want to do that; might get rid
+				// of len(c.node) things altogether
+				Out: logMissingNode{
+					MaxNode: fuse.NodeID(len(c.node)),
+				},
+			})
 			r.RespondError(fuse.ESTALE)
 			return
 		}
@@ -482,7 +525,17 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 	// After responding is too late: we might get another request
 	// with the same ID and be very confused.
 	done := func(resp interface{}) {
-		fuse.Debugf("-> %#x %v", hdr.ID, resp)
+		msg := response{
+			Op:      opName(r),
+			Request: logResponseHeader{ID: hdr.ID},
+		}
+		if err, ok := resp.(fuse.Error); ok {
+			msg.Error = err
+		} else {
+			msg.Out = resp
+		}
+		fuse.Debug(msg)
+
 		c.meta.Lock()
 		delete(c.req, hdr.ID)
 		c.meta.Unlock()
@@ -649,7 +702,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 				break
 			}
 		}
-		done(r)
+		done(nil)
 		r.Respond()
 
 	case *fuse.LookupRequest:
@@ -743,7 +796,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 				n.Forget()
 			}
 		}
-		done(r)
+		done(nil)
 		r.Respond()
 
 	// Handle operations.

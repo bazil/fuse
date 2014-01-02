@@ -18,3 +18,9 @@ func stack() string {
 var Debugf = nop
 
 func nop(string, ...interface{}) {}
+
+func stringify(msg interface{}) {
+	Debugf("%s", msg)
+}
+
+var Debug = stringify
