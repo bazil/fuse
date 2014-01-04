@@ -527,7 +527,6 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 			}
 		}
 
-		log.Printf("setattr %v", r)
 		if n, ok := node.(NodeSetattrer); ok {
 			if err := n.Setattr(r, s, intr); err != nil {
 				done(err)
