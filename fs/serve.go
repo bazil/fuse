@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"hash/fnv"
 	"io"
-	"log"
 	"path"
 	"reflect"
 	"strings"
@@ -655,7 +654,6 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 
 	case *fuse.SetattrRequest:
 		s := &fuse.SetattrResponse{}
-		log.Printf("setattr %v", r)
 		if n, ok := node.(NodeSetattrer); ok {
 			if err := n.Setattr(r, s, intr); err != nil {
 				done(err)
@@ -711,7 +709,6 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 	case *fuse.LinkRequest:
 		n, ok := node.(NodeLinker)
 		if !ok {
-			log.Printf("Node %T doesn't implement fuse Link", node)
 			done(fuse.EIO) /// XXX or EPERM?
 			r.RespondError(fuse.EIO)
 			break
@@ -951,7 +948,6 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 			r.Respond(s)
 			break
 		}
-		println("NO WRITE")
 		done(fuse.EIO)
 		r.RespondError(fuse.EIO)
 
@@ -1021,7 +1017,6 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		}
 		n, ok := node.(NodeRenamer)
 		if !ok {
-			log.Printf("Node %T missing Rename method", node)
 			done(fuse.EIO) // XXX or EPERM like Mkdir?
 			r.RespondError(fuse.EIO)
 			break
@@ -1038,7 +1033,6 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 	case *fuse.MknodRequest:
 		n, ok := node.(NodeMknoder)
 		if !ok {
-			log.Printf("Node %T missing Mknod method", node)
 			done(fuse.EIO)
 			r.RespondError(fuse.EIO)
 			break
@@ -1057,7 +1051,6 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 	case *fuse.FsyncRequest:
 		n, ok := node.(NodeFsyncer)
 		if !ok {
-			log.Printf("Node %T missing Fsync method", node)
 			done(fuse.EIO)
 			r.RespondError(fuse.EIO)
 			break

@@ -500,7 +500,6 @@ func (c *Conn) ReadRequest() (Request, error) {
 			goto corrupt
 		}
 		oldName, newName := string(oldNew[:i]), string(oldNew[i+1:len(oldNew)-1])
-		// log.Printf("RENAME: newDirNode = %d; old = %q, new = %q", newDirNodeID, oldName, newName)
 		req = &RenameRequest{
 			Header:  m.Header(),
 			NewDir:  newDirNodeID,
