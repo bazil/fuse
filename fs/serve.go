@@ -392,6 +392,16 @@ func (c *serveConn) saveHandle(handle Handle, nodeID fuse.NodeID) (id fuse.Handl
 	return
 }
 
+type nodeRefcountDropBug struct {
+	N    uint64
+	Refs uint64
+	Node fuse.NodeID
+}
+
+func (n *nodeRefcountDropBug) String() string {
+	return fmt.Sprintf("bug: trying to drop %d of %d references to %v", n.N, n.Refs, n.Node)
+}
+
 func (c *serveConn) dropNode(id fuse.NodeID, n uint64) (forget bool) {
 	c.meta.Lock()
 	defer c.meta.Unlock()
@@ -401,7 +411,7 @@ func (c *serveConn) dropNode(id fuse.NodeID, n uint64) (forget bool) {
 		// this should only happen if refcounts kernel<->us disagree
 		// *and* two ForgetRequests for the same node race each other;
 		// this indicates a bug somewhere
-		fuse.Debugf("bug: trying to drop %d references to non-existent %v", n, id)
+		fuse.Debug(nodeRefcountDropBug{N: n, Node: id})
 
 		// we may end up triggering Forget twice, but that's better
 		// than not even once, and that's the best we can do
@@ -409,7 +419,7 @@ func (c *serveConn) dropNode(id fuse.NodeID, n uint64) (forget bool) {
 	}
 
 	if n > snode.refs {
-		fuse.Debugf("bug: trying to drop %d of %d references to %v", n, snode.refs, id)
+		fuse.Debug(nodeRefcountDropBug{N: n, Refs: snode.refs, Node: id})
 		n = snode.refs
 	}
 
