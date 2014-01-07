@@ -470,6 +470,8 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		// This happens with OSXFUSE.  Assume it's okay and
 		// that we'll never see an interrupt for this one.
 		// Otherwise everything wedges.  TODO: Report to OSXFUSE?
+		//
+		// TODO this might have been because of missing done() calls
 		intr = nil
 	} else {
 		c.req[hdr.ID] = req
@@ -748,7 +750,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 	case *fuse.ReadRequest:
 		shandle := c.getHandle(r.Handle)
 		if shandle == nil {
-			fuse.Debugf("-> %#x %v", hdr.ID, fuse.ESTALE)
+			done(fuse.ESTALE)
 			r.RespondError(fuse.ESTALE)
 			return
 		}
@@ -816,7 +818,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 	case *fuse.WriteRequest:
 		shandle := c.getHandle(r.Handle)
 		if shandle == nil {
-			fuse.Debugf("-> %#x %v", hdr.ID, fuse.ESTALE)
+			done(fuse.ESTALE)
 			r.RespondError(fuse.ESTALE)
 			return
 		}
@@ -839,7 +841,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 	case *fuse.FlushRequest:
 		shandle := c.getHandle(r.Handle)
 		if shandle == nil {
-			fuse.Debugf("-> %#x %v", hdr.ID, fuse.ESTALE)
+			done(fuse.ESTALE)
 			r.RespondError(fuse.ESTALE)
 			return
 		}
@@ -858,7 +860,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 	case *fuse.ReleaseRequest:
 		shandle := c.getHandle(r.Handle)
 		if shandle == nil {
-			fuse.Debugf("-> %#x %v", hdr.ID, fuse.ESTALE)
+			done(fuse.ESTALE)
 			r.RespondError(fuse.ESTALE)
 			return
 		}
