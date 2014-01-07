@@ -452,8 +452,16 @@ type request struct {
 	In      interface{} `json:",omitempty"`
 }
 
+func (r request) String() string {
+	return fmt.Sprintf("<- %s [%s] %s", r.Op, r.Request, r.In)
+}
+
 type logResponseHeader struct {
 	ID fuse.RequestID
+}
+
+func (m logResponseHeader) String() string {
+	return fmt.Sprintf("ID=%#x", m.ID)
 }
 
 type response struct {
@@ -461,6 +469,19 @@ type response struct {
 	Request logResponseHeader
 	Out     interface{} `json:",omitempty"`
 	Error   fuse.Error  `json:",omitempty"`
+}
+
+func (r response) String() string {
+	switch {
+	case r.Error != nil && r.Out != nil:
+		return fmt.Sprintf("-> %s error=%s %s", r.Request, r.Error, r.Out)
+	case r.Error != nil:
+		return fmt.Sprintf("-> %s error=%s", r.Request, r.Error)
+	case r.Out != nil:
+		return fmt.Sprintf("-> %s %s", r.Request, r.Out)
+	default:
+		return fmt.Sprintf("-> %s", r.Request)
+	}
 }
 
 type logMissingNode struct {
