@@ -15,12 +15,6 @@ func stack() string {
 	return string(buf[:runtime.Stack(buf, false)])
 }
 
-var Debugf = nop
+func nop(msg interface{}) {}
 
-func nop(string, ...interface{}) {}
-
-func stringify(msg interface{}) {
-	Debugf("%s", msg)
-}
-
-var Debug = stringify
+var Debug = nop

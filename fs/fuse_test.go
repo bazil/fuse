@@ -41,6 +41,14 @@ func gather(ch chan []byte) []byte {
 	return buf
 }
 
+// debug adapts fuse.Debug to match t.Log calling convention; due to
+// varargs, we can't just assign tb.Log to fuse.Debug
+func debug(tb testing.TB) func(msg interface{}) {
+	return func(msg interface{}) {
+		tb.Log(msg)
+	}
+}
+
 type badRootFS struct{}
 
 func (badRootFS) Root() (Node, fuse.Error) {
@@ -49,7 +57,7 @@ func (badRootFS) Root() (Node, fuse.Error) {
 }
 
 func TestRootErr(t *testing.T) {
-	fuse.Debugf = log.Printf
+	fuse.Debug = debug(t)
 	dir, err := ioutil.TempDir("", "fusetest")
 	if err != nil {
 		t.Fatal(err)
@@ -94,7 +102,7 @@ func (f testStatFS) Statfs(req *fuse.StatfsRequest, resp *fuse.StatfsResponse, i
 }
 
 func TestStatfs(t *testing.T) {
-	fuse.Debugf = log.Printf
+	fuse.Debug = debug(t)
 	dir, err := ioutil.TempDir("", "fusetest")
 	if err != nil {
 		t.Fatal(err)
@@ -154,7 +162,7 @@ func TestStatfs(t *testing.T) {
 }
 
 func TestFuse(t *testing.T) {
-	fuse.Debugf = log.Printf
+	fuse.Debug = debug(t)
 	dir, err := ioutil.TempDir("", "fusetest")
 	if err != nil {
 		t.Fatal(err)
