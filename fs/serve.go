@@ -505,6 +505,15 @@ func opName(req fuse.Request) string {
 	return s
 }
 
+type logLinkRequestOldNodeNotFound struct {
+	Request *fuse.Header
+	In      *fuse.LinkRequest
+}
+
+func (m *logLinkRequestOldNodeNotFound) String() string {
+	return fmt.Sprintf("In LinkRequest (request %#x), node %d not found", m.Request.Hdr().ID, m.In.OldNode)
+}
+
 func (c *serveConn) serve(fs FS, r fuse.Request) {
 	intr := make(Intr)
 	req := &serveRequest{Request: r, Intr: intr}
@@ -693,7 +702,10 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		}
 		c.meta.Unlock()
 		if oldNode == nil {
-			log.Printf("In LinkRequest, node %d not found", r.OldNode)
+			fuse.Debug(logLinkRequestOldNodeNotFound{
+				Request: r.Hdr(),
+				In:      r,
+			})
 			done(fuse.EIO)
 			r.RespondError(fuse.EIO)
 			break
