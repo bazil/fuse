@@ -89,7 +89,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"runtime"
 	"sync"
@@ -760,6 +759,12 @@ unrecognized:
 	return &h, nil
 }
 
+type bugShortKernelWrite struct {
+	Written int64
+	Error   string
+	Stack   string
+}
+
 func (c *Conn) respond(out *outHeader, n uintptr) {
 	c.wio.Lock()
 	defer c.wio.Unlock()
@@ -767,8 +772,11 @@ func (c *Conn) respond(out *outHeader, n uintptr) {
 	msg := (*[1 << 30]byte)(unsafe.Pointer(out))[:n]
 	nn, err := syscall.Write(c.fd, msg)
 	if nn != len(msg) || err != nil {
-		log.Printf("RESPOND WRITE: %d %v", nn, err)
-		log.Printf("with stack: %s", stack())
+		Debug(bugShortKernelWrite{
+			Written: int64(nn),
+			Error:   err.Error(),
+			Stack:   stack(),
+		})
 	}
 }
 
