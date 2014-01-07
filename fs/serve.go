@@ -482,7 +482,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 	done := func(resp interface{}) {
 		fuse.Debugf("-> %#x %v", hdr.ID, resp)
 		c.meta.Lock()
-		c.req[hdr.ID] = nil
+		delete(c.req, hdr.ID)
 		c.meta.Unlock()
 	}
 
