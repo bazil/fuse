@@ -514,6 +514,15 @@ func (m *logLinkRequestOldNodeNotFound) String() string {
 	return fmt.Sprintf("In LinkRequest (request %#x), node %d not found", m.Request.Hdr().ID, m.In.OldNode)
 }
 
+type renameNewDirNodeNotFound struct {
+	Request *fuse.Header
+	In      *fuse.RenameRequest
+}
+
+func (m *renameNewDirNodeNotFound) String() string {
+	return fmt.Sprintf("In RenameRequest (request %#x), node %d not found", m.Request.Hdr().ID, m.In.NewDir)
+}
+
 func (c *serveConn) serve(fs FS, r fuse.Request) {
 	intr := make(Intr)
 	req := &serveRequest{Request: r, Intr: intr}
@@ -990,7 +999,10 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		}
 		c.meta.Unlock()
 		if newDirNode == nil {
-			println("RENAME NEW DIR NODE NOT FOUND")
+			fuse.Debug(renameNewDirNodeNotFound{
+				Request: r.Hdr(),
+				In:      r,
+			})
 			done(fuse.EIO)
 			r.RespondError(fuse.EIO)
 			break
