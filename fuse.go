@@ -293,6 +293,14 @@ func fileMode(unixMode uint32) os.FileMode {
 	return mode
 }
 
+type noOpcode struct {
+	Opcode uint32
+}
+
+func (m noOpcode) String() string {
+	return fmt.Sprintf("No opcode %v", m.Opcode)
+}
+
 func (c *Conn) ReadRequest() (Request, error) {
 	// TODO: Some kind of buffer reuse.
 	m := newMessage(c)
@@ -331,7 +339,7 @@ func (c *Conn) ReadRequest() (Request, error) {
 	var req Request
 	switch m.hdr.Opcode {
 	default:
-		println("No opcode", m.hdr.Opcode)
+		Debug(noOpcode{Opcode: m.hdr.Opcode})
 		goto unrecognized
 
 	case opLookup:
