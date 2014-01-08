@@ -443,6 +443,15 @@ func (c *serveConn) dropHandle(id fuse.HandleID) {
 	c.meta.Unlock()
 }
 
+type missingHandle struct {
+	Handle    fuse.HandleID
+	MaxHandle fuse.HandleID
+}
+
+func (m missingHandle) String() string {
+	return fmt.Sprint("missing handle", m.Handle, m.MaxHandle)
+}
+
 // Returns nil for invalid handles.
 func (c *serveConn) getHandle(id fuse.HandleID) (shandle *serveHandle) {
 	c.meta.Lock()
@@ -451,7 +460,10 @@ func (c *serveConn) getHandle(id fuse.HandleID) (shandle *serveHandle) {
 		shandle = c.handle[uint(id)]
 	}
 	if shandle == nil {
-		println("missing handle", id, len(c.handle), shandle)
+		fuse.Debug(missingHandle{
+			Handle:    id,
+			MaxHandle: fuse.HandleID(len(c.handle)),
+		})
 	}
 	return
 }
