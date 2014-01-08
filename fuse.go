@@ -301,6 +301,13 @@ func (m noOpcode) String() string {
 	return fmt.Sprintf("No opcode %v", m.Opcode)
 }
 
+type malformedMessage struct {
+}
+
+func (malformedMessage) String() string {
+	return "malformed message"
+}
+
 func (c *Conn) ReadRequest() (Request, error) {
 	// TODO: Some kind of buffer reuse.
 	m := newMessage(c)
@@ -757,7 +764,7 @@ func (c *Conn) ReadRequest() (Request, error) {
 	return req, nil
 
 corrupt:
-	println("malformed message")
+	Debug(malformedMessage{})
 	return nil, fmt.Errorf("fuse: malformed message")
 
 unrecognized:
