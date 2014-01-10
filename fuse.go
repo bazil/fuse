@@ -1,7 +1,4 @@
-// Copyright 2011 The Go Authors.  All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
+// See the file LICENSE for copyright and licensing information.
 // Adapted from Plan 9 from User Space's src/cmd/9pfuse/fuse.c,
 // which carries this notice:
 //
