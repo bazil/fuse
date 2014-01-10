@@ -130,23 +130,23 @@ var setattrValidNames = []flagName{
 	{uint32(SetattrFlags), "SetattrFlags"},
 }
 
-// The OpenFlags are returned in the OpenResponse.
-type OpenFlags uint32
+// The OpenResponseFlags are returned in the OpenResponse.
+type OpenResponseFlags uint32
 
 const (
-	OpenDirectIO    OpenFlags = 1 << 0 // bypass page cache for this open file
-	OpenKeepCache   OpenFlags = 1 << 1 // don't invalidate the data cache on open
-	OpenNonSeekable OpenFlags = 1 << 2 // (Linux?)
+	OpenDirectIO    OpenResponseFlags = 1 << 0 // bypass page cache for this open file
+	OpenKeepCache   OpenResponseFlags = 1 << 1 // don't invalidate the data cache on open
+	OpenNonSeekable OpenResponseFlags = 1 << 2 // (Linux?)
 
-	OpenPurgeAttr OpenFlags = 1 << 30 // OS X
-	OpenPurgeUBC  OpenFlags = 1 << 31 // OS X
+	OpenPurgeAttr OpenResponseFlags = 1 << 30 // OS X
+	OpenPurgeUBC  OpenResponseFlags = 1 << 31 // OS X
 )
 
-func (fl OpenFlags) String() string {
-	return flagString(uint32(fl), openFlagNames)
+func (fl OpenResponseFlags) String() string {
+	return flagString(uint32(fl), openResponseFlagNames)
 }
 
-var openFlagNames = []flagName{
+var openResponseFlagNames = []flagName{
 	{uint32(OpenDirectIO), "OpenDirectIO"},
 	{uint32(OpenKeepCache), "OpenKeepCache"},
 	{uint32(OpenPurgeAttr), "OpenPurgeAttr"},

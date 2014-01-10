@@ -1154,7 +1154,7 @@ func (r *OpenRequest) Respond(resp *OpenResponse) {
 // A OpenResponse is the response to a OpenRequest.
 type OpenResponse struct {
 	Handle HandleID
-	Flags  OpenFlags
+	Flags  OpenResponseFlags
 }
 
 func (r *OpenResponse) String() string {
