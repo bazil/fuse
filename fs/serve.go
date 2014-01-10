@@ -62,6 +62,13 @@ type FSStatfser interface {
 
 type FSDestroyer interface {
 	// Destroy is called when the file system is shutting down.
+	//
+	// Linux only sends this request for block device backed (fuseblk)
+	// filesystems, to allow them to flush writes to disk before the
+	// unmount completes.
+	//
+	// On normal FUSE filesystems, use Forget of the root Node to
+	// do actions at unmount time.
 	Destroy()
 }
 
