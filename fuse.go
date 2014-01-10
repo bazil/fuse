@@ -29,16 +29,16 @@
 // the actual interaction with the kernel and can be the simplest one in contexts
 // such as protocol translators.
 //
-// Servers of synthesized file systems tend to share common bookkeeping
-// abstracted away by the second approach, which is to call the Conn's
-// Serve method to serve the FUSE protocol using
-// an implementation of the service methods in the interfaces
-// FS (file system), Node (file or directory), and Handle (opened file or directory).
+// Servers of synthesized file systems tend to share common
+// bookkeeping abstracted away by the second approach, which is to
+// call fs.Serve to serve the FUSE protocol using an implementation of
+// the service methods in the interfaces FS* (file system), Node* (file
+// or directory), and Handle* (opened file or directory).
 // There are a daunting number of such methods that can be written,
 // but few are required.
 // The specific methods are described in the documentation for those interfaces.
 //
-// The hellofs subdirectory contains a simple illustration of the ServeFS approach.
+// The hellofs subdirectory contains a simple illustration of the fs.Serve approach.
 //
 // Service Methods
 //
