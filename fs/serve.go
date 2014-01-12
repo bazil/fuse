@@ -506,16 +506,29 @@ func (r response) String() string {
 	default:
 		return fmt.Sprintf("-> %s", r.Request)
 	}
+	return "" // return needed to support go 1.2
 }
 
 type logMissingNode struct {
 	MaxNode fuse.NodeID
 }
 
+// The trimSuffix function is copied from the strings module, so that
+// we can support go 1.2, which does not have strings.TrimSuffix.
+
+// TrimSuffix returns s without the provided trailing suffix string.
+// If s doesn't end with suffix, s is returned unchanged.
+func trimSuffix(s, suffix string) string {
+	if strings.HasSuffix(s, suffix) {
+		return s[:len(s)-len(suffix)]
+	}
+	return s
+}
+
 func opName(req fuse.Request) string {
 	t := reflect.Indirect(reflect.ValueOf(req)).Type()
 	s := t.Name()
-	s = strings.TrimSuffix(s, "Request")
+	s = trimSuffix(s, "Request")
 	return s
 }
 
