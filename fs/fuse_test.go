@@ -262,6 +262,7 @@ var fuseTests = []struct {
 	{"readdir", &readdir{}},
 	{"chmod", &chmod{}},
 	{"open", &open{}},
+	{"fsyncDir", &fsyncDir{}},
 }
 
 // TO TEST:
@@ -1223,5 +1224,49 @@ func (f *open) test(path string, t *testing.T) {
 	if g, e := <-f.seen, want; g != e {
 		t.Errorf("open saw %v, want %v", g, e)
 		return
+	}
+}
+
+// Test Fsync on a dir
+
+type fsyncSeen struct {
+	flags uint32
+	dir   bool
+}
+
+type fsyncDir struct {
+	dir
+	seen chan fsyncSeen
+}
+
+func (f *fsyncDir) Fsync(r *fuse.FsyncRequest, intr Intr) fuse.Error {
+	f.seen <- fsyncSeen{flags: r.Flags, dir: r.Dir}
+	return nil
+}
+
+func (f *fsyncDir) setup(t *testing.T) {
+	f.seen = make(chan fsyncSeen, 1)
+}
+
+func (f *fsyncDir) test(path string, t *testing.T) {
+	fil, err := os.Open(path)
+	if err != nil {
+		t.Errorf("fsyncDir open: %v", err)
+		return
+	}
+	defer fil.Close()
+	err = fil.Sync()
+	if err != nil {
+		t.Errorf("fsyncDir sync: %v", err)
+		return
+	}
+
+	close(f.seen)
+	got := <-f.seen
+	if g, e := got.flags, uint32(0); g != e {
+		t.Errorf("fsyncDir bad flags: %v != %v", g, e)
+	}
+	if g, e := got.dir, true; g != e {
+		t.Errorf("fsyncDir bad dir: %v != %v", g, e)
 	}
 }

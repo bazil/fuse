@@ -568,12 +568,13 @@ func (c *Conn) ReadRequest() (Request, error) {
 			LockOwner:    in.LockOwner,
 		}
 
-	case opFsync:
+	case opFsync, opFsyncdir:
 		in := (*fsyncIn)(m.data())
 		if m.len() < unsafe.Sizeof(*in) {
 			goto corrupt
 		}
 		req = &FsyncRequest{
+			Dir:    m.hdr.Opcode == opFsyncdir,
 			Header: m.Header(),
 			Handle: HandleID(in.Fh),
 			Flags:  in.FsyncFlags,
@@ -696,8 +697,6 @@ func (c *Conn) ReadRequest() (Request, error) {
 			Flags:        InitFlags(in.Flags),
 		}
 
-	case opFsyncdir:
-		panic("opFsyncdir")
 	case opGetlk:
 		panic("opGetlk")
 	case opSetlk:
@@ -1698,7 +1697,9 @@ func (r *MknodRequest) Respond(resp *LookupResponse) {
 type FsyncRequest struct {
 	Header `json:"-"`
 	Handle HandleID
-	Flags  uint32
+	// TODO bit 1 is datasync, not well documented upstream
+	Flags uint32
+	Dir   bool
 }
 
 func (r *FsyncRequest) String() string {
