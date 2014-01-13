@@ -513,7 +513,6 @@ func (c *Conn) ReadRequest() (Request, error) {
 			Header: m.Header(),
 			Dir:    m.hdr.Opcode == opOpendir,
 			Flags:  in.Flags,
-			Mode:   fileMode(in.Mode),
 		}
 
 	case opRead, opReaddir:
@@ -714,7 +713,7 @@ func (c *Conn) ReadRequest() (Request, error) {
 		}
 
 	case opCreate:
-		in := (*openIn)(m.data())
+		in := (*createIn)(m.data())
 		if m.len() < unsafe.Sizeof(*in) {
 			goto corrupt
 		}
@@ -1134,11 +1133,10 @@ type OpenRequest struct {
 	Header `json:"-"`
 	Dir    bool // is this Opendir?
 	Flags  uint32
-	Mode   os.FileMode
 }
 
 func (r *OpenRequest) String() string {
-	return fmt.Sprintf("Open [%s] dir=%v fl=%v mode=%v", &r.Header, r.Dir, r.Flags, r.Mode)
+	return fmt.Sprintf("Open [%s] dir=%v fl=%v", &r.Header, r.Dir, r.Flags)
 }
 
 // Respond replies to the request with the given response.

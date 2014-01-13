@@ -346,8 +346,8 @@ type setattrInCommon struct {
 }
 
 type openIn struct {
-	Flags uint32
-	Mode  uint32
+	Flags  uint32
+	Unused uint32
 }
 
 type openOut struct {
@@ -355,6 +355,11 @@ type openOut struct {
 	Fh        uint64
 	OpenFlags uint32
 	Padding   uint32
+}
+
+type createIn struct {
+	Flags uint32
+	Mode  uint32
 }
 
 type createOut struct {
