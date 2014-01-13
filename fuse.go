@@ -563,7 +563,7 @@ func (c *Conn) ReadRequest() (Request, error) {
 			Header:       m.Header(),
 			Dir:          m.hdr.Opcode == opReleasedir,
 			Handle:       HandleID(in.Fh),
-			Flags:        in.Flags,
+			Flags:        openFlags(in.Flags),
 			ReleaseFlags: ReleaseFlags(in.ReleaseFlags),
 			LockOwner:    in.LockOwner,
 		}
