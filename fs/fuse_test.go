@@ -466,30 +466,44 @@ func (w *writeTruncateFlush) test(path string, t *testing.T) {
 
 // Test Mkdir.
 
+type mkdirSeen struct {
+	name string
+	mode os.FileMode
+}
+
+func (s mkdirSeen) String() string {
+	return fmt.Sprintf("%T{name:%q mod:%v}", s, s.name, s.mode)
+}
+
 type mkdir1 struct {
 	dir
-	seen struct {
-		name chan string
-	}
+	seen chan mkdirSeen
 }
 
 func (f *mkdir1) Mkdir(req *fuse.MkdirRequest, intr Intr) (Node, fuse.Error) {
-	f.seen.name <- req.Name
+	f.seen <- mkdirSeen{
+		name: req.Name,
+		mode: req.Mode,
+	}
 	return &mkdir1{}, nil
 }
 
 func (f *mkdir1) setup(t *testing.T) {
-	f.seen.name = make(chan string, 1)
+	f.seen = make(chan mkdirSeen, 1)
 }
 
 func (f *mkdir1) test(path string, t *testing.T) {
-	err := os.Mkdir(path+"/foo", 0777)
+	// uniform umask needed to make os.Mkdir's mode into something
+	// reproducible
+	defer syscall.Umask(syscall.Umask(0022))
+	err := os.Mkdir(path+"/foo", 0771)
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	if <-f.seen.name != "foo" {
-		t.Error(err)
+	want := mkdirSeen{name: "foo", mode: os.ModeDir | 0751}
+	if g, e := <-f.seen, want; g != e {
+		t.Errorf("mkdir saw %v, want %v", g, e)
 		return
 	}
 }

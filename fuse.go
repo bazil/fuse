@@ -463,7 +463,10 @@ func (c *Conn) ReadRequest() (Request, error) {
 		req = &MkdirRequest{
 			Header: m.Header(),
 			Name:   string(name[:i]),
-			Mode:   fileMode(in.Mode) | os.ModeDir,
+			// observed on Linux: mkdirIn.Mode & syscall.S_IFMT == 0,
+			// and this causes fileMode to go into it's "no idea"
+			// code branch; enforce type to directory
+			Mode: fileMode((in.Mode &^ syscall.S_IFMT) | syscall.S_IFDIR),
 		}
 
 	case opUnlink, opRmdir:
