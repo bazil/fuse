@@ -477,7 +477,7 @@ type request struct {
 }
 
 func (r request) String() string {
-	return fmt.Sprintf("<- %s [%s] %s", r.Op, r.Request, r.In)
+	return fmt.Sprintf("<- %s", r.In)
 }
 
 type logResponseHeader struct {
