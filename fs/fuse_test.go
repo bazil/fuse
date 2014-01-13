@@ -260,6 +260,7 @@ var fuseTests = []struct {
 	{"ftruncate0", &ftruncate{toSize: 0}},
 	{"truncateWithOpen", &truncateWithOpen{}},
 	{"readdir", &readdir{}},
+	{"chmod", &chmod{}},
 }
 
 // TO TEST:
@@ -1103,5 +1104,42 @@ func (f *readdir) test(path string, t *testing.T) {
 		names[2] != "two" {
 		t.Errorf(`expected 3 entries of "one", "three", "two", got: %q`, names)
 		return
+	}
+}
+
+// Test Chmod.
+
+type chmodSeen struct {
+	mode os.FileMode
+}
+
+type chmod struct {
+	file
+	seen chan chmodSeen
+}
+
+func (f *chmod) Setattr(req *fuse.SetattrRequest, resp *fuse.SetattrResponse, intr Intr) fuse.Error {
+	if !req.Valid.Mode() {
+		log.Printf("setattr not a chmod: %v", req.Valid)
+		return fuse.EIO
+	}
+	f.seen <- chmodSeen{mode: req.Mode}
+	return nil
+}
+
+func (f *chmod) setup(t *testing.T) {
+	f.seen = make(chan chmodSeen, 1)
+}
+
+func (f *chmod) test(path string, t *testing.T) {
+	err := os.Chmod(path, 0764)
+	if err != nil {
+		t.Errorf("chmod: %v", err)
+		return
+	}
+	close(f.seen)
+	got := <-f.seen
+	if g, e := got.mode, os.FileMode(0764); g != e {
+		t.Errorf("wrong mode: %v != %v", g, e)
 	}
 }
