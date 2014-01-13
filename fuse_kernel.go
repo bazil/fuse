@@ -37,6 +37,8 @@ package fuse
 
 import (
 	"fmt"
+	"os"
+	"syscall"
 	"unsafe"
 )
 
@@ -128,6 +130,41 @@ var setattrValidNames = []flagName{
 	{uint32(SetattrChgtime), "SetattrChgtime"},
 	{uint32(SetattrBkuptime), "SetattrBkuptime"},
 	{uint32(SetattrFlags), "SetattrFlags"},
+}
+
+// OpenFlags are the O_FOO flags passed to open/create/etc calls. For
+// example, os.O_WRONLY | os.O_APPEND.
+type OpenFlags uint32
+
+func (fl OpenFlags) String() string {
+	// O_RDONLY, O_RWONLY, O_RDWR are not flags
+	s := accModeName(uint32(fl) & syscall.O_ACCMODE)
+	flags := uint32(fl) &^ syscall.O_ACCMODE
+	if flags != 0 {
+		s = s + "+" + flagString(flags, openFlagNames)
+	}
+	return s
+}
+
+func accModeName(flags uint32) string {
+	switch flags {
+	case uint32(os.O_RDONLY):
+		return "O_RDONLY"
+	case uint32(os.O_WRONLY):
+		return "O_WRONLY"
+	case uint32(os.O_RDWR):
+		return "O_RDWR"
+	default:
+		return ""
+	}
+}
+
+var openFlagNames = []flagName{
+	{uint32(os.O_CREATE), "O_CREATE"},
+	{uint32(os.O_EXCL), "O_EXCL"},
+	{uint32(os.O_TRUNC), "O_TRUNC"},
+	{uint32(os.O_APPEND), "O_APPEND"},
+	{uint32(os.O_SYNC), "O_SYNC"},
 }
 
 // The OpenResponseFlags are returned in the OpenResponse.

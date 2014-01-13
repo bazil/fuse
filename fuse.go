@@ -1135,7 +1135,7 @@ func (r *LookupResponse) String() string {
 type OpenRequest struct {
 	Header `json:"-"`
 	Dir    bool // is this Opendir?
-	Flags  uint32
+	Flags  OpenFlags
 }
 
 func (r *OpenRequest) String() string {
@@ -1166,7 +1166,7 @@ func (r *OpenResponse) String() string {
 type CreateRequest struct {
 	Header `json:"-"`
 	Name   string
-	Flags  uint32
+	Flags  OpenFlags
 	Mode   os.FileMode
 }
 
@@ -1283,7 +1283,7 @@ type ReleaseRequest struct {
 	Header       `json:"-"`
 	Dir          bool // is this Releasedir?
 	Handle       HandleID
-	Flags        uint32 // flags from OpenRequest
+	Flags        OpenFlags // flags from OpenRequest
 	ReleaseFlags ReleaseFlags
 	LockOwner    uint32
 }

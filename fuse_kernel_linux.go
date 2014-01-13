@@ -49,7 +49,7 @@ func (in *setattrIn) Flags() uint32 {
 	return 0
 }
 
-func openFlags(flags uint32) uint32 {
+func openFlags(flags uint32) OpenFlags {
 	// on amd64, the 32-bit O_LARGEFILE flag is always seen;
 	// on i386, the flag probably depends on the app
 	// requesting, but in any case should be utterly
@@ -58,5 +58,5 @@ func openFlags(flags uint32) uint32 {
 	// API/ABI
 	flags &^= 0x8000
 
-	return flags
+	return OpenFlags(flags)
 }

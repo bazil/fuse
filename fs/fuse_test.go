@@ -520,7 +520,7 @@ func (f *create1) Create(req *fuse.CreateRequest, resp *fuse.CreateResponse, int
 		log.Printf("ERROR create1.Create unexpected name: %q\n", req.Name)
 		return nil, nil, fuse.EPERM
 	}
-	if g, e := req.Flags, uint32(os.O_CREATE|os.O_TRUNC|os.O_RDWR); g != e {
+	if g, e := req.Flags, fuse.OpenFlags(os.O_CREATE|os.O_TRUNC|os.O_RDWR); g != e {
 		log.Printf("ERROR create1.Create unexpected flags: %x != %x\n", g, e)
 		return nil, nil, fuse.EPERM
 	}
@@ -1174,7 +1174,7 @@ func (f *chmod) test(path string, t *testing.T) {
 
 type openSeen struct {
 	dir   bool
-	flags uint32
+	flags fuse.OpenFlags
 }
 
 func (s openSeen) String() string {
@@ -1219,7 +1219,7 @@ func (f *open) test(path string, t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	want := openSeen{dir: false, flags: uint32(os.O_WRONLY | os.O_APPEND)}
+	want := openSeen{dir: false, flags: fuse.OpenFlags(os.O_WRONLY | os.O_APPEND)}
 	if g, e := <-f.seen, want; g != e {
 		t.Errorf("open saw %v, want %v", g, e)
 		return

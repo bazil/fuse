@@ -57,6 +57,6 @@ func (in *setattrIn) Flags() uint32 {
 	return in.Flags_
 }
 
-func openFlags(flags uint32) uint32 {
-	return flags
+func openFlags(flags uint32) OpenFlags {
+	return OpenFlags(flags)
 }
