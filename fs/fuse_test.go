@@ -261,6 +261,7 @@ var fuseTests = []struct {
 	{"truncateWithOpen", &truncateWithOpen{}},
 	{"readdir", &readdir{}},
 	{"chmod", &chmod{}},
+	{"open", &open{}},
 }
 
 // TO TEST:
@@ -1141,5 +1142,61 @@ func (f *chmod) test(path string, t *testing.T) {
 	got := <-f.seen
 	if g, e := got.mode, os.FileMode(0764); g != e {
 		t.Errorf("wrong mode: %v != %v", g, e)
+	}
+}
+
+// Test open
+
+type openSeen struct {
+	dir   bool
+	flags uint32
+}
+
+func (s openSeen) String() string {
+	return fmt.Sprintf("%T{dir:%v flags:%x}", s, s.dir, s.flags)
+}
+
+type open struct {
+	file
+	seen chan openSeen
+}
+
+func (f *open) Open(req *fuse.OpenRequest, resp *fuse.OpenResponse, intr Intr) (Handle, fuse.Error) {
+	f.seen <- openSeen{dir: req.Dir, flags: req.Flags}
+	// pick a really distinct error, to identify it later
+	return nil, fuse.Errno(syscall.EUCLEAN)
+
+}
+
+func (f *open) setup(t *testing.T) {
+	f.seen = make(chan openSeen, 1)
+}
+
+func (f *open) test(path string, t *testing.T) {
+	// node: mode only matters with O_CREATE
+	fil, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0)
+	if err == nil {
+		t.Error("Open err == nil, expected EUCLEAN")
+		fil.Close()
+		return
+	}
+	switch err2 := err.(type) {
+	case *os.PathError:
+		switch err3 := err2.Err.(type) {
+		case syscall.Errno:
+			if g, e := err3, syscall.EUCLEAN; g != e {
+				t.Errorf("unexpected inner error: %v", err3)
+			}
+		default:
+			t.Errorf("unexpected inner error type %T: %v", err2.Err, err2.Err)
+		}
+	default:
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	want := openSeen{dir: false, flags: uint32(os.O_WRONLY | os.O_APPEND)}
+	if g, e := <-f.seen, want; g != e {
+		t.Errorf("open saw %v, want %v", g, e)
+		return
 	}
 }
