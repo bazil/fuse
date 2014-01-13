@@ -25,7 +25,7 @@ var fuseRun = flag.String("fuserun", "", "which fuse test to run. runs all if em
 func umount(dir string) {
 	err := exec.Command("umount", dir).Run()
 	if err != nil && runtime.GOOS == "linux" {
-		exec.Command("/bin/fusermount", "-u", dir).Run()
+		exec.Command("fusermount", "-u", dir).Run()
 	}
 }
 
