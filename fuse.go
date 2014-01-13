@@ -509,20 +509,10 @@ func (c *Conn) ReadRequest() (Request, error) {
 		if m.len() < unsafe.Sizeof(*in) {
 			goto corrupt
 		}
-		flags := in.Flags
-		if runtime.GOOS == "linux" {
-			// on amd64, the 32-bit O_LARGEFILE flag is always seen;
-			// on i386, the flag probably depends on the app
-			// requesting, but in any case should be utterly
-			// uninteresting to us here; our kernel protocol messages
-			// are not directly related to the client app's kernel
-			// API/ABI
-			flags &^= 0x8000
-		}
 		req = &OpenRequest{
 			Header: m.Header(),
 			Dir:    m.hdr.Opcode == opOpendir,
-			Flags:  flags,
+			Flags:  openFlags(in.Flags),
 		}
 
 	case opRead, opReaddir:
@@ -732,19 +722,9 @@ func (c *Conn) ReadRequest() (Request, error) {
 		if i < 0 {
 			goto corrupt
 		}
-		flags := in.Flags
-		if runtime.GOOS == "linux" {
-			// on amd64, the 32-bit O_LARGEFILE flag is always seen;
-			// on i386, the flag probably depends on the app
-			// requesting, but in any case should be utterly
-			// uninteresting to us here; our kernel protocol messages
-			// are not directly related to the client app's kernel
-			// API/ABI
-			flags &^= 0x8000
-		}
 		req = &CreateRequest{
 			Header: m.Header(),
-			Flags:  flags,
+			Flags:  openFlags(in.Flags),
 			Mode:   fileMode(in.Mode),
 			Name:   string(name[:i]),
 		}

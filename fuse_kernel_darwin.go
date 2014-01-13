@@ -56,3 +56,7 @@ func (in *setattrIn) Chgtime() time.Time {
 func (in *setattrIn) Flags() uint32 {
 	return in.Flags_
 }
+
+func openFlags(flags uint32) uint32 {
+	return flags
+}
