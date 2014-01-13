@@ -506,6 +506,14 @@ func (f *create1) Create(req *fuse.CreateRequest, resp *fuse.CreateResponse, int
 		log.Printf("ERROR create1.Create unexpected name: %q\n", req.Name)
 		return nil, nil, fuse.EPERM
 	}
+	if g, e := req.Flags, uint32(os.O_CREATE|os.O_TRUNC|os.O_RDWR); g != e {
+		log.Printf("ERROR create1.Create unexpected flags: %x != %x\n", g, e)
+		return nil, nil, fuse.EPERM
+	}
+	if g, e := req.Mode, os.FileMode(0644); g != e {
+		log.Printf("ERROR create1.Create unexpected mode: %v != %v\n", g, e)
+		return nil, nil, fuse.EPERM
+	}
 	return &f.f, &f.f, nil
 }
 
@@ -514,6 +522,9 @@ func (f *create1) setup(t *testing.T) {
 }
 
 func (f *create1) test(path string, t *testing.T) {
+	// uniform umask needed to make os.Create's 0666 into something
+	// reproducible
+	defer syscall.Umask(syscall.Umask(0022))
 	ff, err := os.Create(path + "/foo")
 	if err != nil {
 		t.Errorf("create1 WriteFile: %v", err)
