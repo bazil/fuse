@@ -264,6 +264,7 @@ var fuseTests = []struct {
 	{"open", &open{}},
 	{"fsyncDir", &fsyncDir{}},
 	{"getxattr", &getxattr{}},
+	{"listxattr", &listxattr{}},
 }
 
 // TO TEST:
@@ -1308,5 +1309,40 @@ func (f *getxattr) test(path string, t *testing.T) {
 	seen := <-f.seen
 	if g, e := seen.name, "not-there"; g != e {
 		t.Errorf("wrong getxattr name: %#v != %#v", g, e)
+	}
+}
+
+// Test Listxattr
+
+type listxattr struct {
+	file
+	seen chan bool
+}
+
+func (f *listxattr) Listxattr(req *fuse.ListxattrRequest, resp *fuse.ListxattrResponse, intr Intr) fuse.Error {
+	f.seen <- true
+	resp.Xattr = []byte("one\x00two\x00")
+	return nil
+}
+
+func (f *listxattr) setup(t *testing.T) {
+	f.seen = make(chan bool, 1)
+}
+
+func (f *listxattr) test(path string, t *testing.T) {
+	buf := make([]byte, 8192)
+	n, err := syscall.Listxattr(path, buf)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+	buf = buf[:n]
+	if g, e := string(buf), "one\x00two\x00"; g != e {
+		t.Errorf("wrong listxattr content: %#v != %#v", g, e)
+	}
+	close(f.seen)
+	seen := <-f.seen
+	if g, e := seen, true; g != e {
+		t.Errorf("listxattr not seen: %#v != %#v", g, e)
 	}
 }

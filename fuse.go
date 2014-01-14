@@ -1048,11 +1048,16 @@ func (r *ListxattrRequest) String() string {
 
 // Respond replies to the request with the given response.
 func (r *ListxattrRequest) Respond(resp *ListxattrResponse) {
-	out := &getxattrOut{
-		outHeader: outHeader{Unique: uint64(r.ID)},
-		Size:      uint32(len(resp.Xattr)),
+	if r.Size == 0 {
+		out := &getxattrOut{
+			outHeader: outHeader{Unique: uint64(r.ID)},
+			Size:      uint32(len(resp.Xattr)),
+		}
+		r.Conn.respond(&out.outHeader, unsafe.Sizeof(*out))
+	} else {
+		out := &outHeader{Unique: uint64(r.ID)}
+		r.Conn.respondData(out, unsafe.Sizeof(*out), resp.Xattr)
 	}
-	r.Conn.respondData(&out.outHeader, unsafe.Sizeof(*out), resp.Xattr)
 }
 
 // A ListxattrResponse is the response to a ListxattrRequest.
