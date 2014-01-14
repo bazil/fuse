@@ -264,6 +264,7 @@ var fuseTests = []struct {
 	{"open", &open{}},
 	{"fsyncDir", &fsyncDir{}},
 	{"getxattr", &getxattr{}},
+	{"getxattrTooSmall", &getxattrTooSmall{}},
 	{"listxattr", &listxattr{}},
 	{"setxattr", &setxattr{}},
 	{"removexattr", &removexattr{}},
@@ -1310,6 +1311,29 @@ func (f *getxattr) test(path string, t *testing.T) {
 	seen := <-f.seen
 	if g, e := seen.name, "not-there"; g != e {
 		t.Errorf("wrong getxattr name: %#v != %#v", g, e)
+	}
+}
+
+// Test Getxattr that has no space to return value
+
+type getxattrTooSmall struct {
+	file
+}
+
+func (f *getxattrTooSmall) Getxattr(req *fuse.GetxattrRequest, resp *fuse.GetxattrResponse, intr Intr) fuse.Error {
+	resp.Xattr = []byte("hello, world")
+	return nil
+}
+
+func (f *getxattrTooSmall) test(path string, t *testing.T) {
+	buf := make([]byte, 3)
+	_, err := syscall.Getxattr(path, "whatever", buf)
+	if err == nil {
+		t.Error("Getxattr = nil; want some error")
+	}
+	if err != syscall.ERANGE {
+		t.Errorf("unexpected error: %v", err)
+		return
 	}
 }
 

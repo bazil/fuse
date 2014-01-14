@@ -880,6 +880,11 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 			r.RespondError(err)
 			break
 		}
+		if uint64(len(s.Xattr)) > uint64(r.Size) {
+			done(fuse.ERANGE)
+			r.RespondError(fuse.ERANGE)
+			break
+		}
 		done(s)
 		r.Respond(s)
 

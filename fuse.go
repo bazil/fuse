@@ -179,6 +179,7 @@ const (
 	EINTR = Errno(syscall.EINTR)
 
 	ENODATA = Errno(syscall.ENODATA)
+	ERANGE  = Errno(syscall.ERANGE)
 )
 
 var errnoNames = map[Errno]string{
