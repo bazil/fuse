@@ -485,18 +485,13 @@ type setxattrInOSX struct {
 	Padding  uint32
 }
 
-type getxattrIn struct {
+type getxattrInCommon struct {
 	Size    uint32
 	Padding uint32
 }
 
-type getxattrInOSX struct {
-	Size    uint32
-	Padding uint32
-
-	// OS X only
-	Position uint32
-	Padding2 uint32
+func (getxattrInCommon) position() uint32 {
+	return 0
 }
 
 type getxattrOut struct {

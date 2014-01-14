@@ -178,15 +178,18 @@ const (
 	// EINTR indicates request was interrupted by an InterruptRequest.
 	// See also fs.Intr.
 	EINTR = Errno(syscall.EINTR)
+
+	ENODATA = Errno(syscall.ENODATA)
 )
 
 var errnoNames = map[Errno]string{
-	ENOSYS: "ENOSYS",
-	ESTALE: "ESTALE",
-	ENOENT: "ENOENT",
-	EIO:    "EIO",
-	EPERM:  "EPERM",
-	EINTR:  "EINTR",
+	ENOSYS:  "ENOSYS",
+	ESTALE:  "ESTALE",
+	ENOENT:  "ENOENT",
+	EIO:     "EIO",
+	EPERM:   "EPERM",
+	EINTR:   "EINTR",
+	ENODATA: "ENODATA",
 }
 
 type errno int
@@ -618,47 +621,31 @@ func (c *Conn) ReadRequest() (Request, error) {
 		req = r
 
 	case opGetxattr:
-		if runtime.GOOS == "darwin" {
-			in := (*getxattrInOSX)(m.data())
-			if m.len() < unsafe.Sizeof(*in) {
-				goto corrupt
-			}
-			req = &GetxattrRequest{
-				Header:   m.Header(),
-				Size:     in.Size,
-				Position: in.Position,
-			}
-		} else {
-			in := (*getxattrIn)(m.data())
-			if m.len() < unsafe.Sizeof(*in) {
-				goto corrupt
-			}
-			req = &GetxattrRequest{
-				Header: m.Header(),
-				Size:   in.Size,
-			}
+		in := (*getxattrIn)(m.data())
+		if m.len() < unsafe.Sizeof(*in) {
+			goto corrupt
+		}
+		name := m.bytes()[unsafe.Sizeof(*in):]
+		i := bytes.IndexByte(name, '\x00')
+		if i < 0 {
+			goto corrupt
+		}
+		req = &GetxattrRequest{
+			Header:   m.Header(),
+			Name:     string(name[:i]),
+			Size:     in.Size,
+			Position: in.position(),
 		}
 
 	case opListxattr:
-		if runtime.GOOS == "darwin" {
-			in := (*getxattrInOSX)(m.data())
-			if m.len() < unsafe.Sizeof(*in) {
-				goto corrupt
-			}
-			req = &ListxattrRequest{
-				Header:   m.Header(),
-				Size:     in.Size,
-				Position: in.Position,
-			}
-		} else {
-			in := (*getxattrIn)(m.data())
-			if m.len() < unsafe.Sizeof(*in) {
-				goto corrupt
-			}
-			req = &ListxattrRequest{
-				Header: m.Header(),
-				Size:   in.Size,
-			}
+		in := (*getxattrIn)(m.data())
+		if m.len() < unsafe.Sizeof(*in) {
+			goto corrupt
+		}
+		req = &ListxattrRequest{
+			Header:   m.Header(),
+			Size:     in.Size,
+			Position: in.position(),
 		}
 
 	case opRemovexattr:
@@ -1001,22 +988,42 @@ func (r *GetattrResponse) String() string {
 
 // A GetxattrRequest asks for the extended attributes associated with r.Node.
 type GetxattrRequest struct {
-	Header   `json:"-"`
-	Size     uint32 // maximum size to return
-	Position uint32 // offset within extended attributes
+	Header `json:"-"`
+
+	// Maximum size to return.
+	Size uint32
+
+	// Name of the attribute requested.
+	Name string
+
+	// Offset within extended attributes.
+	//
+	// Only valid for OS X, and then only with the resource fork
+	// attribute.
+	Position uint32
 }
 
 func (r *GetxattrRequest) String() string {
-	return fmt.Sprintf("Getxattr [%s] %d @%d", &r.Header, r.Size, r.Position)
+	return fmt.Sprintf("Getxattr [%s] %q %d @%d", &r.Header, r.Name, r.Size, r.Position)
 }
 
 // Respond replies to the request with the given response.
 func (r *GetxattrRequest) Respond(resp *GetxattrResponse) {
-	out := &getxattrOut{
-		outHeader: outHeader{Unique: uint64(r.ID)},
-		Size:      uint32(len(resp.Xattr)),
+	if r.Size == 0 {
+		out := &getxattrOut{
+			outHeader: outHeader{Unique: uint64(r.ID)},
+			Size:      uint32(len(resp.Xattr)),
+		}
+		r.Conn.respond(&out.outHeader, unsafe.Sizeof(*out))
+	} else {
+		out := &outHeader{Unique: uint64(r.ID)}
+		r.Conn.respondData(out, unsafe.Sizeof(*out), resp.Xattr)
 	}
-	r.Conn.respondData(&out.outHeader, unsafe.Sizeof(*out), resp.Xattr)
+}
+
+func (r *GetxattrRequest) RespondError(err Error) {
+	err = translateGetxattrError(err)
+	r.Header.RespondError(err)
 }
 
 // A GetxattrResponse is the response to a GetxattrRequest.

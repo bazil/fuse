@@ -60,3 +60,15 @@ func (in *setattrIn) Flags() uint32 {
 func openFlags(flags uint32) OpenFlags {
 	return OpenFlags(flags)
 }
+
+type getxattrIn struct {
+	getxattrInCommon
+
+	// OS X only
+	Position uint32
+	Padding  uint32
+}
+
+func (g *getxattrIn) position() uint32 {
+	return g.Position
+}

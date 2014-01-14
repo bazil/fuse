@@ -77,9 +77,6 @@ type FSDestroyer interface {
 //
 // TODO implement methods
 //
-// Getxattr obtains an extended attribute for the receiver.
-// XXX
-//
 // Listxattr lists the extended attributes recorded for the receiver.
 //
 // Removexattr removes an extended attribute from the receiver.
@@ -189,6 +186,16 @@ type NodeMknoder interface {
 // TODO this should be on Handle not Node
 type NodeFsyncer interface {
 	Fsync(r *fuse.FsyncRequest, intr Intr) fuse.Error
+}
+
+type NodeGetxattrer interface {
+	// Getxattr gets an extended attribute by the given name from the
+	// node.
+	//
+	// If there is no xattr by that name, returns fuse.ENODATA. This
+	// will be translated to the platform-specific correct error code
+	// by the framework.
+	Getxattr(req *fuse.GetxattrRequest, resp *fuse.GetxattrResponse, intr Intr) fuse.Error
 }
 
 var startTime = time.Now()
@@ -847,7 +854,24 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		done(s)
 		r.Respond(s)
 
-	case *fuse.GetxattrRequest, *fuse.SetxattrRequest, *fuse.ListxattrRequest, *fuse.RemovexattrRequest:
+	case *fuse.GetxattrRequest:
+		n, ok := node.(NodeGetxattrer)
+		if !ok {
+			done(fuse.ENOSYS)
+			r.RespondError(fuse.ENOSYS)
+			break
+		}
+		s := &fuse.GetxattrResponse{}
+		err := n.Getxattr(r, s, intr)
+		if err != nil {
+			done(err)
+			r.RespondError(err)
+			break
+		}
+		done(s)
+		r.Respond(s)
+
+	case *fuse.SetxattrRequest, *fuse.ListxattrRequest, *fuse.RemovexattrRequest:
 		// TODO: Use n.
 		done(fuse.ENOSYS)
 		r.RespondError(fuse.ENOSYS)
