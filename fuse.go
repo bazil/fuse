@@ -87,7 +87,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"runtime"
 	"sync"
 	"syscall"
 	"time"
@@ -584,41 +583,28 @@ func (c *Conn) ReadRequest() (Request, error) {
 		}
 
 	case opSetxattr:
-		var size uint32
-		var r *SetxattrRequest
-		if runtime.GOOS == "darwin" {
-			in := (*setxattrInOSX)(m.data())
-			if m.len() < unsafe.Sizeof(*in) {
-				goto corrupt
-			}
-			r = &SetxattrRequest{
-				Flags:    in.Flags,
-				Position: in.Position,
-			}
-			size = in.Size
-			m.off += int(unsafe.Sizeof(*in))
-		} else {
-			in := (*setxattrIn)(m.data())
-			if m.len() < unsafe.Sizeof(*in) {
-				goto corrupt
-			}
-			r = &SetxattrRequest{}
-			size = in.Size
-			m.off += int(unsafe.Sizeof(*in))
+		in := (*setxattrIn)(m.data())
+		if m.len() < unsafe.Sizeof(*in) {
+			goto corrupt
 		}
-		r.Header = m.Header()
+		m.off += int(unsafe.Sizeof(*in))
 		name := m.bytes()
 		i := bytes.IndexByte(name, '\x00')
 		if i < 0 {
 			goto corrupt
 		}
-		r.Name = string(name[:i])
-		r.Xattr = name[i+1:]
-		if uint32(len(r.Xattr)) < size {
+		xattr := name[i+1:]
+		if uint32(len(xattr)) < in.Size {
 			goto corrupt
 		}
-		r.Xattr = r.Xattr[:size]
-		req = r
+		xattr = xattr[:in.Size]
+		req = &SetxattrRequest{
+			Header:   m.Header(),
+			Flags:    in.Flags,
+			Position: in.position(),
+			Name:     string(name[:i]),
+			Xattr:    xattr,
+		}
 
 	case opGetxattr:
 		in := (*getxattrIn)(m.data())
@@ -1087,11 +1073,27 @@ func (r *RemovexattrRequest) Respond() {
 
 // A SetxattrRequest asks to set an extended attribute associated with a file.
 type SetxattrRequest struct {
-	Header   `json:"-"`
-	Flags    uint32
-	Position uint32 // OS X only
-	Name     string
-	Xattr    []byte
+	Header `json:"-"`
+
+	// Flags can make the request fail if attribute does/not already
+	// exist. Unfortunately, the constants are platform-specific and
+	// not exposed by Go1.2. Look for XATTR_CREATE, XATTR_REPLACE.
+	//
+	// TODO improve this later
+	//
+	// TODO XATTR_CREATE and exist -> EEXIST
+	//
+	// TODO XATTR_REPLACE and not exist -> ENODATA
+	Flags uint32
+
+	// Offset within extended attributes.
+	//
+	// Only valid for OS X, and then only with the resource fork
+	// attribute.
+	Position uint32
+
+	Name  string
+	Xattr []byte
 }
 
 func (r *SetxattrRequest) String() string {
@@ -1102,6 +1104,11 @@ func (r *SetxattrRequest) String() string {
 func (r *SetxattrRequest) Respond() {
 	out := &outHeader{Unique: uint64(r.ID)}
 	r.Conn.respond(out, unsafe.Sizeof(*out))
+}
+
+func (r *SetxattrRequest) RespondError(err Error) {
+	err = translateGetxattrError(err)
+	r.Header.RespondError(err)
 }
 
 // A LookupRequest asks to look up the given name in the directory named by r.Node.

@@ -471,18 +471,13 @@ type fsyncIn struct {
 	Padding    uint32
 }
 
-type setxattrIn struct {
+type setxattrInCommon struct {
 	Size  uint32
 	Flags uint32
 }
 
-type setxattrInOSX struct {
-	Size  uint32
-	Flags uint32
-
-	// OS X only
-	Position uint32
-	Padding  uint32
+func (setxattrInCommon) position() uint32 {
+	return 0
 }
 
 type getxattrInCommon struct {

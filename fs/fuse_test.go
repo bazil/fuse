@@ -265,6 +265,7 @@ var fuseTests = []struct {
 	{"fsyncDir", &fsyncDir{}},
 	{"getxattr", &getxattr{}},
 	{"listxattr", &listxattr{}},
+	{"setxattr", &setxattr{}},
 }
 
 // TO TEST:
@@ -1344,5 +1345,44 @@ func (f *listxattr) test(path string, t *testing.T) {
 	seen := <-f.seen
 	if g, e := seen, true; g != e {
 		t.Errorf("listxattr not seen: %#v != %#v", g, e)
+	}
+}
+
+// Test Setxattr
+
+type setxattrSeen struct {
+	name  string
+	flags uint32
+	value string
+}
+
+type setxattr struct {
+	file
+	seen chan setxattrSeen
+}
+
+func (f *setxattr) Setxattr(req *fuse.SetxattrRequest, intr Intr) fuse.Error {
+	f.seen <- setxattrSeen{
+		name:  req.Name,
+		flags: req.Flags,
+		value: string(req.Xattr),
+	}
+	return nil
+}
+
+func (f *setxattr) setup(t *testing.T) {
+	f.seen = make(chan setxattrSeen, 1)
+}
+
+func (f *setxattr) test(path string, t *testing.T) {
+	err := syscall.Setxattr(path, "greeting", []byte("hello, world"), 0)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+	close(f.seen)
+	want := setxattrSeen{flags: 0, name: "greeting", value: "hello, world"}
+	if g, e := <-f.seen, want; g != e {
+		t.Errorf("setxattr saw %v, want %v", g, e)
 	}
 }

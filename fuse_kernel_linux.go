@@ -64,3 +64,7 @@ func openFlags(flags uint32) OpenFlags {
 type getxattrIn struct {
 	getxattrInCommon
 }
+
+type setxattrIn struct {
+	setxattrInCommon
+}

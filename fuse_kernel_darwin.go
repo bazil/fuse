@@ -72,3 +72,15 @@ type getxattrIn struct {
 func (g *getxattrIn) position() uint32 {
 	return g.Position
 }
+
+type setxattrIn struct {
+	setxattrInCommon
+
+	// OS X only
+	Position uint32
+	Padding  uint32
+}
+
+func (s *setxattrInCommon) position() uint32 {
+	return s.Position
+}

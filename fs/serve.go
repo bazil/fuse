@@ -79,7 +79,6 @@ type FSDestroyer interface {
 //
 // Removexattr removes an extended attribute from the receiver.
 //
-// Setxattr sets an extended attribute for the receiver.
 type Node interface {
 	Attr() fuse.Attr
 }
@@ -199,6 +198,12 @@ type NodeGetxattrer interface {
 type NodeListxattrer interface {
 	// Listxattr lists the extended attributes recorded for the node.
 	Listxattr(req *fuse.ListxattrRequest, resp *fuse.ListxattrResponse, intr Intr) fuse.Error
+}
+
+type NodeSetxattrer interface {
+	// Setxattr sets an extended attribute with the given name and
+	// value for the node.
+	Setxattr(req *fuse.SetxattrRequest, intr Intr) fuse.Error
 }
 
 var startTime = time.Now()
@@ -891,7 +896,23 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		done(s)
 		r.Respond(s)
 
-	case *fuse.SetxattrRequest, *fuse.RemovexattrRequest:
+	case *fuse.SetxattrRequest:
+		n, ok := node.(NodeSetxattrer)
+		if !ok {
+			done(fuse.ENOSYS)
+			r.RespondError(fuse.ENOSYS)
+			break
+		}
+		err := n.Setxattr(r, intr)
+		if err != nil {
+			done(err)
+			r.RespondError(err)
+			break
+		}
+		done(nil)
+		r.Respond()
+
+	case *fuse.RemovexattrRequest:
 		// TODO: Use n.
 		done(fuse.ENOSYS)
 		r.RespondError(fuse.ENOSYS)
