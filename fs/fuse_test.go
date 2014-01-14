@@ -266,6 +266,7 @@ var fuseTests = []struct {
 	{"getxattr", &getxattr{}},
 	{"listxattr", &listxattr{}},
 	{"setxattr", &setxattr{}},
+	{"removexattr", &removexattr{}},
 }
 
 // TO TEST:
@@ -275,7 +276,6 @@ var fuseTests = []struct {
 //	Setattr(*SetattrRequest, *SetattrResponse)
 //	Access(*AccessRequest)
 //	Open(*OpenRequest, *OpenResponse)
-//	Getxattr, Setxattr, Listxattr, Removexattr
 //	Write(*WriteRequest, *WriteResponse)
 //	Flush(*FlushRequest, *FlushResponse)
 
@@ -1384,5 +1384,38 @@ func (f *setxattr) test(path string, t *testing.T) {
 	want := setxattrSeen{flags: 0, name: "greeting", value: "hello, world"}
 	if g, e := <-f.seen, want; g != e {
 		t.Errorf("setxattr saw %v, want %v", g, e)
+	}
+}
+
+// Test Removexattr
+
+type removexattrSeen struct {
+	name string
+}
+
+type removexattr struct {
+	file
+	seen chan removexattrSeen
+}
+
+func (f *removexattr) Removexattr(req *fuse.RemovexattrRequest, intr Intr) fuse.Error {
+	f.seen <- removexattrSeen{name: req.Name}
+	return nil
+}
+
+func (f *removexattr) setup(t *testing.T) {
+	f.seen = make(chan removexattrSeen, 1)
+}
+
+func (f *removexattr) test(path string, t *testing.T) {
+	err := syscall.Removexattr(path, "greeting")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+	close(f.seen)
+	want := removexattrSeen{name: "greeting"}
+	if g, e := <-f.seen, want; g != e {
+		t.Errorf("removexattr saw %v, want %v", g, e)
 	}
 }

@@ -74,11 +74,6 @@ type FSDestroyer interface {
 //
 // Other FUSE requests can be handled by implementing methods from the
 // Node* interfaces, for example NodeOpener.
-//
-// TODO implement methods
-//
-// Removexattr removes an extended attribute from the receiver.
-//
 type Node interface {
 	Attr() fuse.Attr
 }
@@ -204,6 +199,15 @@ type NodeSetxattrer interface {
 	// Setxattr sets an extended attribute with the given name and
 	// value for the node.
 	Setxattr(req *fuse.SetxattrRequest, intr Intr) fuse.Error
+}
+
+type NodeRemovexattrer interface {
+	// Removexattr removes an extended attribute for the name.
+	//
+	// If there is no xattr by that name, returns fuse.ENODATA. This
+	// will be translated to the platform-specific correct error code
+	// by the framework.
+	Removexattr(req *fuse.RemovexattrRequest, intr Intr) fuse.Error
 }
 
 var startTime = time.Now()
@@ -913,9 +917,20 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		r.Respond()
 
 	case *fuse.RemovexattrRequest:
-		// TODO: Use n.
-		done(fuse.ENOSYS)
-		r.RespondError(fuse.ENOSYS)
+		n, ok := node.(NodeRemovexattrer)
+		if !ok {
+			done(fuse.ENOSYS)
+			r.RespondError(fuse.ENOSYS)
+			break
+		}
+		err := n.Removexattr(r, intr)
+		if err != nil {
+			done(err)
+			r.RespondError(err)
+			break
+		}
+		done(nil)
+		r.Respond()
 
 	case *fuse.ForgetRequest:
 		forget := c.dropNode(hdr.Node, r.N)

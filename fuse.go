@@ -1071,6 +1071,11 @@ func (r *RemovexattrRequest) Respond() {
 	r.Conn.respond(out, unsafe.Sizeof(*out))
 }
 
+func (r *RemovexattrRequest) RespondError(err Error) {
+	err = translateGetxattrError(err)
+	r.Header.RespondError(err)
+}
+
 // A SetxattrRequest asks to set an extended attribute associated with a file.
 type SetxattrRequest struct {
 	Header `json:"-"`
