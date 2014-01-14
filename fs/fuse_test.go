@@ -266,6 +266,7 @@ var fuseTests = []struct {
 	{"getxattr", &getxattr{}},
 	{"getxattrTooSmall", &getxattrTooSmall{}},
 	{"listxattr", &listxattr{}},
+	{"listxattrTooSmall", &listxattrTooSmall{}},
 	{"setxattr", &setxattr{}},
 	{"removexattr", &removexattr{}},
 }
@@ -1369,6 +1370,29 @@ func (f *listxattr) test(path string, t *testing.T) {
 	seen := <-f.seen
 	if g, e := seen, true; g != e {
 		t.Errorf("listxattr not seen: %#v != %#v", g, e)
+	}
+}
+
+// Test Listxattr that has no space to return value
+
+type listxattrTooSmall struct {
+	file
+}
+
+func (f *listxattrTooSmall) Listxattr(req *fuse.ListxattrRequest, resp *fuse.ListxattrResponse, intr Intr) fuse.Error {
+	resp.Xattr = []byte("one\x00two\x00")
+	return nil
+}
+
+func (f *listxattrTooSmall) test(path string, t *testing.T) {
+	buf := make([]byte, 3)
+	_, err := syscall.Listxattr(path, buf)
+	if err == nil {
+		t.Error("Listxattr = nil; want some error")
+	}
+	if err != syscall.ERANGE {
+		t.Errorf("unexpected error: %v", err)
+		return
 	}
 }
 
