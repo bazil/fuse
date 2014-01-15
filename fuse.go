@@ -1056,6 +1056,14 @@ func (r *ListxattrResponse) String() string {
 	return fmt.Sprintf("Listxattr %x", r.Xattr)
 }
 
+// Append adds an extended attribute name to the response.
+func (r *ListxattrResponse) Append(names ...string) {
+	for _, name := range names {
+		r.Xattr = append(r.Xattr, name...)
+		r.Xattr = append(r.Xattr, '\x00')
+	}
+}
+
 // A RemovexattrRequest asks to remove an extended attribute associated with r.Node.
 type RemovexattrRequest struct {
 	Header `json:"-"`

@@ -1347,7 +1347,7 @@ type listxattr struct {
 
 func (f *listxattr) Listxattr(req *fuse.ListxattrRequest, resp *fuse.ListxattrResponse, intr Intr) fuse.Error {
 	f.seen <- true
-	resp.Xattr = []byte("one\x00two\x00")
+	resp.Append("one", "two")
 	return nil
 }
 
