@@ -94,7 +94,7 @@ func (f testStatFS) Attr() fuse.Attr {
 
 func (f testStatFS) Statfs(req *fuse.StatfsRequest, resp *fuse.StatfsResponse, int Intr) fuse.Error {
 	resp.Blocks = 42
-	resp.Namelen = 13
+	resp.Files = 13
 	return nil
 }
 
@@ -131,8 +131,8 @@ func TestStatfs(t *testing.T) {
 		if g, e := st.Blocks, uint64(42); g != e {
 			t.Errorf("got Blocks = %q; want %q", g, e)
 		}
-		if g, e := st.Namelen, int64(13); g != e {
-			t.Errorf("got Namelen = %q; want %q", g, e)
+		if g, e := st.Files, uint64(13); g != e {
+			t.Errorf("got Files = %d; want %d", g, e)
 		}
 	}
 
@@ -151,8 +151,8 @@ func TestStatfs(t *testing.T) {
 		if g, e := st.Blocks, uint64(42); g != e {
 			t.Errorf("got Blocks = %q; want %q", g, e)
 		}
-		if g, e := st.Namelen, int64(13); g != e {
-			t.Errorf("got Namelen = %q; want %q", g, e)
+		if g, e := st.Files, uint64(13); g != e {
+			t.Errorf("got Files = %d; want %d", g, e)
 		}
 	}
 
