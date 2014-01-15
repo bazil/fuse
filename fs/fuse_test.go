@@ -265,6 +265,7 @@ var fuseTests = []struct {
 	{"fsyncDir", &fsyncDir{}},
 	{"getxattr", &getxattr{}},
 	{"getxattrTooSmall", &getxattrTooSmall{}},
+	{"getxattrSize", &getxattrSize{}},
 	{"listxattr", &listxattr{}},
 	{"listxattrTooSmall", &listxattrTooSmall{}},
 	{"setxattr", &setxattr{}},
@@ -1335,6 +1336,29 @@ func (f *getxattrTooSmall) test(path string, t *testing.T) {
 	if err != syscall.ERANGE {
 		t.Errorf("unexpected error: %v", err)
 		return
+	}
+}
+
+// Test Getxattr used to probe result size
+
+type getxattrSize struct {
+	file
+}
+
+func (f *getxattrSize) Getxattr(req *fuse.GetxattrRequest, resp *fuse.GetxattrResponse, intr Intr) fuse.Error {
+	resp.Xattr = []byte("hello, world")
+	return nil
+}
+
+func (f *getxattrSize) test(path string, t *testing.T) {
+	buf := make([]byte, 0)
+	n, err := syscall.Getxattr(path, "whatever", buf)
+	if err != nil {
+		t.Errorf("Getxattr unexpected error: %v", err)
+		return
+	}
+	if g, e := n, len("hello, world"); g != e {
+		t.Errorf("Getxattr incorrect size: %d != %d", g, e)
 	}
 }
 
