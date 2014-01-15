@@ -81,6 +81,6 @@ type setxattrIn struct {
 	Padding  uint32
 }
 
-func (s *setxattrInCommon) position() uint32 {
+func (s *setxattrIn) position() uint32 {
 	return s.Position
 }
