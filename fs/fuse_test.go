@@ -531,7 +531,11 @@ func (f *create1) Create(req *fuse.CreateRequest, resp *fuse.CreateResponse, int
 		log.Printf("ERROR create1.Create unexpected name: %q\n", req.Name)
 		return nil, nil, fuse.EPERM
 	}
-	if g, e := req.Flags, fuse.OpenFlags(os.O_CREATE|os.O_TRUNC|os.O_RDWR); g != e {
+	flags := req.Flags
+	// OS X does not pass O_TRUNC here, Linux does; as this is a
+	// Create, that's acceptable
+	flags &^= fuse.OpenFlags(os.O_TRUNC)
+	if g, e := flags, fuse.OpenFlags(os.O_CREATE|os.O_RDWR); g != e {
 		log.Printf("ERROR create1.Create unexpected flags: %v != %v\n", g, e)
 		return nil, nil, fuse.EPERM
 	}
