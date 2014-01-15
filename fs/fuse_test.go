@@ -50,7 +50,7 @@ type badRootFS struct{}
 
 func (badRootFS) Root() (Node, fuse.Error) {
 	// pick a really distinct error, to identify it later
-	return nil, fuse.Errno(syscall.EUCLEAN)
+	return nil, fuse.Errno(syscall.ENAMETOOLONG)
 }
 
 func TestRootErr(t *testing.T) {
@@ -74,7 +74,9 @@ func TestRootErr(t *testing.T) {
 
 	select {
 	case err := <-ch:
-		if err.Error() != "cannot obtain root node: structure needs cleaning" {
+		// TODO this is not be a textual comparison, Serve hides
+		// details
+		if err.Error() != "cannot obtain root node: file name too long" {
 			t.Errorf("Unexpected error: %v", err)
 		}
 	case <-time.After(1 * time.Second):
@@ -1198,7 +1200,7 @@ type open struct {
 func (f *open) Open(req *fuse.OpenRequest, resp *fuse.OpenResponse, intr Intr) (Handle, fuse.Error) {
 	f.seen <- openSeen{dir: req.Dir, flags: req.Flags}
 	// pick a really distinct error, to identify it later
-	return nil, fuse.Errno(syscall.EUCLEAN)
+	return nil, fuse.Errno(syscall.ENAMETOOLONG)
 
 }
 
@@ -1210,7 +1212,7 @@ func (f *open) test(path string, t *testing.T) {
 	// node: mode only matters with O_CREATE
 	fil, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0)
 	if err == nil {
-		t.Error("Open err == nil, expected EUCLEAN")
+		t.Error("Open err == nil, expected ENAMETOOLONG")
 		fil.Close()
 		return
 	}
@@ -1218,7 +1220,7 @@ func (f *open) test(path string, t *testing.T) {
 	case *os.PathError:
 		switch err3 := err2.Err.(type) {
 		case syscall.Errno:
-			if g, e := err3, syscall.EUCLEAN; g != e {
+			if g, e := err3, syscall.ENAMETOOLONG; g != e {
 				t.Errorf("unexpected inner error: %v", err3)
 			}
 		default:
