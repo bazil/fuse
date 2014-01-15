@@ -532,7 +532,7 @@ func (f *create1) Create(req *fuse.CreateRequest, resp *fuse.CreateResponse, int
 		return nil, nil, fuse.EPERM
 	}
 	if g, e := req.Flags, fuse.OpenFlags(os.O_CREATE|os.O_TRUNC|os.O_RDWR); g != e {
-		log.Printf("ERROR create1.Create unexpected flags: %x != %x\n", g, e)
+		log.Printf("ERROR create1.Create unexpected flags: %v != %v\n", g, e)
 		return nil, nil, fuse.EPERM
 	}
 	if g, e := req.Mode, os.FileMode(0644); g != e {
