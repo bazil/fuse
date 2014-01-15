@@ -17,6 +17,7 @@ import (
 import (
 	"bazil.org/fuse"
 	"bazil.org/fuse/fuseutil"
+	"bazil.org/fuse/syscallx"
 )
 
 var fuseRun = flag.String("fuserun", "", "which fuse test to run. runs all if empty.")
@@ -1301,7 +1302,7 @@ func (f *getxattr) setup(t *testing.T) {
 
 func (f *getxattr) test(path string, t *testing.T) {
 	buf := make([]byte, 8192)
-	n, err := syscall.Getxattr(path, "not-there", buf)
+	n, err := syscallx.Getxattr(path, "not-there", buf)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		return
@@ -1330,7 +1331,7 @@ func (f *getxattrTooSmall) Getxattr(req *fuse.GetxattrRequest, resp *fuse.Getxat
 
 func (f *getxattrTooSmall) test(path string, t *testing.T) {
 	buf := make([]byte, 3)
-	_, err := syscall.Getxattr(path, "whatever", buf)
+	_, err := syscallx.Getxattr(path, "whatever", buf)
 	if err == nil {
 		t.Error("Getxattr = nil; want some error")
 	}
@@ -1353,7 +1354,7 @@ func (f *getxattrSize) Getxattr(req *fuse.GetxattrRequest, resp *fuse.GetxattrRe
 
 func (f *getxattrSize) test(path string, t *testing.T) {
 	buf := make([]byte, 0)
-	n, err := syscall.Getxattr(path, "whatever", buf)
+	n, err := syscallx.Getxattr(path, "whatever", buf)
 	if err != nil {
 		t.Errorf("Getxattr unexpected error: %v", err)
 		return
@@ -1382,7 +1383,7 @@ func (f *listxattr) setup(t *testing.T) {
 
 func (f *listxattr) test(path string, t *testing.T) {
 	buf := make([]byte, 8192)
-	n, err := syscall.Listxattr(path, buf)
+	n, err := syscallx.Listxattr(path, buf)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		return
@@ -1411,7 +1412,7 @@ func (f *listxattrTooSmall) Listxattr(req *fuse.ListxattrRequest, resp *fuse.Lis
 
 func (f *listxattrTooSmall) test(path string, t *testing.T) {
 	buf := make([]byte, 3)
-	_, err := syscall.Listxattr(path, buf)
+	_, err := syscallx.Listxattr(path, buf)
 	if err == nil {
 		t.Error("Listxattr = nil; want some error")
 	}
@@ -1434,7 +1435,7 @@ func (f *listxattrSize) Listxattr(req *fuse.ListxattrRequest, resp *fuse.Listxat
 
 func (f *listxattrSize) test(path string, t *testing.T) {
 	buf := make([]byte, 0)
-	n, err := syscall.Listxattr(path, buf)
+	n, err := syscallx.Listxattr(path, buf)
 	if err != nil {
 		t.Errorf("Listxattr unexpected error: %v", err)
 		return
@@ -1471,7 +1472,7 @@ func (f *setxattr) setup(t *testing.T) {
 }
 
 func (f *setxattr) test(path string, t *testing.T) {
-	err := syscall.Setxattr(path, "greeting", []byte("hello, world"), 0)
+	err := syscallx.Setxattr(path, "greeting", []byte("hello, world"), 0)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		return
@@ -1504,7 +1505,7 @@ func (f *removexattr) setup(t *testing.T) {
 }
 
 func (f *removexattr) test(path string, t *testing.T) {
-	err := syscall.Removexattr(path, "greeting")
+	err := syscallx.Removexattr(path, "greeting")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		return
