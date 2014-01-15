@@ -268,6 +268,7 @@ var fuseTests = []struct {
 	{"getxattrSize", &getxattrSize{}},
 	{"listxattr", &listxattr{}},
 	{"listxattrTooSmall", &listxattrTooSmall{}},
+	{"listxattrSize", &listxattrSize{}},
 	{"setxattr", &setxattr{}},
 	{"removexattr", &removexattr{}},
 }
@@ -1417,6 +1418,29 @@ func (f *listxattrTooSmall) test(path string, t *testing.T) {
 	if err != syscall.ERANGE {
 		t.Errorf("unexpected error: %v", err)
 		return
+	}
+}
+
+// Test Listxattr used to probe result size
+
+type listxattrSize struct {
+	file
+}
+
+func (f *listxattrSize) Listxattr(req *fuse.ListxattrRequest, resp *fuse.ListxattrResponse, intr Intr) fuse.Error {
+	resp.Xattr = []byte("one\x00two\x00")
+	return nil
+}
+
+func (f *listxattrSize) test(path string, t *testing.T) {
+	buf := make([]byte, 0)
+	n, err := syscall.Listxattr(path, buf)
+	if err != nil {
+		t.Errorf("Listxattr unexpected error: %v", err)
+		return
+	}
+	if g, e := n, len("one\x00two\x00"); g != e {
+		t.Errorf("Getxattr incorrect size: %d != %d", g, e)
 	}
 }
 

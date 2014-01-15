@@ -902,7 +902,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 			r.RespondError(err)
 			break
 		}
-		if uint64(len(s.Xattr)) > uint64(r.Size) {
+		if r.Size != 0 && uint64(len(s.Xattr)) > uint64(r.Size) {
 			done(fuse.ERANGE)
 			r.RespondError(fuse.ERANGE)
 			break
