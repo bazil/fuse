@@ -1193,7 +1193,7 @@ type openSeen struct {
 }
 
 func (s openSeen) String() string {
-	return fmt.Sprintf("%T{dir:%v flags:%x}", s, s.dir, s.flags)
+	return fmt.Sprintf("%T{dir:%v flags:%v}", s, s.dir, s.flags)
 }
 
 type open struct {
