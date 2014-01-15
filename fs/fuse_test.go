@@ -1235,6 +1235,14 @@ func (f *open) test(path string, t *testing.T) {
 	}
 
 	want := openSeen{dir: false, flags: fuse.OpenFlags(os.O_WRONLY | os.O_APPEND)}
+	if runtime.GOOS == "darwin" {
+		// osxfuse does not let O_APPEND through at all
+		//
+		// https://code.google.com/p/macfuse/issues/detail?id=233
+		// https://code.google.com/p/macfuse/issues/detail?id=132
+		// https://code.google.com/p/macfuse/issues/detail?id=133
+		want.flags &^= fuse.OpenFlags(os.O_APPEND)
+	}
 	if g, e := <-f.seen, want; g != e {
 		t.Errorf("open saw %v, want %v", g, e)
 		return
