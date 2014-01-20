@@ -869,8 +869,8 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 	case *fuse.GetxattrRequest:
 		n, ok := node.(NodeGetxattrer)
 		if !ok {
-			done(fuse.ENOSYS)
-			r.RespondError(fuse.ENOSYS)
+			done(fuse.ENOTSUP)
+			r.RespondError(fuse.ENOTSUP)
 			break
 		}
 		s := &fuse.GetxattrResponse{}
@@ -891,8 +891,8 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 	case *fuse.ListxattrRequest:
 		n, ok := node.(NodeListxattrer)
 		if !ok {
-			done(fuse.ENOSYS)
-			r.RespondError(fuse.ENOSYS)
+			done(fuse.ENOTSUP)
+			r.RespondError(fuse.ENOTSUP)
 			break
 		}
 		s := &fuse.ListxattrResponse{}
@@ -913,8 +913,8 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 	case *fuse.SetxattrRequest:
 		n, ok := node.(NodeSetxattrer)
 		if !ok {
-			done(fuse.ENOSYS)
-			r.RespondError(fuse.ENOSYS)
+			done(fuse.ENOTSUP)
+			r.RespondError(fuse.ENOTSUP)
 			break
 		}
 		err := n.Setxattr(r, intr)
@@ -929,8 +929,8 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 	case *fuse.RemovexattrRequest:
 		n, ok := node.(NodeRemovexattrer)
 		if !ok {
-			done(fuse.ENOSYS)
-			r.RespondError(fuse.ENOSYS)
+			done(fuse.ENOTSUP)
+			r.RespondError(fuse.ENOTSUP)
 			break
 		}
 		err := n.Removexattr(r, intr)

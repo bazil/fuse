@@ -180,6 +180,7 @@ const (
 
 	ENODATA = Errno(syscall.ENODATA)
 	ERANGE  = Errno(syscall.ERANGE)
+	ENOTSUP = Errno(syscall.ENOTSUP)
 )
 
 var errnoNames = map[Errno]string{
