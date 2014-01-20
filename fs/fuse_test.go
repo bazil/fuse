@@ -1100,7 +1100,8 @@ func (f *truncateWithOpen) test(path string, t *testing.T) {
 	if g, e := gotr.Size, uint64(0); g != e {
 		t.Errorf("got Size = %q; want %q", g, e)
 	}
-	if g, e := gotr.Valid&^fuse.SetattrLockOwner, fuse.SetattrSize; g != e {
+	// osxfuse sets SetattrHandle here, linux does not
+	if g, e := gotr.Valid&^(fuse.SetattrLockOwner|fuse.SetattrHandle), fuse.SetattrSize; g != e {
 		t.Errorf("got Valid = %q; want %q", g, e)
 	}
 	t.Logf("Got request: %#v", gotr)
