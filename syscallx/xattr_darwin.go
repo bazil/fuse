@@ -6,10 +6,17 @@ package syscallx
 
 */
 
-//sys getxattr(path string, attr string, dest []byte, position uint32, options int) (sz int, err error)
+// cannot use dest []byte here because OS X getxattr really wants a
+// NULL to trigger size probing, size==0 is not enough
+//
+//sys getxattr(path string, attr string, dest *byte, size int, position uint32, options int) (sz int, err error)
 
 func Getxattr(path string, attr string, dest []byte) (sz int, err error) {
-	return getxattr(path, attr, dest, 0, 0)
+	var destp *byte
+	if len(dest) > 0 {
+		destp = &dest[0]
+	}
+	return getxattr(path, attr, destp, len(dest), 0, 0)
 }
 
 //sys listxattr(path string, dest []byte, options int) (sz int, err error)
