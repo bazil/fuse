@@ -1374,8 +1374,7 @@ func (f *getxattrSize) Getxattr(req *fuse.GetxattrRequest, resp *fuse.GetxattrRe
 }
 
 func (f *getxattrSize) test(path string, t *testing.T) {
-	buf := make([]byte, 0)
-	n, err := syscallx.Getxattr(path, "whatever", buf)
+	n, err := syscallx.Getxattr(path, "whatever", nil)
 	if err != nil {
 		t.Errorf("Getxattr unexpected error: %v", err)
 		return
