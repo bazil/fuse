@@ -572,7 +572,7 @@ func (f *create1) test(path string, t *testing.T) {
 	ff.Close()
 }
 
-// Test Create + WriteAll + Remove
+// Test Create + Write + Remove
 
 type create3 struct {
 	dir
@@ -978,11 +978,6 @@ type truncate struct {
 	}
 }
 
-// present purely to trigger bugs in WriteAll logic
-func (*truncate) WriteAll(data []byte, intr Intr) fuse.Error {
-	return nil
-}
-
 func (f *truncate) Setattr(req *fuse.SetattrRequest, resp *fuse.SetattrResponse, intr Intr) fuse.Error {
 	f.seen.gotr <- req
 	return nil
@@ -1019,11 +1014,6 @@ type ftruncate struct {
 	seen struct {
 		gotr chan *fuse.SetattrRequest
 	}
-}
-
-// present purely to trigger bugs in WriteAll logic
-func (*ftruncate) WriteAll(data []byte, intr Intr) fuse.Error {
-	return nil
 }
 
 func (f *ftruncate) Setattr(req *fuse.SetattrRequest, resp *fuse.SetattrResponse, intr Intr) fuse.Error {
@@ -1069,11 +1059,6 @@ type truncateWithOpen struct {
 	seen struct {
 		gotr chan *fuse.SetattrRequest
 	}
-}
-
-// present purely to trigger bugs in WriteAll logic
-func (*truncateWithOpen) WriteAll(data []byte, intr Intr) fuse.Error {
-	return nil
 }
 
 func (f *truncateWithOpen) Setattr(req *fuse.SetattrRequest, resp *fuse.SetattrResponse, intr Intr) fuse.Error {
