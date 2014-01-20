@@ -1454,8 +1454,7 @@ func (f *listxattrSize) Listxattr(req *fuse.ListxattrRequest, resp *fuse.Listxat
 }
 
 func (f *listxattrSize) test(path string, t *testing.T) {
-	buf := make([]byte, 0)
-	n, err := syscallx.Listxattr(path, buf)
+	n, err := syscallx.Listxattr(path, nil)
 	if err != nil {
 		t.Errorf("Listxattr unexpected error: %v", err)
 		return
