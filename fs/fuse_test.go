@@ -1221,16 +1221,13 @@ func (f *open) test(path string, t *testing.T) {
 		fil.Close()
 		return
 	}
+
 	switch err2 := err.(type) {
 	case *os.PathError:
-		switch err3 := err2.Err.(type) {
-		case syscall.Errno:
-			if g, e := err3, syscall.ENAMETOOLONG; g != e {
-				t.Errorf("unexpected inner error: %v", err3)
-			}
-		default:
-			t.Errorf("unexpected inner error type %T: %v", err2.Err, err2.Err)
+		if err2.Err == syscall.ENAMETOOLONG {
+			break
 		}
+		t.Errorf("unexpected inner error: %#v", err2)
 	default:
 		t.Errorf("unexpected error: %v", err)
 	}
