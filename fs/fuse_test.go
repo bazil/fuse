@@ -59,7 +59,6 @@ func TestRootErr(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	os.MkdirAll(dir, 0777)
 
 	c, err := fuse.Mount(dir)
 	if err != nil {
@@ -106,7 +105,6 @@ func TestStatfs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	os.MkdirAll(dir, 0777)
 
 	c, err := fuse.Mount(dir)
 	if err != nil {
@@ -166,7 +164,6 @@ func TestFuse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	os.MkdirAll(dir, 0777)
 
 	for _, tt := range fuseTests {
 		if *fuseRun == "" || *fuseRun == tt.name {
