@@ -102,7 +102,6 @@ var fuseTests = []struct {
 		test(string, *testing.T)
 	}
 }{
-	{"writeTruncateFlush", &writeTruncateFlush{}},
 	{"mkdir1", &mkdir1{}},
 	{"create1", &create1{}},
 	{"create3", &create3{}},
@@ -171,61 +170,6 @@ func (w *write) Release(r *fuse.ReleaseRequest, intr Intr) fuse.Error {
 func (w *write) setup(t *testing.T) {
 	w.seen.data = make(chan []byte, 10)
 	w.seen.fsync = make(chan bool, 1)
-}
-
-// Test Write calling Setattr+Write+Flush.
-
-type writeTruncateFlush struct {
-	file
-	seen struct {
-		data    chan []byte
-		setattr chan bool
-		flush   chan bool
-	}
-}
-
-func (w *writeTruncateFlush) Setattr(req *fuse.SetattrRequest, resp *fuse.SetattrResponse, intr Intr) fuse.Error {
-	w.seen.setattr <- true
-	return nil
-}
-
-func (w *writeTruncateFlush) Flush(req *fuse.FlushRequest, intr Intr) fuse.Error {
-	w.seen.flush <- true
-	return nil
-}
-
-func (w *writeTruncateFlush) Write(req *fuse.WriteRequest, resp *fuse.WriteResponse, intr Intr) fuse.Error {
-	w.seen.data <- req.Data
-	resp.Size = len(req.Data)
-	return nil
-}
-
-func (w *writeTruncateFlush) Release(r *fuse.ReleaseRequest, intr Intr) fuse.Error {
-	close(w.seen.data)
-	return nil
-}
-
-func (w *writeTruncateFlush) setup(t *testing.T) {
-	w.seen.data = make(chan []byte, 100)
-	w.seen.setattr = make(chan bool, 1)
-	w.seen.flush = make(chan bool, 1)
-}
-
-func (w *writeTruncateFlush) test(path string, t *testing.T) {
-	err := ioutil.WriteFile(path, []byte(hi), 0666)
-	if err != nil {
-		t.Errorf("WriteFile: %v", err)
-		return
-	}
-	if !<-w.seen.setattr {
-		t.Errorf("writeTruncateFlush expected Setattr")
-	}
-	if !<-w.seen.flush {
-		t.Errorf("writeTruncateFlush expected Setattr")
-	}
-	if got := string(gather(w.seen.data)); got != hi {
-		t.Errorf("writeTruncateFlush = %q, want %q", got, hi)
-	}
 }
 
 // Test Mkdir.

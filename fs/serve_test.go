@@ -338,3 +338,65 @@ func TestWrite(t *testing.T) {
 		t.Errorf("write = %q, want %q", got, hi)
 	}
 }
+
+// Test Write calling Setattr+Write+Flush.
+
+type writeTruncateFlush struct {
+	file
+	seen struct {
+		data    chan []byte
+		setattr chan bool
+		flush   chan bool
+	}
+}
+
+func (w *writeTruncateFlush) Setattr(req *fuse.SetattrRequest, resp *fuse.SetattrResponse, intr fs.Intr) fuse.Error {
+	w.seen.setattr <- true
+	return nil
+}
+
+func (w *writeTruncateFlush) Flush(req *fuse.FlushRequest, intr fs.Intr) fuse.Error {
+	w.seen.flush <- true
+	return nil
+}
+
+func (w *writeTruncateFlush) Write(req *fuse.WriteRequest, resp *fuse.WriteResponse, intr fs.Intr) fuse.Error {
+	w.seen.data <- req.Data
+	resp.Size = len(req.Data)
+	return nil
+}
+
+func (w *writeTruncateFlush) Release(r *fuse.ReleaseRequest, intr fs.Intr) fuse.Error {
+	close(w.seen.data)
+	return nil
+}
+
+func (w *writeTruncateFlush) setup() {
+	w.seen.data = make(chan []byte, 100)
+	w.seen.setattr = make(chan bool, 1)
+	w.seen.flush = make(chan bool, 1)
+}
+
+func TestWriteTruncateFlush(t *testing.T) {
+	w := &writeTruncateFlush{}
+	w.setup()
+	mnt, err := fstestutil.MountedT(t, childMapFS{"child": w})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	err = ioutil.WriteFile(mnt.Dir+"/child", []byte(hi), 0666)
+	if err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	if !<-w.seen.setattr {
+		t.Errorf("writeTruncateFlush expected Setattr")
+	}
+	if !<-w.seen.flush {
+		t.Errorf("writeTruncateFlush expected Setattr")
+	}
+	if got := string(gather(w.seen.data)); got != hi {
+		t.Errorf("writeTruncateFlush = %q, want %q", got, hi)
+	}
+}
