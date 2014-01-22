@@ -102,7 +102,6 @@ var fuseTests = []struct {
 		test(string, *testing.T)
 	}
 }{
-	{"release", &release{}},
 	{"write", &write{}},
 	{"writeTruncateFlush", &writeTruncateFlush{}},
 	{"mkdir1", &mkdir1{}},
@@ -532,37 +531,6 @@ func (f *rename1) test(path string, t *testing.T) {
 	err = os.Rename(path+"/old2", path+"/new2")
 	if err == nil {
 		t.Fatal("expected error on second Rename; got nil")
-	}
-}
-
-// Test Release.
-
-type release struct {
-	file
-	seen struct {
-		did chan bool
-	}
-}
-
-func (r *release) Release(*fuse.ReleaseRequest, Intr) fuse.Error {
-	r.seen.did <- true
-	return nil
-}
-
-func (r *release) setup(t *testing.T) {
-	r.seen.did = make(chan bool, 1)
-}
-
-func (r *release) test(path string, t *testing.T) {
-	f, err := os.Open(path)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	f.Close()
-	time.Sleep(1 * time.Second)
-	if !<-r.seen.did {
-		t.Error("Close did not Release")
 	}
 }
 

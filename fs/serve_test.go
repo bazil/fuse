@@ -228,3 +228,36 @@ func TestReadAllWithHandleRead(t *testing.T) {
 
 	testReadAll(t, mnt.Dir+"/child")
 }
+
+// Test Release.
+
+type release struct {
+	file
+	seen chan bool
+}
+
+func (r *release) Release(*fuse.ReleaseRequest, fs.Intr) fuse.Error {
+	r.seen <- true
+	return nil
+}
+
+func TestRelease(t *testing.T) {
+	r := &release{
+		seen: make(chan bool, 1),
+	}
+	mnt, err := fstestutil.MountedT(t, childMapFS{"child": r})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	f, err := os.Open(mnt.Dir + "/child")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+	time.Sleep(1 * time.Second)
+	if !<-r.seen {
+		t.Error("Close did not Release")
+	}
+}
