@@ -102,8 +102,6 @@ var fuseTests = []struct {
 		test(string, *testing.T)
 	}
 }{
-	{"readAll", readAll{}},
-	{"readAll1", &readAll1{}},
 	{"release", &release{}},
 	{"write", &write{}},
 	{"writeTruncateFlush", &writeTruncateFlush{}},
@@ -145,39 +143,7 @@ var fuseTests = []struct {
 //	Write(*WriteRequest, *WriteResponse)
 //	Flush(*FlushRequest, *FlushResponse)
 
-// Test Read calling ReadAll.
-
-type readAll struct{ file }
-
 const hi = "hello, world"
-
-func (readAll) ReadAll(intr Intr) ([]byte, fuse.Error) {
-	return []byte(hi), nil
-}
-
-func (readAll) test(path string, t *testing.T) {
-	data, err := ioutil.ReadFile(path)
-	if err != nil {
-		t.Errorf("readAll: %v", err)
-		return
-	}
-	if string(data) != hi {
-		t.Errorf("readAll = %q, want %q", data, hi)
-	}
-}
-
-// Test Read.
-
-type readAll1 struct{ file }
-
-func (readAll1) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, intr Intr) fuse.Error {
-	fuseutil.HandleRead(req, resp, []byte(hi))
-	return nil
-}
-
-func (readAll1) test(path string, t *testing.T) {
-	readAll{}.test(path, t)
-}
 
 // Test Write calling basic Write, with an fsync thrown in too.
 

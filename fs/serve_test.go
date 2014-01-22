@@ -4,6 +4,8 @@ import (
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
 	"bazil.org/fuse/fs/fstestutil"
+	"bazil.org/fuse/fuseutil"
+	"io/ioutil"
 	"os"
 	"syscall"
 	"testing"
@@ -13,6 +15,34 @@ import (
 func init() {
 	fstestutil.DebugByDefault()
 }
+
+// childMapFS is an FS with one fixed child named "child".
+type childMapFS map[string]fs.Node
+
+var _ = fs.FS(childMapFS{})
+var _ = fs.Node(childMapFS{})
+var _ = fs.NodeStringLookuper(childMapFS{})
+
+func (f childMapFS) Attr() fuse.Attr {
+	return fuse.Attr{Inode: 1, Mode: os.ModeDir | 0777}
+}
+
+func (f childMapFS) Root() (fs.Node, fuse.Error) {
+	return f, nil
+}
+
+func (f childMapFS) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
+	child, ok := f[name]
+	if !ok {
+		return nil, fuse.ENOENT
+	}
+	return child, nil
+}
+
+// file can be embedded in a struct to make it look like a file.
+type file struct{}
+
+func (f file) Attr() fuse.Attr { return fuse.Attr{Mode: 0666} }
 
 type badRootFS struct{}
 
@@ -148,4 +178,53 @@ func TestStatRoot(t *testing.T) {
 			t.Errorf("root has wrong gid: %d", stat.Gid)
 		}
 	}
+}
+
+// Test Read calling ReadAll.
+
+type readAll struct{ file }
+
+const hi = "hello, world"
+
+func (readAll) ReadAll(intr fs.Intr) ([]byte, fuse.Error) {
+	return []byte(hi), nil
+}
+
+func testReadAll(t *testing.T, path string) {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		t.Fatalf("readAll: %v", err)
+	}
+	if string(data) != hi {
+		t.Errorf("readAll = %q, want %q", data, hi)
+	}
+}
+
+func TestReadAll(t *testing.T) {
+	mnt, err := fstestutil.MountedT(t, childMapFS{"child": readAll{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	testReadAll(t, mnt.Dir+"/child")
+}
+
+// Test Read.
+
+type readWithHandleRead struct{ file }
+
+func (readWithHandleRead) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, intr fs.Intr) fuse.Error {
+	fuseutil.HandleRead(req, resp, []byte(hi))
+	return nil
+}
+
+func TestReadAllWithHandleRead(t *testing.T) {
+	mnt, err := fstestutil.MountedT(t, childMapFS{"child": readWithHandleRead{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	testReadAll(t, mnt.Dir+"/child")
 }
