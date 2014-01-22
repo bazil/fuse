@@ -22,14 +22,6 @@ import (
 
 var fuseRun = flag.String("fuserun", "", "which fuse test to run. runs all if empty.")
 
-// umount tries its best to unmount dir.
-func umount(dir string) {
-	err := exec.Command("umount", dir).Run()
-	if err != nil && runtime.GOOS == "linux" {
-		exec.Command("fusermount", "-u", dir).Run()
-	}
-}
-
 func gather(ch chan []byte) []byte {
 	var buf []byte
 	for b := range ch {
@@ -64,7 +56,7 @@ func TestRootErr(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer umount(dir)
+	defer fuse.Unmount(dir)
 
 	ch := make(chan error, 1)
 	go func() {
@@ -110,7 +102,7 @@ func TestStatfs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer umount(dir)
+	defer fuse.Unmount(dir)
 
 	go func() {
 		err := Serve(c, testStatFS{})
@@ -180,7 +172,7 @@ func TestFuse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer umount(dir)
+	defer fuse.Unmount(dir)
 
 	go func() {
 		err := Serve(c, testFS{})
