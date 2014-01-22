@@ -71,3 +71,19 @@ func (r *Setattrs) Setattr(req *fuse.SetattrRequest, resp *fuse.SetattrResponse,
 func (r *Setattrs) RecordedSetattr() bool {
 	return r.rec.Recorded()
 }
+
+// Flushes notes whether a FUSE Flush call has been seen.
+type Flushes struct {
+	rec MarkRecorder
+}
+
+var _ = fs.HandleFlusher(&Flushes{})
+
+func (r *Flushes) Flush(req *fuse.FlushRequest, intr fs.Intr) fuse.Error {
+	r.rec.Mark()
+	return nil
+}
+
+func (r *Flushes) RecordedFlush() bool {
+	return r.rec.Recorded()
+}

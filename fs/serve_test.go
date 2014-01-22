@@ -307,23 +307,11 @@ type writeTruncateFlush struct {
 	file
 	record.Writes
 	record.Setattrs
-	seen struct {
-		flush chan bool
-	}
-}
-
-func (w *writeTruncateFlush) Flush(req *fuse.FlushRequest, intr fs.Intr) fuse.Error {
-	w.seen.flush <- true
-	return nil
-}
-
-func (w *writeTruncateFlush) setup() {
-	w.seen.flush = make(chan bool, 1)
+	record.Flushes
 }
 
 func TestWriteTruncateFlush(t *testing.T) {
 	w := &writeTruncateFlush{}
-	w.setup()
 	mnt, err := fstestutil.MountedT(t, childMapFS{"child": w})
 	if err != nil {
 		t.Fatal(err)
@@ -337,7 +325,7 @@ func TestWriteTruncateFlush(t *testing.T) {
 	if !w.RecordedSetattr() {
 		t.Errorf("writeTruncateFlush expected Setattr")
 	}
-	if !<-w.seen.flush {
+	if !w.RecordedFlush() {
 		t.Errorf("writeTruncateFlush expected Setattr")
 	}
 	if got := string(w.RecordedWriteData()); got != hi {
