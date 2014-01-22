@@ -306,15 +306,10 @@ func TestWrite(t *testing.T) {
 type writeTruncateFlush struct {
 	file
 	record.Writes
+	record.Setattrs
 	seen struct {
-		setattr chan bool
-		flush   chan bool
+		flush chan bool
 	}
-}
-
-func (w *writeTruncateFlush) Setattr(req *fuse.SetattrRequest, resp *fuse.SetattrResponse, intr fs.Intr) fuse.Error {
-	w.seen.setattr <- true
-	return nil
 }
 
 func (w *writeTruncateFlush) Flush(req *fuse.FlushRequest, intr fs.Intr) fuse.Error {
@@ -323,7 +318,6 @@ func (w *writeTruncateFlush) Flush(req *fuse.FlushRequest, intr fs.Intr) fuse.Er
 }
 
 func (w *writeTruncateFlush) setup() {
-	w.seen.setattr = make(chan bool, 1)
 	w.seen.flush = make(chan bool, 1)
 }
 
@@ -340,7 +334,7 @@ func TestWriteTruncateFlush(t *testing.T) {
 	if err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
-	if !<-w.seen.setattr {
+	if !w.RecordedSetattr() {
 		t.Errorf("writeTruncateFlush expected Setattr")
 	}
 	if !<-w.seen.flush {
