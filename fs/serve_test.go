@@ -442,3 +442,68 @@ func TestCreate(t *testing.T) {
 
 	ff.Close()
 }
+
+// Test Create + Write + Remove
+
+type create3file struct {
+	file
+	record.Writes
+}
+
+type create3 struct {
+	dir
+	f          create3file
+	fooCreated record.MarkRecorder
+	fooRemoved record.MarkRecorder
+}
+
+func (f *create3) Create(req *fuse.CreateRequest, resp *fuse.CreateResponse, intr fs.Intr) (fs.Node, fs.Handle, fuse.Error) {
+	if req.Name != "foo" {
+		log.Printf("ERROR create3.Create unexpected name: %q\n", req.Name)
+		return nil, nil, fuse.EPERM
+	}
+	f.fooCreated.Mark()
+	return &f.f, &f.f, nil
+}
+
+func (f *create3) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
+	if f.fooCreated.Recorded() && !f.fooRemoved.Recorded() && name == "foo" {
+		return &f.f, nil
+	}
+	return nil, fuse.ENOENT
+}
+
+func (f *create3) Remove(r *fuse.RemoveRequest, intr fs.Intr) fuse.Error {
+	if f.fooCreated.Recorded() && !f.fooRemoved.Recorded() &&
+		r.Name == "foo" && !r.Dir {
+		f.fooRemoved.Mark()
+		return nil
+	}
+	return fuse.ENOENT
+}
+
+func TestCreateWriteRemove(t *testing.T) {
+	f := &create3{}
+	mnt, err := fstestutil.MountedT(t, simpleFS{f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	err = ioutil.WriteFile(mnt.Dir+"/foo", []byte(hi), 0666)
+	if err != nil {
+		t.Fatalf("create3 WriteFile: %v", err)
+	}
+	if got := string(f.f.RecordedWriteData()); got != hi {
+		t.Fatalf("create3 write = %q, want %q", got, hi)
+	}
+
+	err = os.Remove(mnt.Dir + "/foo")
+	if err != nil {
+		t.Fatalf("Remove: %v", err)
+	}
+	err = os.Remove(mnt.Dir + "/foo")
+	if err == nil {
+		t.Fatalf("second Remove = nil; want some error")
+	}
+}

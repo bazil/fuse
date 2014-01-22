@@ -102,7 +102,6 @@ var fuseTests = []struct {
 		test(string, *testing.T)
 	}
 }{
-	{"create3", &create3{}},
 	{"symlink1", &symlink1{}},
 	{"link1", &link1{}},
 	{"rename1", &rename1{}},
@@ -168,62 +167,6 @@ func (w *write) Release(r *fuse.ReleaseRequest, intr Intr) fuse.Error {
 func (w *write) setup(t *testing.T) {
 	w.seen.data = make(chan []byte, 10)
 	w.seen.fsync = make(chan bool, 1)
-}
-
-// Test Create + Write + Remove
-
-type create3 struct {
-	dir
-	f         write
-	fooExists bool
-}
-
-func (f *create3) Create(req *fuse.CreateRequest, resp *fuse.CreateResponse, intr Intr) (Node, Handle, fuse.Error) {
-	if req.Name != "foo" {
-		log.Printf("ERROR create3.Create unexpected name: %q\n", req.Name)
-		return nil, nil, fuse.EPERM
-	}
-	return &f.f, &f.f, nil
-}
-
-func (f *create3) Lookup(name string, intr Intr) (Node, fuse.Error) {
-	if f.fooExists && name == "foo" {
-		return file{}, nil
-	}
-	return nil, fuse.ENOENT
-}
-
-func (f *create3) Remove(r *fuse.RemoveRequest, intr Intr) fuse.Error {
-	if f.fooExists && r.Name == "foo" && !r.Dir {
-		f.fooExists = false
-		return nil
-	}
-	return fuse.ENOENT
-}
-
-func (f *create3) setup(t *testing.T) {
-	f.f.setup(t)
-}
-
-func (f *create3) test(path string, t *testing.T) {
-	err := ioutil.WriteFile(path+"/foo", []byte(hi), 0666)
-	if err != nil {
-		t.Fatalf("create3 WriteFile: %v", err)
-	}
-	if got := string(gather(f.f.seen.data)); got != hi {
-		t.Fatalf("create3 write = %q, want %q", got, hi)
-	}
-
-	f.fooExists = true
-	log.Printf("pre-Remove")
-	err = os.Remove(path + "/foo")
-	if err != nil {
-		t.Fatalf("Remove: %v", err)
-	}
-	err = os.Remove(path + "/foo")
-	if err == nil {
-		t.Fatalf("second Remove = nil; want some error")
-	}
 }
 
 // Test symlink + readlink
