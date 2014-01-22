@@ -102,7 +102,6 @@ var fuseTests = []struct {
 		test(string, *testing.T)
 	}
 }{
-	{"write", &write{}},
 	{"writeTruncateFlush", &writeTruncateFlush{}},
 	{"mkdir1", &mkdir1{}},
 	{"create1", &create1{}},
@@ -144,8 +143,7 @@ var fuseTests = []struct {
 
 const hi = "hello, world"
 
-// Test Write calling basic Write, with an fsync thrown in too.
-
+// TODO only used by other tests, at this point
 type write struct {
 	file
 	seen struct {
@@ -173,40 +171,6 @@ func (w *write) Release(r *fuse.ReleaseRequest, intr Intr) fuse.Error {
 func (w *write) setup(t *testing.T) {
 	w.seen.data = make(chan []byte, 10)
 	w.seen.fsync = make(chan bool, 1)
-}
-
-func (w *write) test(path string, t *testing.T) {
-	log.Printf("pre-write Create")
-	f, err := os.Create(path)
-	if err != nil {
-		t.Fatalf("Create: %v", err)
-	}
-	log.Printf("pre-write Write")
-	n, err := f.Write([]byte(hi))
-	if err != nil {
-		t.Fatalf("Write: %v", err)
-	}
-	if n != len(hi) {
-		t.Fatalf("short write; n=%d; hi=%d", n, len(hi))
-	}
-
-	err = syscall.Fsync(int(f.Fd()))
-	if err != nil {
-		t.Fatalf("Fsync = %v", err)
-	}
-	if !<-w.seen.fsync {
-		t.Errorf("never received expected fsync call")
-	}
-
-	log.Printf("pre-write Close")
-	err = f.Close()
-	if err != nil {
-		t.Fatalf("Close: %v", err)
-	}
-	log.Printf("post-write Close")
-	if got := string(gather(w.seen.data)); got != hi {
-		t.Errorf("write = %q, want %q", got, hi)
-	}
 }
 
 // Test Write calling Setattr+Write+Flush.

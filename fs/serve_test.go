@@ -261,3 +261,80 @@ func TestRelease(t *testing.T) {
 		t.Error("Close did not Release")
 	}
 }
+
+// Test Write calling basic Write, with an fsync thrown in too.
+
+type write struct {
+	file
+	seen struct {
+		data  chan []byte
+		fsync chan bool
+	}
+}
+
+func (w *write) Write(req *fuse.WriteRequest, resp *fuse.WriteResponse, intr fs.Intr) fuse.Error {
+	w.seen.data <- req.Data
+	resp.Size = len(req.Data)
+	return nil
+}
+
+func (w *write) Fsync(r *fuse.FsyncRequest, intr fs.Intr) fuse.Error {
+	w.seen.fsync <- true
+	return nil
+}
+
+func (w *write) Release(r *fuse.ReleaseRequest, intr fs.Intr) fuse.Error {
+	close(w.seen.data)
+	return nil
+}
+
+func (w *write) setup() {
+	w.seen.data = make(chan []byte, 10)
+	w.seen.fsync = make(chan bool, 1)
+}
+
+func gather(ch chan []byte) []byte {
+	var buf []byte
+	for b := range ch {
+		buf = append(buf, b...)
+	}
+	return buf
+}
+
+func TestWrite(t *testing.T) {
+	w := &write{}
+	w.setup()
+	mnt, err := fstestutil.MountedT(t, childMapFS{"child": w})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	f, err := os.Create(mnt.Dir + "/child")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	n, err := f.Write([]byte(hi))
+	if err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if n != len(hi) {
+		t.Fatalf("short write; n=%d; hi=%d", n, len(hi))
+	}
+
+	err = syscall.Fsync(int(f.Fd()))
+	if err != nil {
+		t.Fatalf("Fsync = %v", err)
+	}
+	if !<-w.seen.fsync {
+		t.Errorf("never received expected fsync call")
+	}
+
+	err = f.Close()
+	if err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if got := string(gather(w.seen.data)); got != hi {
+		t.Errorf("write = %q, want %q", got, hi)
+	}
+}
