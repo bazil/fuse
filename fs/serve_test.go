@@ -7,6 +7,7 @@ import (
 	"bazil.org/fuse/fs/fstestutil/record"
 	"bazil.org/fuse/fuseutil"
 	"io/ioutil"
+	"log"
 	"os"
 	"syscall"
 	"testing"
@@ -380,4 +381,64 @@ func TestMkdir(t *testing.T) {
 	if g, e := f.RecordedMkdir(), want; g != e {
 		t.Errorf("mkdir saw %+v, want %+v", g, e)
 	}
+}
+
+// Test Create (and fsync)
+
+type create1file struct {
+	file
+	record.Fsyncs
+}
+
+type create1 struct {
+	dir
+	f create1file
+}
+
+func (f *create1) Create(req *fuse.CreateRequest, resp *fuse.CreateResponse, intr fs.Intr) (fs.Node, fs.Handle, fuse.Error) {
+	if req.Name != "foo" {
+		log.Printf("ERROR create1.Create unexpected name: %q\n", req.Name)
+		return nil, nil, fuse.EPERM
+	}
+	flags := req.Flags
+	// OS X does not pass O_TRUNC here, Linux does; as this is a
+	// Create, that's acceptable
+	flags &^= fuse.OpenFlags(os.O_TRUNC)
+	if g, e := flags, fuse.OpenFlags(os.O_CREATE|os.O_RDWR); g != e {
+		log.Printf("ERROR create1.Create unexpected flags: %v != %v\n", g, e)
+		return nil, nil, fuse.EPERM
+	}
+	if g, e := req.Mode, os.FileMode(0644); g != e {
+		log.Printf("ERROR create1.Create unexpected mode: %v != %v\n", g, e)
+		return nil, nil, fuse.EPERM
+	}
+	return &f.f, &f.f, nil
+}
+
+func TestCreate(t *testing.T) {
+	f := &create1{}
+	mnt, err := fstestutil.MountedT(t, simpleFS{f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	// uniform umask needed to make os.Create's 0666 into something
+	// reproducible
+	defer syscall.Umask(syscall.Umask(0022))
+	ff, err := os.Create(mnt.Dir + "/foo")
+	if err != nil {
+		t.Fatalf("create1 WriteFile: %v", err)
+	}
+
+	err = syscall.Fsync(int(ff.Fd()))
+	if err != nil {
+		t.Fatalf("Fsync = %v", err)
+	}
+
+	if !f.f.RecordedFsync() {
+		t.Errorf("never received expected fsync call")
+	}
+
+	ff.Close()
 }

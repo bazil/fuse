@@ -102,7 +102,6 @@ var fuseTests = []struct {
 		test(string, *testing.T)
 	}
 }{
-	{"create1", &create1{}},
 	{"create3", &create3{}},
 	{"symlink1", &symlink1{}},
 	{"link1", &link1{}},
@@ -169,59 +168,6 @@ func (w *write) Release(r *fuse.ReleaseRequest, intr Intr) fuse.Error {
 func (w *write) setup(t *testing.T) {
 	w.seen.data = make(chan []byte, 10)
 	w.seen.fsync = make(chan bool, 1)
-}
-
-// Test Create (and fsync)
-
-type create1 struct {
-	dir
-	f write
-}
-
-func (f *create1) Create(req *fuse.CreateRequest, resp *fuse.CreateResponse, intr Intr) (Node, Handle, fuse.Error) {
-	if req.Name != "foo" {
-		log.Printf("ERROR create1.Create unexpected name: %q\n", req.Name)
-		return nil, nil, fuse.EPERM
-	}
-	flags := req.Flags
-	// OS X does not pass O_TRUNC here, Linux does; as this is a
-	// Create, that's acceptable
-	flags &^= fuse.OpenFlags(os.O_TRUNC)
-	if g, e := flags, fuse.OpenFlags(os.O_CREATE|os.O_RDWR); g != e {
-		log.Printf("ERROR create1.Create unexpected flags: %v != %v\n", g, e)
-		return nil, nil, fuse.EPERM
-	}
-	if g, e := req.Mode, os.FileMode(0644); g != e {
-		log.Printf("ERROR create1.Create unexpected mode: %v != %v\n", g, e)
-		return nil, nil, fuse.EPERM
-	}
-	return &f.f, &f.f, nil
-}
-
-func (f *create1) setup(t *testing.T) {
-	f.f.setup(t)
-}
-
-func (f *create1) test(path string, t *testing.T) {
-	// uniform umask needed to make os.Create's 0666 into something
-	// reproducible
-	defer syscall.Umask(syscall.Umask(0022))
-	ff, err := os.Create(path + "/foo")
-	if err != nil {
-		t.Errorf("create1 WriteFile: %v", err)
-		return
-	}
-
-	err = syscall.Fsync(int(ff.Fd()))
-	if err != nil {
-		t.Fatalf("Fsync = %v", err)
-	}
-
-	if !<-f.f.seen.fsync {
-		t.Errorf("never received expected fsync call")
-	}
-
-	ff.Close()
 }
 
 // Test Create + Write + Remove
