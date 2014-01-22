@@ -102,3 +102,50 @@ func TestStatfs(t *testing.T) {
 	}
 
 }
+
+// Test Stat of root.
+
+type root struct{}
+
+func (f root) Root() (fs.Node, fuse.Error) {
+	return f, nil
+}
+
+func (root) Attr() fuse.Attr {
+	return fuse.Attr{Inode: 1, Mode: os.ModeDir | 0555}
+}
+
+func TestStatRoot(t *testing.T) {
+	mnt, err := fstestutil.MountedT(t, root{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	fi, err := os.Stat(mnt.Dir)
+	if err != nil {
+		t.Fatalf("root getattr failed with %v", err)
+	}
+	mode := fi.Mode()
+	if (mode & os.ModeType) != os.ModeDir {
+		t.Errorf("root is not a directory: %#v", fi)
+	}
+	if mode.Perm() != 0555 {
+		t.Errorf("root has weird access mode: %v", mode.Perm())
+	}
+	switch stat := fi.Sys().(type) {
+	case *syscall.Stat_t:
+		if stat.Ino != 1 {
+			t.Errorf("root has wrong inode: %v", stat.Ino)
+		}
+		if stat.Nlink != 1 {
+			t.Errorf("root has wrong link count: %v", stat.Nlink)
+		}
+		if stat.Uid != 0 {
+			t.Errorf("root has wrong uid: %d", stat.Uid)
+		}
+		if stat.Gid != 0 {
+			t.Errorf("root has wrong gid: %d", stat.Gid)
+		}
+	}
+}
