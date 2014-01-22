@@ -4,6 +4,7 @@ import (
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
 	"bazil.org/fuse/fs/fstestutil"
+	"bazil.org/fuse/fs/fstestutil/record"
 	"bazil.org/fuse/fuseutil"
 	"io/ioutil"
 	"os"
@@ -233,18 +234,11 @@ func TestReadAllWithHandleRead(t *testing.T) {
 
 type release struct {
 	file
-	seen chan bool
-}
-
-func (r *release) Release(*fuse.ReleaseRequest, fs.Intr) fuse.Error {
-	r.seen <- true
-	return nil
+	record.ReleaseWaiter
 }
 
 func TestRelease(t *testing.T) {
-	r := &release{
-		seen: make(chan bool, 1),
-	}
+	r := &release{}
 	mnt, err := fstestutil.MountedT(t, childMapFS{"child": r})
 	if err != nil {
 		t.Fatal(err)
@@ -256,9 +250,8 @@ func TestRelease(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.Close()
-	time.Sleep(1 * time.Second)
-	if !<-r.seen {
-		t.Error("Close did not Release")
+	if !r.WaitForRelease(1 * time.Second) {
+		t.Error("Close did not Release in time")
 	}
 }
 
@@ -266,44 +259,12 @@ func TestRelease(t *testing.T) {
 
 type write struct {
 	file
-	seen struct {
-		data  chan []byte
-		fsync chan bool
-	}
-}
-
-func (w *write) Write(req *fuse.WriteRequest, resp *fuse.WriteResponse, intr fs.Intr) fuse.Error {
-	w.seen.data <- req.Data
-	resp.Size = len(req.Data)
-	return nil
-}
-
-func (w *write) Fsync(r *fuse.FsyncRequest, intr fs.Intr) fuse.Error {
-	w.seen.fsync <- true
-	return nil
-}
-
-func (w *write) Release(r *fuse.ReleaseRequest, intr fs.Intr) fuse.Error {
-	close(w.seen.data)
-	return nil
-}
-
-func (w *write) setup() {
-	w.seen.data = make(chan []byte, 10)
-	w.seen.fsync = make(chan bool, 1)
-}
-
-func gather(ch chan []byte) []byte {
-	var buf []byte
-	for b := range ch {
-		buf = append(buf, b...)
-	}
-	return buf
+	record.Writes
+	record.Fsyncs
 }
 
 func TestWrite(t *testing.T) {
 	w := &write{}
-	w.setup()
 	mnt, err := fstestutil.MountedT(t, childMapFS{"child": w})
 	if err != nil {
 		t.Fatal(err)
@@ -326,7 +287,7 @@ func TestWrite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Fsync = %v", err)
 	}
-	if !<-w.seen.fsync {
+	if !w.RecordedFsync() {
 		t.Errorf("never received expected fsync call")
 	}
 
@@ -334,7 +295,8 @@ func TestWrite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Close: %v", err)
 	}
-	if got := string(gather(w.seen.data)); got != hi {
+
+	if got := string(w.RecordedWriteData()); got != hi {
 		t.Errorf("write = %q, want %q", got, hi)
 	}
 }
@@ -343,8 +305,8 @@ func TestWrite(t *testing.T) {
 
 type writeTruncateFlush struct {
 	file
+	record.Writes
 	seen struct {
-		data    chan []byte
 		setattr chan bool
 		flush   chan bool
 	}
@@ -360,19 +322,7 @@ func (w *writeTruncateFlush) Flush(req *fuse.FlushRequest, intr fs.Intr) fuse.Er
 	return nil
 }
 
-func (w *writeTruncateFlush) Write(req *fuse.WriteRequest, resp *fuse.WriteResponse, intr fs.Intr) fuse.Error {
-	w.seen.data <- req.Data
-	resp.Size = len(req.Data)
-	return nil
-}
-
-func (w *writeTruncateFlush) Release(r *fuse.ReleaseRequest, intr fs.Intr) fuse.Error {
-	close(w.seen.data)
-	return nil
-}
-
 func (w *writeTruncateFlush) setup() {
-	w.seen.data = make(chan []byte, 100)
 	w.seen.setattr = make(chan bool, 1)
 	w.seen.flush = make(chan bool, 1)
 }
@@ -396,7 +346,7 @@ func TestWriteTruncateFlush(t *testing.T) {
 	if !<-w.seen.flush {
 		t.Errorf("writeTruncateFlush expected Setattr")
 	}
-	if got := string(gather(w.seen.data)); got != hi {
+	if got := string(w.RecordedWriteData()); got != hi {
 		t.Errorf("writeTruncateFlush = %q, want %q", got, hi)
 	}
 }
