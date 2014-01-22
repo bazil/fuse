@@ -3,6 +3,7 @@ package record
 import (
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
+	"sync"
 	"sync/atomic"
 )
 
@@ -86,4 +87,71 @@ func (r *Flushes) Flush(req *fuse.FlushRequest, intr fs.Intr) fuse.Error {
 
 func (r *Flushes) RecordedFlush() bool {
 	return r.rec.Recorded()
+}
+
+type Recorder struct {
+	mu  sync.Mutex
+	val interface{}
+}
+
+// Record that we've seen value. A nil value is indistinguishable from
+// no value recorded.
+func (r *Recorder) Record(value interface{}) {
+	r.mu.Lock()
+	r.val = value
+	r.mu.Unlock()
+}
+
+func (r *Recorder) Recorded() interface{} {
+	r.mu.Lock()
+	val := r.val
+	r.mu.Unlock()
+	return val
+}
+
+type RequestRecorder struct {
+	rec Recorder
+}
+
+// Record a fuse.Request, after zeroing header fields that are hard to
+// reproduce.
+//
+// Make sure to record a copy, not the original request.
+func (r *RequestRecorder) RecordRequest(req fuse.Request) {
+	hdr := req.Hdr()
+	*hdr = fuse.Header{}
+	r.rec.Record(req)
+}
+
+func (r *RequestRecorder) Recorded() fuse.Request {
+	val := r.rec.Recorded()
+	if val == nil {
+		return nil
+	}
+	return val.(fuse.Request)
+}
+
+// Mkdirs records a Mkdir request and its fields.
+type Mkdirs struct {
+	rec RequestRecorder
+}
+
+var _ = fs.NodeMkdirer(&Mkdirs{})
+
+// Mkdir records the request and returns an error. Most callers should
+// wrap this call in a function that returns a more useful result.
+func (r *Mkdirs) Mkdir(req *fuse.MkdirRequest, intr fs.Intr) (fs.Node, fuse.Error) {
+	tmp := *req
+	r.rec.RecordRequest(&tmp)
+	return nil, fuse.EIO
+}
+
+// RecordedMkdir returns information about the Mkdir request.
+// If no request was seen, returns a zero value.
+func (r *Mkdirs) RecordedMkdir() fuse.MkdirRequest {
+	val := r.rec.Recorded()
+	if val == nil {
+		return fuse.MkdirRequest{}
+	}
+	return *(val.(*fuse.MkdirRequest))
 }

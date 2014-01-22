@@ -40,10 +40,26 @@ func (f childMapFS) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
 	return child, nil
 }
 
+// simpleFS is a trivial FS that just implements the Root method.
+type simpleFS struct {
+	node fs.Node
+}
+
+var _ = fs.FS(simpleFS{})
+
+func (f simpleFS) Root() (fs.Node, fuse.Error) {
+	return f.node, nil
+}
+
 // file can be embedded in a struct to make it look like a file.
 type file struct{}
 
 func (f file) Attr() fuse.Attr { return fuse.Attr{Mode: 0666} }
+
+// dir can be embedded in a struct to make it look like a directory.
+type dir struct{}
+
+func (f dir) Attr() fuse.Attr { return fuse.Attr{Mode: os.ModeDir | 0777} }
 
 type badRootFS struct{}
 
@@ -330,5 +346,38 @@ func TestWriteTruncateFlush(t *testing.T) {
 	}
 	if got := string(w.RecordedWriteData()); got != hi {
 		t.Errorf("writeTruncateFlush = %q, want %q", got, hi)
+	}
+}
+
+// Test Mkdir.
+
+type mkdir1 struct {
+	dir
+	record.Mkdirs
+}
+
+func (f *mkdir1) Mkdir(req *fuse.MkdirRequest, intr fs.Intr) (fs.Node, fuse.Error) {
+	f.Mkdirs.Mkdir(req, intr)
+	return &mkdir1{}, nil
+}
+
+func TestMkdir(t *testing.T) {
+	f := &mkdir1{}
+	mnt, err := fstestutil.MountedT(t, simpleFS{f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	// uniform umask needed to make os.Mkdir's mode into something
+	// reproducible
+	defer syscall.Umask(syscall.Umask(0022))
+	err = os.Mkdir(mnt.Dir+"/foo", 0771)
+	if err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	want := fuse.MkdirRequest{Name: "foo", Mode: os.ModeDir | 0751}
+	if g, e := f.RecordedMkdir(), want; g != e {
+		t.Errorf("mkdir saw %+v, want %+v", g, e)
 	}
 }
