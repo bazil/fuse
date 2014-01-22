@@ -38,81 +38,6 @@ func debug(tb testing.TB) func(msg interface{}) {
 	}
 }
 
-type testStatFS struct{}
-
-func (f testStatFS) Root() (Node, fuse.Error) {
-	return f, nil
-}
-
-func (f testStatFS) Attr() fuse.Attr {
-	return fuse.Attr{Inode: 1, Mode: os.ModeDir | 0777}
-}
-
-func (f testStatFS) Statfs(req *fuse.StatfsRequest, resp *fuse.StatfsResponse, int Intr) fuse.Error {
-	resp.Blocks = 42
-	resp.Files = 13
-	return nil
-}
-
-func TestStatfs(t *testing.T) {
-	fuse.Debug = debug(t)
-	dir, err := ioutil.TempDir("", "fusetest")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	c, err := fuse.Mount(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer fuse.Unmount(dir)
-
-	go func() {
-		err := Serve(c, testStatFS{})
-		if err != nil {
-			fmt.Printf("SERVE ERROR: %v\n", err)
-		}
-	}()
-
-	waitForMount_inode1(t, dir)
-
-	{
-		var st syscall.Statfs_t
-		err = syscall.Statfs(dir, &st)
-		if err != nil {
-			t.Errorf("Statfs failed: %v", err)
-		}
-		t.Logf("Statfs got: %#v", st)
-		if g, e := st.Blocks, uint64(42); g != e {
-			t.Errorf("got Blocks = %q; want %q", g, e)
-		}
-		if g, e := st.Files, uint64(13); g != e {
-			t.Errorf("got Files = %d; want %d", g, e)
-		}
-	}
-
-	{
-		var st syscall.Statfs_t
-		f, err := os.Open(dir)
-		if err != nil {
-			t.Errorf("Open for fstatfs failed: %v", err)
-		}
-		defer f.Close()
-		err = syscall.Fstatfs(int(f.Fd()), &st)
-		if err != nil {
-			t.Errorf("Fstatfs failed: %v", err)
-		}
-		t.Logf("Fstatfs got: %#v", st)
-		if g, e := st.Blocks, uint64(42); g != e {
-			t.Errorf("got Blocks = %q; want %q", g, e)
-		}
-		if g, e := st.Files, uint64(13); g != e {
-			t.Errorf("got Files = %d; want %d", g, e)
-		}
-	}
-
-}
-
 func TestFuse(t *testing.T) {
 	fuse.Debug = debug(t)
 	dir, err := ioutil.TempDir("", "fusetest")
@@ -164,23 +89,6 @@ func waitForMount(t *testing.T, dir string) {
 		_, err := os.Stat(dir + "/" + probeEntry)
 		if err == nil {
 			return
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatalf("mount did not work")
-}
-
-// TODO maybe wait for fstype to change to FUse (verify it's not fuse to begin with)
-func waitForMount_inode1(t *testing.T, dir string) {
-	for tries := 0; tries < 100; tries++ {
-		fi, err := os.Stat(dir)
-		if err == nil {
-			if si, ok := fi.Sys().(*syscall.Stat_t); ok {
-				if si.Ino == 1 {
-					return
-				}
-				t.Logf("waiting for root: %v", si.Ino)
-			}
 		}
 		time.Sleep(10 * time.Millisecond)
 	}

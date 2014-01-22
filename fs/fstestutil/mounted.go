@@ -68,6 +68,9 @@ func Mounted(srv *fs.Server) (*Mount, error) {
 // MountedT mounts the filesystem at a temporary directory,
 // directing it's debug log to the testing logger.
 //
+// It also waits until the filesystem is known to be visible (OS X
+// workaround).
+//
 // See Mounted for usage.
 //
 // The debug log is not enabled by default. Use `-fuse.debug` or call
@@ -81,5 +84,12 @@ func MountedT(t testing.TB, filesys fs.FS) (*Mount, error) {
 			t.Logf("FUSE: %s", msg)
 		}
 	}
-	return Mounted(srv)
+	mnt, err := Mounted(srv)
+	if err != nil {
+		return mnt, err
+	}
+	// the wait logic is in MountedT and not Mounted for ease of log
+	// integration; we just pass on t
+	waitForMount(t, mnt.Dir, mnt.done)
+	return mnt, err
 }
