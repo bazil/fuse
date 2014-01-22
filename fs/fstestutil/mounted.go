@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"testing"
 )
 
 // Mount contains information about the mount for the test to use.
@@ -37,10 +38,10 @@ func (mnt *Mount) Close() {
 	os.Remove(mnt.Dir)
 }
 
-// Mounted mounts the filesystem at a temporary directory.
+// Mounted mounts the fuse.Server at a temporary directory.
 //
 // After successful return, caller must clean up by calling Close.
-func Mounted(filesys fs.FS) (*Mount, error) {
+func Mounted(srv *fs.Server) (*Mount, error) {
 	dir, err := ioutil.TempDir("", "fusetest")
 	if err != nil {
 		return nil, err
@@ -59,7 +60,26 @@ func Mounted(filesys fs.FS) (*Mount, error) {
 	}
 	go func() {
 		defer close(done)
-		serveErr <- fs.Serve(c, filesys)
+		serveErr <- srv.Serve(c)
 	}()
 	return mnt, nil
+}
+
+// MountedT mounts the filesystem at a temporary directory,
+// directing it's debug log to the testing logger.
+//
+// See Mounted for usage.
+//
+// The debug log is not enabled by default. Use `-fuse.debug` or call
+// DebugByDefault to enable.
+func MountedT(t testing.TB, filesys fs.FS) (*Mount, error) {
+	srv := &fs.Server{
+		FS: filesys,
+	}
+	if *debug {
+		srv.Debug = func(msg interface{}) {
+			t.Logf("FUSE: %s", msg)
+		}
+	}
+	return Mounted(srv)
 }

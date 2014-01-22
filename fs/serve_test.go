@@ -9,6 +9,10 @@ import (
 	"time"
 )
 
+func init() {
+	fstestutil.DebugByDefault()
+}
+
 type badRootFS struct{}
 
 func (badRootFS) Root() (fs.Node, fuse.Error) {
@@ -17,7 +21,7 @@ func (badRootFS) Root() (fs.Node, fuse.Error) {
 }
 
 func TestRootErr(t *testing.T) {
-	mnt, err := fstestutil.Mounted(badRootFS{})
+	mnt, err := fstestutil.MountedT(t, badRootFS{})
 	if err != nil {
 		t.Fatal(err)
 	}
