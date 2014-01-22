@@ -38,43 +38,6 @@ func debug(tb testing.TB) func(msg interface{}) {
 	}
 }
 
-type badRootFS struct{}
-
-func (badRootFS) Root() (Node, fuse.Error) {
-	// pick a really distinct error, to identify it later
-	return nil, fuse.Errno(syscall.ENAMETOOLONG)
-}
-
-func TestRootErr(t *testing.T) {
-	fuse.Debug = debug(t)
-	dir, err := ioutil.TempDir("", "fusetest")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	c, err := fuse.Mount(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer fuse.Unmount(dir)
-
-	ch := make(chan error, 1)
-	go func() {
-		ch <- Serve(c, badRootFS{})
-	}()
-
-	select {
-	case err := <-ch:
-		// TODO this is not be a textual comparison, Serve hides
-		// details
-		if err.Error() != "cannot obtain root node: file name too long" {
-			t.Errorf("Unexpected error: %v", err)
-		}
-	case <-time.After(1 * time.Second):
-		t.Fatal("Serve did not return an error as expected, aborting")
-	}
-}
-
 type testStatFS struct{}
 
 func (f testStatFS) Root() (Node, fuse.Error) {
