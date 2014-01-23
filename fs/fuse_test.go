@@ -102,7 +102,6 @@ var fuseTests = []struct {
 		test(string, *testing.T)
 	}
 }{
-	{"symlink1", &symlink1{}},
 	{"link1", &link1{}},
 	{"rename1", &rename1{}},
 	{"mknod1", &mknod1{}},
@@ -167,52 +166,6 @@ func (w *write) Release(r *fuse.ReleaseRequest, intr Intr) fuse.Error {
 func (w *write) setup(t *testing.T) {
 	w.seen.data = make(chan []byte, 10)
 	w.seen.fsync = make(chan bool, 1)
-}
-
-// Test symlink + readlink
-
-type symlink1 struct {
-	dir
-	seen struct {
-		req chan *fuse.SymlinkRequest
-	}
-}
-
-func (f *symlink1) Symlink(req *fuse.SymlinkRequest, intr Intr) (Node, fuse.Error) {
-	f.seen.req <- req
-	return symlink{target: req.Target}, nil
-}
-
-func (f *symlink1) setup(t *testing.T) {
-	f.seen.req = make(chan *fuse.SymlinkRequest, 1)
-}
-
-func (f *symlink1) test(path string, t *testing.T) {
-	const target = "/some-target"
-
-	err := os.Symlink(target, path+"/symlink.file")
-	if err != nil {
-		t.Errorf("os.Symlink: %v", err)
-		return
-	}
-
-	req := <-f.seen.req
-
-	if req.NewName != "symlink.file" {
-		t.Errorf("symlink newName = %q; want %q", req.NewName, "symlink.file")
-	}
-	if req.Target != target {
-		t.Errorf("symlink target = %q; want %q", req.Target, target)
-	}
-
-	gotName, err := os.Readlink(path + "/symlink.file")
-	if err != nil {
-		t.Errorf("os.Readlink: %v", err)
-		return
-	}
-	if gotName != target {
-		t.Errorf("os.Readlink = %q; want %q", gotName, target)
-	}
 }
 
 // Test link
@@ -339,18 +292,10 @@ func (f *mknod1) test(path string, t *testing.T) {
 type file struct{}
 type dir struct{}
 type fifo struct{}
-type symlink struct {
-	target string
-}
 
-func (f file) Attr() fuse.Attr    { return fuse.Attr{Mode: 0666} }
-func (f dir) Attr() fuse.Attr     { return fuse.Attr{Mode: os.ModeDir | 0777} }
-func (f fifo) Attr() fuse.Attr    { return fuse.Attr{Mode: os.ModeNamedPipe | 0666} }
-func (f symlink) Attr() fuse.Attr { return fuse.Attr{Mode: os.ModeSymlink | 0666} }
-
-func (f symlink) Readlink(*fuse.ReadlinkRequest, Intr) (string, fuse.Error) {
-	return f.target, nil
-}
+func (f file) Attr() fuse.Attr { return fuse.Attr{Mode: 0666} }
+func (f dir) Attr() fuse.Attr  { return fuse.Attr{Mode: os.ModeDir | 0777} }
+func (f fifo) Attr() fuse.Attr { return fuse.Attr{Mode: os.ModeNamedPipe | 0666} }
 
 type testFS struct{}
 

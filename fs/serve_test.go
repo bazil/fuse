@@ -62,6 +62,13 @@ type dir struct{}
 
 func (f dir) Attr() fuse.Attr { return fuse.Attr{Mode: os.ModeDir | 0777} }
 
+// symlink can be embedded in a struct to make it look like a symlink.
+type symlink struct {
+	target string
+}
+
+func (f symlink) Attr() fuse.Attr { return fuse.Attr{Mode: os.ModeSymlink | 0666} }
+
 type badRootFS struct{}
 
 func (badRootFS) Root() (fs.Node, fuse.Error) {
@@ -505,5 +512,56 @@ func TestCreateWriteRemove(t *testing.T) {
 	err = os.Remove(mnt.Dir + "/foo")
 	if err == nil {
 		t.Fatalf("second Remove = nil; want some error")
+	}
+}
+
+// Test symlink + readlink
+
+// is a Node that is a symlink to target
+type symlink1link struct {
+	symlink
+	target string
+}
+
+func (f symlink1link) Readlink(*fuse.ReadlinkRequest, fs.Intr) (string, fuse.Error) {
+	return f.target, nil
+}
+
+type symlink1 struct {
+	dir
+	record.Symlinks
+}
+
+func (f *symlink1) Symlink(req *fuse.SymlinkRequest, intr fs.Intr) (fs.Node, fuse.Error) {
+	f.Symlinks.Symlink(req, intr)
+	return symlink1link{target: req.Target}, nil
+}
+
+func TestSymlink(t *testing.T) {
+	f := &symlink1{}
+	mnt, err := fstestutil.MountedT(t, simpleFS{f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	const target = "/some-target"
+
+	err = os.Symlink(target, mnt.Dir+"/symlink.file")
+	if err != nil {
+		t.Fatalf("os.Symlink: %v", err)
+	}
+
+	want := fuse.SymlinkRequest{NewName: "symlink.file", Target: target}
+	if g, e := f.RecordedSymlink(), want; g != e {
+		t.Errorf("symlink saw %+v, want %+v", g, e)
+	}
+
+	gotName, err := os.Readlink(mnt.Dir + "/symlink.file")
+	if err != nil {
+		t.Fatalf("os.Readlink: %v", err)
+	}
+	if gotName != target {
+		t.Errorf("os.Readlink = %q; want %q", gotName, target)
 	}
 }

@@ -155,3 +155,28 @@ func (r *Mkdirs) RecordedMkdir() fuse.MkdirRequest {
 	}
 	return *(val.(*fuse.MkdirRequest))
 }
+
+// Symlinks records a Symlink request and its fields.
+type Symlinks struct {
+	rec RequestRecorder
+}
+
+var _ = fs.NodeSymlinker(&Symlinks{})
+
+// Symlink records the request and returns an error. Most callers should
+// wrap this call in a function that returns a more useful result.
+func (r *Symlinks) Symlink(req *fuse.SymlinkRequest, intr fs.Intr) (fs.Node, fuse.Error) {
+	tmp := *req
+	r.rec.RecordRequest(&tmp)
+	return nil, fuse.EIO
+}
+
+// RecordedSymlink returns information about the Symlink request.
+// If no request was seen, returns a zero value.
+func (r *Symlinks) RecordedSymlink() fuse.SymlinkRequest {
+	val := r.rec.Recorded()
+	if val == nil {
+		return fuse.SymlinkRequest{}
+	}
+	return *(val.(*fuse.SymlinkRequest))
+}
