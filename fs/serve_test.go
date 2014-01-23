@@ -1183,3 +1183,32 @@ func TestGetxattrTooSmall(t *testing.T) {
 		return
 	}
 }
+
+// Test Getxattr used to probe result size
+
+type getxattrSize struct {
+	file
+}
+
+func (f *getxattrSize) Getxattr(req *fuse.GetxattrRequest, resp *fuse.GetxattrResponse, intr fs.Intr) fuse.Error {
+	resp.Xattr = []byte("hello, world")
+	return nil
+}
+
+func TestGetxattrSize(t *testing.T) {
+	f := &getxattrSize{}
+	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	n, err := syscallx.Getxattr(mnt.Dir+"/child", "whatever", nil)
+	if err != nil {
+		t.Errorf("Getxattr unexpected error: %v", err)
+		return
+	}
+	if g, e := n, len("hello, world"); g != e {
+		t.Errorf("Getxattr incorrect size: %d != %d", g, e)
+	}
+}
