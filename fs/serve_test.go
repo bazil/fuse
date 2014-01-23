@@ -1212,3 +1212,43 @@ func TestGetxattrSize(t *testing.T) {
 		t.Errorf("Getxattr incorrect size: %d != %d", g, e)
 	}
 }
+
+// Test Listxattr
+
+type listxattr struct {
+	file
+	record.Listxattrs
+}
+
+func (f *listxattr) Listxattr(req *fuse.ListxattrRequest, resp *fuse.ListxattrResponse, intr fs.Intr) fuse.Error {
+	f.Listxattrs.Listxattr(req, resp, intr)
+	resp.Append("one", "two")
+	return nil
+}
+
+func TestListxattr(t *testing.T) {
+	f := &listxattr{}
+	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	buf := make([]byte, 8192)
+	n, err := syscallx.Listxattr(mnt.Dir+"/child", buf)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+	buf = buf[:n]
+	if g, e := string(buf), "one\x00two\x00"; g != e {
+		t.Errorf("wrong listxattr content: %#v != %#v", g, e)
+	}
+
+	want := fuse.ListxattrRequest{
+		Size: 8192,
+	}
+	if g, e := f.RecordedListxattr(), want; g != e {
+		t.Fatalf("listxattr saw %+v, want %+v", g, e)
+	}
+}
