@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -102,7 +101,6 @@ var fuseTests = []struct {
 		test(string, *testing.T)
 	}
 }{
-	{"rename1", &rename1{}},
 	{"mknod1", &mknod1{}},
 	{"dataHandle", dataHandleTest{}},
 	{"interrupt", &interrupt{}},
@@ -165,42 +163,6 @@ func (w *write) Release(r *fuse.ReleaseRequest, intr Intr) fuse.Error {
 func (w *write) setup(t *testing.T) {
 	w.seen.data = make(chan []byte, 10)
 	w.seen.fsync = make(chan bool, 1)
-}
-
-// Test Rename
-
-type rename1 struct {
-	dir
-	renames int32
-}
-
-func (f *rename1) Lookup(name string, intr Intr) (Node, fuse.Error) {
-	if name == "old" {
-		return file{}, nil
-	}
-	return nil, fuse.ENOENT
-}
-
-func (f *rename1) Rename(r *fuse.RenameRequest, newDir Node, intr Intr) fuse.Error {
-	if r.OldName == "old" && r.NewName == "new" && newDir == f {
-		atomic.AddInt32(&f.renames, 1)
-		return nil
-	}
-	return fuse.EIO
-}
-
-func (f *rename1) test(path string, t *testing.T) {
-	err := os.Rename(path+"/old", path+"/new")
-	if err != nil {
-		t.Fatalf("Rename: %v", err)
-	}
-	if atomic.LoadInt32(&f.renames) != 1 {
-		t.Fatalf("expected rename didn't happen")
-	}
-	err = os.Rename(path+"/old2", path+"/new2")
-	if err == nil {
-		t.Fatal("expected error on second Rename; got nil")
-	}
 }
 
 // Test mknod

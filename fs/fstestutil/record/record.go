@@ -28,17 +28,30 @@ func (w *Writes) RecordedWriteData() []byte {
 	return w.buf.Bytes()
 }
 
-// MarkRecorder records whether a thing has occurred.
-type MarkRecorder struct {
+// Counter records number of times a thing has occurred.
+type Counter struct {
 	count uint32
 }
 
-func (r *MarkRecorder) Mark() {
+func (r *Counter) Inc() {
 	atomic.StoreUint32(&r.count, 1)
 }
 
+func (r *Counter) Count() uint32 {
+	return atomic.LoadUint32(&r.count)
+}
+
+// MarkRecorder records whether a thing has occurred.
+type MarkRecorder struct {
+	count Counter
+}
+
+func (r *MarkRecorder) Mark() {
+	r.count.Inc()
+}
+
 func (r *MarkRecorder) Recorded() bool {
-	return atomic.LoadUint32(&r.count) > 0
+	return r.count.Count() > 0
 }
 
 // Fsyncs notes whether a FUSE Fsync call has been seen.

@@ -608,3 +608,46 @@ func TestLink(t *testing.T) {
 		t.Fatalf("link saw %+v, want %+v", g, e)
 	}
 }
+
+// Test Rename
+
+type rename1 struct {
+	dir
+	renamed record.Counter
+}
+
+func (f *rename1) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
+	if name == "old" {
+		return file{}, nil
+	}
+	return nil, fuse.ENOENT
+}
+
+func (f *rename1) Rename(r *fuse.RenameRequest, newDir fs.Node, intr fs.Intr) fuse.Error {
+	if r.OldName == "old" && r.NewName == "new" && newDir == f {
+		f.renamed.Inc()
+		return nil
+	}
+	return fuse.EIO
+}
+
+func TestRename(t *testing.T) {
+	f := &rename1{}
+	mnt, err := fstestutil.MountedT(t, simpleFS{f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	err = os.Rename(mnt.Dir+"/old", mnt.Dir+"/new")
+	if err != nil {
+		t.Fatalf("Rename: %v", err)
+	}
+	if g, e := f.renamed.Count(), uint32(1); g != e {
+		t.Fatalf("expected rename didn't happen: %d != %d", g, e)
+	}
+	err = os.Rename(mnt.Dir+"/old2", mnt.Dir+"/new2")
+	if err == nil {
+		t.Fatal("expected error on second Rename; got nil")
+	}
+}
