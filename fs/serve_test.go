@@ -17,6 +17,16 @@ import (
 	"time"
 )
 
+// TO TEST:
+//	Lookup(*LookupRequest, *LookupResponse)
+//	Getattr(*GetattrRequest, *GetattrResponse)
+//	Attr with explicit inode
+//	Setattr(*SetattrRequest, *SetattrResponse)
+//	Access(*AccessRequest)
+//	Open(*OpenRequest, *OpenResponse)
+//	Write(*WriteRequest, *WriteResponse)
+//	Flush(*FlushRequest, *FlushResponse)
+
 func init() {
 	fstestutil.DebugByDefault()
 }
