@@ -98,7 +98,6 @@ var fuseTests = []struct {
 		test(string, *testing.T)
 	}
 }{
-	{"getxattrTooSmall", &getxattrTooSmall{}},
 	{"getxattrSize", &getxattrSize{}},
 	{"listxattr", &listxattr{}},
 	{"listxattrTooSmall", &listxattrTooSmall{}},
@@ -183,29 +182,6 @@ func (testFS) ReadDir(intr Intr) ([]fuse.Dirent, fuse.Error) {
 		}
 	}
 	return dirs, nil
-}
-
-// Test Getxattr that has no space to return value
-
-type getxattrTooSmall struct {
-	file
-}
-
-func (f *getxattrTooSmall) Getxattr(req *fuse.GetxattrRequest, resp *fuse.GetxattrResponse, intr Intr) fuse.Error {
-	resp.Xattr = []byte("hello, world")
-	return nil
-}
-
-func (f *getxattrTooSmall) test(path string, t *testing.T) {
-	buf := make([]byte, 3)
-	_, err := syscallx.Getxattr(path, "whatever", buf)
-	if err == nil {
-		t.Error("Getxattr = nil; want some error")
-	}
-	if err != syscall.ERANGE {
-		t.Errorf("unexpected error: %v", err)
-		return
-	}
 }
 
 // Test Getxattr used to probe result size

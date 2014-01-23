@@ -1153,3 +1153,33 @@ func TestGetxattr(t *testing.T) {
 		t.Errorf("wrong getxattr name: %#v != %#v", g, e)
 	}
 }
+
+// Test Getxattr that has no space to return value
+
+type getxattrTooSmall struct {
+	file
+}
+
+func (f *getxattrTooSmall) Getxattr(req *fuse.GetxattrRequest, resp *fuse.GetxattrResponse, intr fs.Intr) fuse.Error {
+	resp.Xattr = []byte("hello, world")
+	return nil
+}
+
+func TestGetxattrTooSmall(t *testing.T) {
+	f := &getxattrTooSmall{}
+	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	buf := make([]byte, 3)
+	_, err = syscallx.Getxattr(mnt.Dir+"/child", "whatever", buf)
+	if err == nil {
+		t.Error("Getxattr = nil; want some error")
+	}
+	if err != syscall.ERANGE {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+}
