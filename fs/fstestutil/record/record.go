@@ -353,3 +353,28 @@ func (r *Setxattrs) RecordedSetxattr() fuse.SetxattrRequest {
 	}
 	return *(val.(*fuse.SetxattrRequest))
 }
+
+// Removexattrs records a Removexattr request and its fields.
+type Removexattrs struct {
+	rec RequestRecorder
+}
+
+var _ = fs.NodeRemovexattrer(&Removexattrs{})
+
+// Removexattr records the request and returns an error. Most callers should
+// wrap this call in a function that returns a more useful result.
+func (r *Removexattrs) Removexattr(req *fuse.RemovexattrRequest, intr fs.Intr) fuse.Error {
+	tmp := *req
+	r.rec.RecordRequest(&tmp)
+	return nil
+}
+
+// RecordedRemovexattr returns information about the Removexattr request.
+// If no request was seen, returns a zero value.
+func (r *Removexattrs) RecordedRemovexattr() fuse.RemovexattrRequest {
+	val := r.rec.Recorded()
+	if val == nil {
+		return fuse.RemovexattrRequest{}
+	}
+	return *(val.(*fuse.RemovexattrRequest))
+}

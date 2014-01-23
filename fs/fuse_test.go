@@ -2,17 +2,12 @@ package fs
 
 import (
 	"flag"
-	"fmt"
-	"io/ioutil"
-	"log"
 	"os"
 	"testing"
-	"time"
 )
 
 import (
 	"bazil.org/fuse"
-	"bazil.org/fuse/syscallx"
 )
 
 var fuseRun = flag.String("fuserun", "", "which fuse test to run. runs all if empty.")
@@ -31,73 +26,6 @@ func debug(tb testing.TB) func(msg interface{}) {
 	return func(msg interface{}) {
 		tb.Log(msg)
 	}
-}
-
-func TestFuse(t *testing.T) {
-	fuse.Debug = debug(t)
-	dir, err := ioutil.TempDir("", "fusetest")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for _, tt := range fuseTests {
-		if *fuseRun == "" || *fuseRun == tt.name {
-			if st, ok := tt.node.(interface {
-				setup(*testing.T)
-			}); ok {
-				t.Logf("setting up %T", tt.node)
-				st.setup(t)
-			}
-		}
-	}
-
-	c, err := fuse.Mount(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer fuse.Unmount(dir)
-
-	go func() {
-		err := Serve(c, testFS{})
-		if err != nil {
-			fmt.Printf("SERVE ERROR: %v\n", err)
-		}
-	}()
-
-	waitForMount(t, dir)
-
-	for _, tt := range fuseTests {
-		if *fuseRun == "" || *fuseRun == tt.name {
-			t.Logf("running %T", tt.node)
-			tt.node.test(dir+"/"+tt.name, t)
-		}
-	}
-}
-
-func waitForMount(t *testing.T, dir string) {
-	// Filename to wait for in dir:
-	probeEntry := *fuseRun
-	if probeEntry == "" {
-		probeEntry = fuseTests[0].name
-	}
-	for tries := 0; tries < 100; tries++ {
-		_, err := os.Stat(dir + "/" + probeEntry)
-		if err == nil {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatalf("mount did not work")
-}
-
-var fuseTests = []struct {
-	name string
-	node interface {
-		Node
-		test(string, *testing.T)
-	}
-}{
-	{"removexattr", &removexattr{}},
 }
 
 // TO TEST:
@@ -147,66 +75,3 @@ type dir struct{}
 
 func (f file) Attr() fuse.Attr { return fuse.Attr{Mode: 0666} }
 func (f dir) Attr() fuse.Attr  { return fuse.Attr{Mode: os.ModeDir | 0777} }
-
-type testFS struct{}
-
-func (testFS) Root() (Node, fuse.Error) {
-	return testFS{}, nil
-}
-
-func (testFS) Attr() fuse.Attr {
-	return fuse.Attr{Inode: 1, Mode: os.ModeDir | 0555}
-}
-
-func (testFS) Lookup(name string, intr Intr) (Node, fuse.Error) {
-	for _, tt := range fuseTests {
-		if tt.name == name {
-			return tt.node, nil
-		}
-	}
-	return nil, fuse.ENOENT
-}
-
-func (testFS) ReadDir(intr Intr) ([]fuse.Dirent, fuse.Error) {
-	var dirs []fuse.Dirent
-	for _, tt := range fuseTests {
-		if *fuseRun == "" || *fuseRun == tt.name {
-			log.Printf("Readdir; adding %q", tt.name)
-			dirs = append(dirs, fuse.Dirent{Name: tt.name})
-		}
-	}
-	return dirs, nil
-}
-
-// Test Removexattr
-
-type removexattrSeen struct {
-	name string
-}
-
-type removexattr struct {
-	file
-	seen chan removexattrSeen
-}
-
-func (f *removexattr) Removexattr(req *fuse.RemovexattrRequest, intr Intr) fuse.Error {
-	f.seen <- removexattrSeen{name: req.Name}
-	return nil
-}
-
-func (f *removexattr) setup(t *testing.T) {
-	f.seen = make(chan removexattrSeen, 1)
-}
-
-func (f *removexattr) test(path string, t *testing.T) {
-	err := syscallx.Removexattr(path, "greeting")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-		return
-	}
-	close(f.seen)
-	want := removexattrSeen{name: "greeting"}
-	if g, e := <-f.seen, want; g != e {
-		t.Errorf("removexattr saw %v, want %v", g, e)
-	}
-}

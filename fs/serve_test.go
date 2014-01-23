@@ -1349,3 +1349,30 @@ func TestSetxattr(t *testing.T) {
 		t.Errorf("Setxattr incorrect data: %q != %q", g, e)
 	}
 }
+
+// Test Removexattr
+
+type removexattr struct {
+	file
+	record.Removexattrs
+}
+
+func TestRemovexattr(t *testing.T) {
+	f := &removexattr{}
+	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	err = syscallx.Removexattr(mnt.Dir+"/child", "greeting")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+
+	want := fuse.RemovexattrRequest{Name: "greeting"}
+	if g, e := f.RecordedRemovexattr(), want; g != e {
+		t.Errorf("removexattr saw %v, want %v", g, e)
+	}
+}
