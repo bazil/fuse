@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"runtime"
 	"syscall"
 	"testing"
@@ -729,5 +730,80 @@ func TestDataHandle(t *testing.T) {
 	}
 	if string(data) != hi {
 		t.Errorf("readAll = %q, want %q", data, hi)
+	}
+}
+
+// Test interrupt
+
+type interrupt struct {
+	file
+
+	// strobes to signal we have a read hanging
+	hanging chan struct{}
+}
+
+func (it *interrupt) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, intr fs.Intr) fuse.Error {
+	select {
+	case it.hanging <- struct{}{}:
+	default:
+	}
+	<-intr
+	return fuse.EINTR
+}
+
+func TestInterrupt(t *testing.T) {
+	f := &interrupt{}
+	f.hanging = make(chan struct{}, 1)
+	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	// start a subprocess that can hang until signaled
+	cmd := exec.Command("cat", mnt.Dir+"/child")
+
+	err = cmd.Start()
+	if err != nil {
+		t.Errorf("interrupt: cannot start cat: %v", err)
+		return
+	}
+
+	// try to clean up if child is still alive when returning
+	defer cmd.Process.Kill()
+
+	// wait till we're sure it's hanging in read
+	<-f.hanging
+
+	err = cmd.Process.Signal(os.Interrupt)
+	if err != nil {
+		t.Errorf("interrupt: cannot interrupt cat: %v", err)
+		return
+	}
+
+	p, err := cmd.Process.Wait()
+	if err != nil {
+		t.Errorf("interrupt: cat bork: %v", err)
+		return
+	}
+	switch ws := p.Sys().(type) {
+	case syscall.WaitStatus:
+		if ws.CoreDump() {
+			t.Errorf("interrupt: didn't expect cat to dump core: %v", ws)
+		}
+
+		if ws.Exited() {
+			t.Errorf("interrupt: didn't expect cat to exit normally: %v", ws)
+		}
+
+		if !ws.Signaled() {
+			t.Errorf("interrupt: expected cat to get a signal: %v", ws)
+		} else {
+			if ws.Signal() != os.Interrupt {
+				t.Errorf("interrupt: cat got wrong signal: %v", ws)
+			}
+		}
+	default:
+		t.Logf("interrupt: this platform has no test coverage")
 	}
 }

@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"os/exec"
 	"runtime"
 	"syscall"
 	"testing"
@@ -15,7 +14,6 @@ import (
 
 import (
 	"bazil.org/fuse"
-	"bazil.org/fuse/fuseutil"
 	"bazil.org/fuse/syscallx"
 )
 
@@ -101,7 +99,6 @@ var fuseTests = []struct {
 		test(string, *testing.T)
 	}
 }{
-	{"interrupt", &interrupt{}},
 	{"truncate42", &truncate{toSize: 42}},
 	{"truncate0", &truncate{toSize: 0}},
 	{"ftruncate42", &ftruncate{toSize: 42}},
@@ -197,80 +194,6 @@ func (testFS) ReadDir(intr Intr) ([]fuse.Dirent, fuse.Error) {
 		}
 	}
 	return dirs, nil
-}
-
-// Test interrupt
-
-type interrupt struct {
-	file
-
-	// closed to signal we have a read hanging
-	hanging chan struct{}
-}
-
-func (it *interrupt) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, intr Intr) fuse.Error {
-	if it.hanging == nil {
-		fuseutil.HandleRead(req, resp, []byte("don't read this outside of the test"))
-		return nil
-	}
-
-	close(it.hanging)
-	<-intr
-	return fuse.EINTR
-}
-
-func (it *interrupt) setup(t *testing.T) {
-	it.hanging = make(chan struct{})
-}
-
-func (it *interrupt) test(path string, t *testing.T) {
-
-	// start a subprocess that can hang until signaled
-	cmd := exec.Command("cat", path)
-
-	err := cmd.Start()
-	if err != nil {
-		t.Errorf("interrupt: cannot start cat: %v", err)
-		return
-	}
-
-	// try to clean up if child is still alive when returning
-	defer cmd.Process.Kill()
-
-	// wait till we're sure it's hanging in read
-	<-it.hanging
-
-	err = cmd.Process.Signal(os.Interrupt)
-	if err != nil {
-		t.Errorf("interrupt: cannot interrupt cat: %v", err)
-		return
-	}
-
-	p, err := cmd.Process.Wait()
-	if err != nil {
-		t.Errorf("interrupt: cat bork: %v", err)
-		return
-	}
-	switch ws := p.Sys().(type) {
-	case syscall.WaitStatus:
-		if ws.CoreDump() {
-			t.Errorf("interrupt: didn't expect cat to dump core: %v", ws)
-		}
-
-		if ws.Exited() {
-			t.Errorf("interrupt: didn't expect cat to exit normally: %v", ws)
-		}
-
-		if !ws.Signaled() {
-			t.Errorf("interrupt: expected cat to get a signal: %v", ws)
-		} else {
-			if ws.Signal() != os.Interrupt {
-				t.Errorf("interrupt: cat got wrong signal: %v", ws)
-			}
-		}
-	default:
-		t.Logf("interrupt: this platform has no test coverage")
-	}
 }
 
 // Test truncate
