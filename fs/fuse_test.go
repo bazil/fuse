@@ -101,7 +101,6 @@ var fuseTests = []struct {
 		test(string, *testing.T)
 	}
 }{
-	{"dataHandle", dataHandleTest{}},
 	{"interrupt", &interrupt{}},
 	{"truncate42", &truncate{toSize: 42}},
 	{"truncate0", &truncate{toSize: 0}},
@@ -198,27 +197,6 @@ func (testFS) ReadDir(intr Intr) ([]fuse.Dirent, fuse.Error) {
 		}
 	}
 	return dirs, nil
-}
-
-// Test Read served with DataHandle.
-
-type dataHandleTest struct {
-	file
-}
-
-func (dataHandleTest) Open(*fuse.OpenRequest, *fuse.OpenResponse, Intr) (Handle, fuse.Error) {
-	return DataHandle([]byte(hi)), nil
-}
-
-func (dataHandleTest) test(path string, t *testing.T) {
-	data, err := ioutil.ReadFile(path)
-	if err != nil {
-		t.Errorf("readAll: %v", err)
-		return
-	}
-	if string(data) != hi {
-		t.Errorf("readAll = %q, want %q", data, hi)
-	}
 }
 
 // Test interrupt

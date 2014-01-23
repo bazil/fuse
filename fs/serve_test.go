@@ -703,3 +703,31 @@ func TestMknod(t *testing.T) {
 		t.Fatalf("mknod saw %+v, want %+v", g, e)
 	}
 }
+
+// Test Read served with DataHandle.
+
+type dataHandleTest struct {
+	file
+}
+
+func (dataHandleTest) Open(*fuse.OpenRequest, *fuse.OpenResponse, fs.Intr) (fs.Handle, fuse.Error) {
+	return fs.DataHandle([]byte(hi)), nil
+}
+
+func TestDataHandle(t *testing.T) {
+	f := &dataHandleTest{}
+	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	data, err := ioutil.ReadFile(mnt.Dir + "/child")
+	if err != nil {
+		t.Errorf("readAll: %v", err)
+		return
+	}
+	if string(data) != hi {
+		t.Errorf("readAll = %q, want %q", data, hi)
+	}
+}
