@@ -97,7 +97,6 @@ var fuseTests = []struct {
 		test(string, *testing.T)
 	}
 }{
-	{"setxattr", &setxattr{}},
 	{"removexattr", &removexattr{}},
 }
 
@@ -177,45 +176,6 @@ func (testFS) ReadDir(intr Intr) ([]fuse.Dirent, fuse.Error) {
 		}
 	}
 	return dirs, nil
-}
-
-// Test Setxattr
-
-type setxattrSeen struct {
-	name  string
-	flags uint32
-	value string
-}
-
-type setxattr struct {
-	file
-	seen chan setxattrSeen
-}
-
-func (f *setxattr) Setxattr(req *fuse.SetxattrRequest, intr Intr) fuse.Error {
-	f.seen <- setxattrSeen{
-		name:  req.Name,
-		flags: req.Flags,
-		value: string(req.Xattr),
-	}
-	return nil
-}
-
-func (f *setxattr) setup(t *testing.T) {
-	f.seen = make(chan setxattrSeen, 1)
-}
-
-func (f *setxattr) test(path string, t *testing.T) {
-	err := syscallx.Setxattr(path, "greeting", []byte("hello, world"), 0)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-		return
-	}
-	close(f.seen)
-	want := setxattrSeen{flags: 0, name: "greeting", value: "hello, world"}
-	if g, e := <-f.seen, want; g != e {
-		t.Errorf("setxattr saw %v, want %v", g, e)
-	}
 }
 
 // Test Removexattr

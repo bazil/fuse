@@ -1311,3 +1311,41 @@ func TestListxattrSize(t *testing.T) {
 		t.Errorf("Getxattr incorrect size: %d != %d", g, e)
 	}
 }
+
+// Test Setxattr
+
+type setxattr struct {
+	file
+	record.Setxattrs
+}
+
+func TestSetxattr(t *testing.T) {
+	f := &setxattr{}
+	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	err = syscallx.Setxattr(mnt.Dir+"/child", "greeting", []byte("hello, world"), 0)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+
+	// fuse.SetxattrRequest contains a byte slice and thus cannot be
+	// directly compared
+	got := f.RecordedSetxattr()
+
+	if g, e := got.Name, "greeting"; g != e {
+		t.Errorf("Setxattr incorrect name: %q != %q", g, e)
+	}
+
+	if g, e := got.Flags, uint32(0); g != e {
+		t.Errorf("Setxattr incorrect flags: %d != %d", g, e)
+	}
+
+	if g, e := string(got.Xattr), "hello, world"; g != e {
+		t.Errorf("Setxattr incorrect data: %q != %q", g, e)
+	}
+}

@@ -328,3 +328,28 @@ func (r *Listxattrs) RecordedListxattr() fuse.ListxattrRequest {
 	}
 	return *(val.(*fuse.ListxattrRequest))
 }
+
+// Setxattrs records a Setxattr request and its fields.
+type Setxattrs struct {
+	rec RequestRecorder
+}
+
+var _ = fs.NodeSetxattrer(&Setxattrs{})
+
+// Setxattr records the request and returns an error. Most callers should
+// wrap this call in a function that returns a more useful result.
+func (r *Setxattrs) Setxattr(req *fuse.SetxattrRequest, intr fs.Intr) fuse.Error {
+	tmp := *req
+	r.rec.RecordRequest(&tmp)
+	return nil
+}
+
+// RecordedSetxattr returns information about the Setxattr request.
+// If no request was seen, returns a zero value.
+func (r *Setxattrs) RecordedSetxattr() fuse.SetxattrRequest {
+	val := r.rec.Recorded()
+	if val == nil {
+		return fuse.SetxattrRequest{}
+	}
+	return *(val.(*fuse.SetxattrRequest))
+}
