@@ -1016,3 +1016,58 @@ func TestChmod(t *testing.T) {
 		t.Errorf("wrong mode: %v != %v", g, e)
 	}
 }
+
+// Test open
+
+type open struct {
+	file
+	record.Opens
+}
+
+func (f *open) Open(req *fuse.OpenRequest, resp *fuse.OpenResponse, intr fs.Intr) (fs.Handle, fuse.Error) {
+	f.Opens.Open(req, resp, intr)
+	// pick a really distinct error, to identify it later
+	return nil, fuse.Errno(syscall.ENAMETOOLONG)
+
+}
+
+func TestOpen(t *testing.T) {
+	f := &open{}
+	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	// node: mode only matters with O_CREATE
+	fil, err := os.OpenFile(mnt.Dir+"/child", os.O_WRONLY|os.O_APPEND, 0)
+	if err == nil {
+		t.Error("Open err == nil, expected ENAMETOOLONG")
+		fil.Close()
+		return
+	}
+
+	switch err2 := err.(type) {
+	case *os.PathError:
+		if err2.Err == syscall.ENAMETOOLONG {
+			break
+		}
+		t.Errorf("unexpected inner error: %#v", err2)
+	default:
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	want := fuse.OpenRequest{Dir: false, Flags: fuse.OpenFlags(os.O_WRONLY | os.O_APPEND)}
+	if runtime.GOOS == "darwin" {
+		// osxfuse does not let O_APPEND through at all
+		//
+		// https://code.google.com/p/macfuse/issues/detail?id=233
+		// https://code.google.com/p/macfuse/issues/detail?id=132
+		// https://code.google.com/p/macfuse/issues/detail?id=133
+		want.Flags &^= fuse.OpenFlags(os.O_APPEND)
+	}
+	if g, e := f.RecordedOpen(), want; g != e {
+		t.Errorf("open saw %v, want %v", g, e)
+		return
+	}
+}

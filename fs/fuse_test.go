@@ -99,7 +99,6 @@ var fuseTests = []struct {
 		test(string, *testing.T)
 	}
 }{
-	{"open", &open{}},
 	{"fsyncDir", &fsyncDir{}},
 	{"getxattr", &getxattr{}},
 	{"getxattrTooSmall", &getxattrTooSmall{}},
@@ -187,67 +186,6 @@ func (testFS) ReadDir(intr Intr) ([]fuse.Dirent, fuse.Error) {
 		}
 	}
 	return dirs, nil
-}
-
-// Test open
-
-type openSeen struct {
-	dir   bool
-	flags fuse.OpenFlags
-}
-
-func (s openSeen) String() string {
-	return fmt.Sprintf("%T{dir:%v flags:%v}", s, s.dir, s.flags)
-}
-
-type open struct {
-	file
-	seen chan openSeen
-}
-
-func (f *open) Open(req *fuse.OpenRequest, resp *fuse.OpenResponse, intr Intr) (Handle, fuse.Error) {
-	f.seen <- openSeen{dir: req.Dir, flags: req.Flags}
-	// pick a really distinct error, to identify it later
-	return nil, fuse.Errno(syscall.ENAMETOOLONG)
-
-}
-
-func (f *open) setup(t *testing.T) {
-	f.seen = make(chan openSeen, 1)
-}
-
-func (f *open) test(path string, t *testing.T) {
-	// node: mode only matters with O_CREATE
-	fil, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0)
-	if err == nil {
-		t.Error("Open err == nil, expected ENAMETOOLONG")
-		fil.Close()
-		return
-	}
-
-	switch err2 := err.(type) {
-	case *os.PathError:
-		if err2.Err == syscall.ENAMETOOLONG {
-			break
-		}
-		t.Errorf("unexpected inner error: %#v", err2)
-	default:
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	want := openSeen{dir: false, flags: fuse.OpenFlags(os.O_WRONLY | os.O_APPEND)}
-	if runtime.GOOS == "darwin" {
-		// osxfuse does not let O_APPEND through at all
-		//
-		// https://code.google.com/p/macfuse/issues/detail?id=233
-		// https://code.google.com/p/macfuse/issues/detail?id=132
-		// https://code.google.com/p/macfuse/issues/detail?id=133
-		want.flags &^= fuse.OpenFlags(os.O_APPEND)
-	}
-	if g, e := <-f.seen, want; g != e {
-		t.Errorf("open saw %v, want %v", g, e)
-		return
-	}
 }
 
 // Test Fsync on a dir

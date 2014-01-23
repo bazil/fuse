@@ -248,3 +248,28 @@ func (r *Mknods) RecordedMknod() fuse.MknodRequest {
 	}
 	return *(val.(*fuse.MknodRequest))
 }
+
+// Opens records a Open request and its fields.
+type Opens struct {
+	rec RequestRecorder
+}
+
+var _ = fs.NodeOpener(&Opens{})
+
+// Open records the request and returns an error. Most callers should
+// wrap this call in a function that returns a more useful result.
+func (r *Opens) Open(req *fuse.OpenRequest, resp *fuse.OpenResponse, intr fs.Intr) (fs.Handle, fuse.Error) {
+	tmp := *req
+	r.rec.RecordRequest(&tmp)
+	return nil, fuse.EIO
+}
+
+// RecordedOpen returns information about the Open request.
+// If no request was seen, returns a zero value.
+func (r *Opens) RecordedOpen() fuse.OpenRequest {
+	val := r.rec.Recorded()
+	if val == nil {
+		return fuse.OpenRequest{}
+	}
+	return *(val.(*fuse.OpenRequest))
+}
