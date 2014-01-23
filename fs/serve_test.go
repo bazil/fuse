@@ -353,7 +353,7 @@ func TestWriteTruncateFlush(t *testing.T) {
 	if err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
-	if !w.RecordedSetattr() {
+	if w.RecordedSetattr() == (fuse.SetattrRequest{}) {
 		t.Errorf("writeTruncateFlush expected Setattr")
 	}
 	if !w.RecordedFlush() {
