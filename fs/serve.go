@@ -546,7 +546,15 @@ func (r response) String() string {
 	case r.Error != nil:
 		return fmt.Sprintf("-> %s error=%s", r.Request, r.Error)
 	case r.Out != nil:
-		return fmt.Sprintf("-> %s %s", r.Request, r.Out)
+		// make sure (seemingly) empty values are readable
+		switch r.Out.(type) {
+		case string:
+			return fmt.Sprintf("-> %s %q", r.Request, r.Out)
+		case []byte:
+			return fmt.Sprintf("-> %s [% x]", r.Request, r.Out)
+		default:
+			return fmt.Sprintf("-> %s %s", r.Request, r.Out)
+		}
 	default:
 		return fmt.Sprintf("-> %s", r.Request)
 	}
