@@ -1071,3 +1071,47 @@ func TestOpen(t *testing.T) {
 		return
 	}
 }
+
+// Test Fsync on a dir
+
+type fsyncDir struct {
+	dir
+	record.Fsyncs
+}
+
+func TestFsyncDir(t *testing.T) {
+	f := &fsyncDir{}
+	mnt, err := fstestutil.MountedT(t, simpleFS{f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	fil, err := os.Open(mnt.Dir)
+	if err != nil {
+		t.Errorf("fsyncDir open: %v", err)
+		return
+	}
+	defer fil.Close()
+	err = fil.Sync()
+	if err != nil {
+		t.Errorf("fsyncDir sync: %v", err)
+		return
+	}
+
+	got := f.RecordedFsync()
+	want := fuse.FsyncRequest{
+		Flags: 0,
+		Dir:   true,
+		// unpredictable
+		Handle: got.Handle,
+	}
+	if runtime.GOOS == "darwin" {
+		// TODO document the meaning of these flags, figure out why
+		// they differ
+		want.Flags = 1
+	}
+	if g, e := got, want; g != e {
+		t.Fatalf("fsyncDir saw %+v, want %+v", g, e)
+	}
+}

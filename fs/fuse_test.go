@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"runtime"
 	"syscall"
 	"testing"
 	"time"
@@ -99,7 +98,6 @@ var fuseTests = []struct {
 		test(string, *testing.T)
 	}
 }{
-	{"fsyncDir", &fsyncDir{}},
 	{"getxattr", &getxattr{}},
 	{"getxattrTooSmall", &getxattrTooSmall{}},
 	{"getxattrSize", &getxattrSize{}},
@@ -186,56 +184,6 @@ func (testFS) ReadDir(intr Intr) ([]fuse.Dirent, fuse.Error) {
 		}
 	}
 	return dirs, nil
-}
-
-// Test Fsync on a dir
-
-type fsyncSeen struct {
-	flags uint32
-	dir   bool
-}
-
-type fsyncDir struct {
-	dir
-	seen chan fsyncSeen
-}
-
-func (f *fsyncDir) Fsync(r *fuse.FsyncRequest, intr Intr) fuse.Error {
-	f.seen <- fsyncSeen{flags: r.Flags, dir: r.Dir}
-	return nil
-}
-
-func (f *fsyncDir) setup(t *testing.T) {
-	f.seen = make(chan fsyncSeen, 1)
-}
-
-func (f *fsyncDir) test(path string, t *testing.T) {
-	fil, err := os.Open(path)
-	if err != nil {
-		t.Errorf("fsyncDir open: %v", err)
-		return
-	}
-	defer fil.Close()
-	err = fil.Sync()
-	if err != nil {
-		t.Errorf("fsyncDir sync: %v", err)
-		return
-	}
-
-	close(f.seen)
-	got := <-f.seen
-	want := uint32(0)
-	if runtime.GOOS == "darwin" {
-		// TODO document the meaning of these flags, figure out why
-		// they differ
-		want = 1
-	}
-	if g, e := got.flags, want; g != e {
-		t.Errorf("fsyncDir bad flags: %v != %v", g, e)
-	}
-	if g, e := got.dir, true; g != e {
-		t.Errorf("fsyncDir bad dir: %v != %v", g, e)
-	}
 }
 
 // Test Getxattr
