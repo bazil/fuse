@@ -99,7 +99,6 @@ var fuseTests = []struct {
 		test(string, *testing.T)
 	}
 }{
-	{"truncateWithOpen", &truncateWithOpen{}},
 	{"readdir", &readdir{}},
 	{"chmod", &chmod{}},
 	{"open", &open{}},
@@ -190,46 +189,6 @@ func (testFS) ReadDir(intr Intr) ([]fuse.Dirent, fuse.Error) {
 		}
 	}
 	return dirs, nil
-}
-
-// Test opening existing file truncates
-
-type truncateWithOpen struct {
-	file
-	seen struct {
-		gotr chan *fuse.SetattrRequest
-	}
-}
-
-func (f *truncateWithOpen) Setattr(req *fuse.SetattrRequest, resp *fuse.SetattrResponse, intr Intr) fuse.Error {
-	f.seen.gotr <- req
-	return nil
-}
-
-func (f *truncateWithOpen) setup(t *testing.T) {
-	f.seen.gotr = make(chan *fuse.SetattrRequest, 1)
-}
-
-func (f *truncateWithOpen) test(path string, t *testing.T) {
-	fil, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC, 0666)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	fil.Close()
-
-	gotr := <-f.seen.gotr
-	if gotr == nil {
-		t.Fatalf("no recorded SetattrRequest")
-	}
-	if g, e := gotr.Size, uint64(0); g != e {
-		t.Errorf("got Size = %q; want %q", g, e)
-	}
-	// osxfuse sets SetattrHandle here, linux does not
-	if g, e := gotr.Valid&^(fuse.SetattrLockOwner|fuse.SetattrHandle), fuse.SetattrSize; g != e {
-		t.Errorf("got Valid = %q; want %q", g, e)
-	}
-	t.Logf("Got request: %#v", gotr)
 }
 
 // Test readdir

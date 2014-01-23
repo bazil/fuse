@@ -896,3 +896,39 @@ func TestFtruncate42(t *testing.T) {
 func TestFtruncate0(t *testing.T) {
 	testFtruncate(t, 0)
 }
+
+// Test opening existing file truncates
+
+type truncateWithOpen struct {
+	file
+	record.Setattrs
+}
+
+func TestTruncateWithOpen(t *testing.T) {
+	f := &truncateWithOpen{}
+	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	fil, err := os.OpenFile(mnt.Dir+"/child", os.O_WRONLY|os.O_TRUNC, 0666)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	fil.Close()
+
+	gotr := f.RecordedSetattr()
+	if gotr == (fuse.SetattrRequest{}) {
+		t.Fatalf("no recorded SetattrRequest")
+	}
+	if g, e := gotr.Size, uint64(0); g != e {
+		t.Errorf("got Size = %q; want %q", g, e)
+	}
+	// osxfuse sets SetattrHandle here, linux does not
+	if g, e := gotr.Valid&^(fuse.SetattrLockOwner|fuse.SetattrHandle), fuse.SetattrSize; g != e {
+		t.Errorf("got Valid = %q; want %q", g, e)
+	}
+	t.Logf("Got request: %#v", gotr)
+}
