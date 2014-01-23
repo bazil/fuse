@@ -6,6 +6,7 @@ import (
 	"bazil.org/fuse/fs/fstestutil"
 	"bazil.org/fuse/fs/fstestutil/record"
 	"bazil.org/fuse/fuseutil"
+	"bazil.org/fuse/syscallx"
 	"io/ioutil"
 	"log"
 	"os"
@@ -1113,5 +1114,42 @@ func TestFsyncDir(t *testing.T) {
 	}
 	if g, e := got, want; g != e {
 		t.Fatalf("fsyncDir saw %+v, want %+v", g, e)
+	}
+}
+
+// Test Getxattr
+
+type getxattr struct {
+	file
+	record.Getxattrs
+}
+
+func (f *getxattr) Getxattr(req *fuse.GetxattrRequest, resp *fuse.GetxattrResponse, intr fs.Intr) fuse.Error {
+	f.Getxattrs.Getxattr(req, resp, intr)
+	resp.Xattr = []byte("hello, world")
+	return nil
+}
+
+func TestGetxattr(t *testing.T) {
+	f := &getxattr{}
+	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	buf := make([]byte, 8192)
+	n, err := syscallx.Getxattr(mnt.Dir+"/child", "not-there", buf)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+	buf = buf[:n]
+	if g, e := string(buf), "hello, world"; g != e {
+		t.Errorf("wrong getxattr content: %#v != %#v", g, e)
+	}
+	seen := f.RecordedGetxattr()
+	if g, e := seen.Name, "not-there"; g != e {
+		t.Errorf("wrong getxattr name: %#v != %#v", g, e)
 	}
 }

@@ -98,7 +98,6 @@ var fuseTests = []struct {
 		test(string, *testing.T)
 	}
 }{
-	{"getxattr", &getxattr{}},
 	{"getxattrTooSmall", &getxattrTooSmall{}},
 	{"getxattrSize", &getxattrSize{}},
 	{"listxattr", &listxattr{}},
@@ -184,45 +183,6 @@ func (testFS) ReadDir(intr Intr) ([]fuse.Dirent, fuse.Error) {
 		}
 	}
 	return dirs, nil
-}
-
-// Test Getxattr
-
-type getxattrSeen struct {
-	name string
-}
-
-type getxattr struct {
-	file
-	seen chan getxattrSeen
-}
-
-func (f *getxattr) Getxattr(req *fuse.GetxattrRequest, resp *fuse.GetxattrResponse, intr Intr) fuse.Error {
-	f.seen <- getxattrSeen{name: req.Name}
-	resp.Xattr = []byte("hello, world")
-	return nil
-}
-
-func (f *getxattr) setup(t *testing.T) {
-	f.seen = make(chan getxattrSeen, 1)
-}
-
-func (f *getxattr) test(path string, t *testing.T) {
-	buf := make([]byte, 8192)
-	n, err := syscallx.Getxattr(path, "not-there", buf)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-		return
-	}
-	buf = buf[:n]
-	if g, e := string(buf), "hello, world"; g != e {
-		t.Errorf("wrong getxattr content: %#v != %#v", g, e)
-	}
-	close(f.seen)
-	seen := <-f.seen
-	if g, e := seen.name, "not-there"; g != e {
-		t.Errorf("wrong getxattr name: %#v != %#v", g, e)
-	}
 }
 
 // Test Getxattr that has no space to return value

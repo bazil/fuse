@@ -278,3 +278,28 @@ func (r *Opens) RecordedOpen() fuse.OpenRequest {
 	}
 	return *(val.(*fuse.OpenRequest))
 }
+
+// Getxattrs records a Getxattr request and its fields.
+type Getxattrs struct {
+	rec RequestRecorder
+}
+
+var _ = fs.NodeGetxattrer(&Getxattrs{})
+
+// Getxattr records the request and returns an error. Most callers should
+// wrap this call in a function that returns a more useful result.
+func (r *Getxattrs) Getxattr(req *fuse.GetxattrRequest, resp *fuse.GetxattrResponse, intr fs.Intr) fuse.Error {
+	tmp := *req
+	r.rec.RecordRequest(&tmp)
+	return fuse.ENODATA
+}
+
+// RecordedGetxattr returns information about the Getxattr request.
+// If no request was seen, returns a zero value.
+func (r *Getxattrs) RecordedGetxattr() fuse.GetxattrRequest {
+	val := r.rec.Recorded()
+	if val == nil {
+		return fuse.GetxattrRequest{}
+	}
+	return *(val.(*fuse.GetxattrRequest))
+}
