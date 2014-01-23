@@ -932,3 +932,52 @@ func TestTruncateWithOpen(t *testing.T) {
 	}
 	t.Logf("Got request: %#v", gotr)
 }
+
+// Test readdir
+
+type readdir struct {
+	dir
+}
+
+func (d *readdir) ReadDir(intr fs.Intr) ([]fuse.Dirent, fuse.Error) {
+	return []fuse.Dirent{
+		{Name: "one", Inode: 11, Type: fuse.DT_Dir},
+		{Name: "three", Inode: 13},
+		{Name: "two", Inode: 12, Type: fuse.DT_File},
+	}, nil
+}
+
+func TestReadDir(t *testing.T) {
+	f := &readdir{}
+	mnt, err := fstestutil.MountedT(t, simpleFS{f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	fil, err := os.Open(mnt.Dir)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer fil.Close()
+
+	// go Readdir is just Readdirnames + Lstat, there's no point in
+	// testing that here; we have no consumption API for the real
+	// dirent data
+	names, err := fil.Readdirnames(100)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	t.Logf("Got readdir: %q", names)
+
+	if len(names) != 3 ||
+		names[0] != "one" ||
+		names[1] != "three" ||
+		names[2] != "two" {
+		t.Errorf(`expected 3 entries of "one", "three", "two", got: %q`, names)
+		return
+	}
+}
