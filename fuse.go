@@ -1696,6 +1696,10 @@ type LinkRequest struct {
 	NewName string
 }
 
+func (r *LinkRequest) String() string {
+	return fmt.Sprintf("Link [%s] node %d to %q", &r.Header, r.OldNode, r.NewName)
+}
+
 func (r *LinkRequest) Respond(resp *LookupResponse) {
 	out := &entryOut{
 		outHeader:      outHeader{Unique: uint64(r.ID)},
