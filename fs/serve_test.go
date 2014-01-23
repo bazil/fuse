@@ -318,7 +318,7 @@ func TestWrite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Fsync = %v", err)
 	}
-	if !w.RecordedFsync() {
+	if w.RecordedFsync() == (fuse.FsyncRequest{}) {
 		t.Errorf("never received expected fsync call")
 	}
 
@@ -450,7 +450,7 @@ func TestCreate(t *testing.T) {
 		t.Fatalf("Fsync = %v", err)
 	}
 
-	if !f.f.RecordedFsync() {
+	if f.f.RecordedFsync() == (fuse.FsyncRequest{}) {
 		t.Errorf("never received expected fsync call")
 	}
 

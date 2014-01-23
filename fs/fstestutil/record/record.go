@@ -54,22 +54,6 @@ func (r *MarkRecorder) Recorded() bool {
 	return r.count.Count() > 0
 }
 
-// Fsyncs notes whether a FUSE Fsync call has been seen.
-type Fsyncs struct {
-	rec MarkRecorder
-}
-
-var _ = fs.NodeFsyncer(&Fsyncs{})
-
-func (r *Fsyncs) Fsync(req *fuse.FsyncRequest, intr fs.Intr) fuse.Error {
-	r.rec.Mark()
-	return nil
-}
-
-func (r *Fsyncs) RecordedFsync() bool {
-	return r.rec.Recorded()
-}
-
 // Flushes notes whether a FUSE Flush call has been seen.
 type Flushes struct {
 	rec MarkRecorder
@@ -147,6 +131,27 @@ func (r *Setattrs) RecordedSetattr() fuse.SetattrRequest {
 		return fuse.SetattrRequest{}
 	}
 	return *(val.(*fuse.SetattrRequest))
+}
+
+// Fsyncs records an Fsync request and its fields.
+type Fsyncs struct {
+	rec RequestRecorder
+}
+
+var _ = fs.NodeFsyncer(&Fsyncs{})
+
+func (r *Fsyncs) Fsync(req *fuse.FsyncRequest, intr fs.Intr) fuse.Error {
+	tmp := *req
+	r.rec.RecordRequest(&tmp)
+	return nil
+}
+
+func (r *Fsyncs) RecordedFsync() fuse.FsyncRequest {
+	val := r.rec.Recorded()
+	if val == nil {
+		return fuse.FsyncRequest{}
+	}
+	return *(val.(*fuse.FsyncRequest))
 }
 
 // Mkdirs records a Mkdir request and its fields.
