@@ -1,10 +1,49 @@
 package fstestutil
 
 import (
+	"bazil.org/fuse"
 	"flag"
+	"log"
+	"strconv"
 )
 
-var debug = flag.Bool("fuse.debug", false, "log FUSE processing details")
+type flagDebug bool
+
+var debug flagDebug
+
+var _ = flag.Value(&debug)
+
+func (f *flagDebug) IsBoolFlag() bool {
+	return true
+}
+
+func nop(msg interface{}) {}
+
+func (f *flagDebug) Set(s string) error {
+	v, err := strconv.ParseBool(s)
+	if err != nil {
+		return err
+	}
+	*f = flagDebug(v)
+	if v {
+		fuse.Debug = logMsg
+	} else {
+		fuse.Debug = nop
+	}
+	return nil
+}
+
+func (f *flagDebug) String() string {
+	return strconv.FormatBool(bool(*f))
+}
+
+func logMsg(msg interface{}) {
+	log.Printf("FUSE: %s\n", msg)
+}
+
+func init() {
+	flag.Var(&debug, "fuse.debug", "log FUSE processing details")
+}
 
 // DebugByDefault changes the default of the `-fuse.debug` flag to
 // true.

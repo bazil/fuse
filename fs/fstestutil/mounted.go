@@ -76,7 +76,7 @@ func MountedT(t testing.TB, filesys fs.FS) (*Mount, error) {
 	srv := &fs.Server{
 		FS: filesys,
 	}
-	if *debug {
+	if debug {
 		srv.Debug = func(msg interface{}) {
 			t.Logf("FUSE: %s", msg)
 		}
