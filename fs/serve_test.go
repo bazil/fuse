@@ -807,3 +807,92 @@ func TestInterrupt(t *testing.T) {
 		t.Logf("interrupt: this platform has no test coverage")
 	}
 }
+
+// Test truncate
+
+type truncate struct {
+	file
+	record.Setattrs
+}
+
+func testTruncate(t *testing.T, toSize int64) {
+	f := &truncate{}
+	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	err = os.Truncate(mnt.Dir+"/child", toSize)
+	if err != nil {
+		t.Fatalf("Truncate: %v", err)
+	}
+	gotr := f.RecordedSetattr()
+	if gotr == (fuse.SetattrRequest{}) {
+		t.Fatalf("no recorded SetattrRequest")
+	}
+	if g, e := gotr.Size, uint64(toSize); g != e {
+		t.Errorf("got Size = %q; want %q", g, e)
+	}
+	if g, e := gotr.Valid&^fuse.SetattrLockOwner, fuse.SetattrSize; g != e {
+		t.Errorf("got Valid = %q; want %q", g, e)
+	}
+	t.Logf("Got request: %#v", gotr)
+}
+
+func TestTruncate42(t *testing.T) {
+	testTruncate(t, 42)
+}
+
+func TestTruncate0(t *testing.T) {
+	testTruncate(t, 0)
+}
+
+// Test ftruncate
+
+type ftruncate struct {
+	file
+	record.Setattrs
+}
+
+func testFtruncate(t *testing.T, toSize int64) {
+	f := &ftruncate{}
+	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	{
+		fil, err := os.OpenFile(mnt.Dir+"/child", os.O_WRONLY, 0666)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		defer fil.Close()
+
+		err = fil.Truncate(toSize)
+		if err != nil {
+			t.Fatalf("Ftruncate: %v", err)
+		}
+	}
+	gotr := f.RecordedSetattr()
+	if gotr == (fuse.SetattrRequest{}) {
+		t.Fatalf("no recorded SetattrRequest")
+	}
+	if g, e := gotr.Size, uint64(toSize); g != e {
+		t.Errorf("got Size = %q; want %q", g, e)
+	}
+	if g, e := gotr.Valid&^fuse.SetattrLockOwner, fuse.SetattrHandle|fuse.SetattrSize; g != e {
+		t.Errorf("got Valid = %q; want %q", g, e)
+	}
+	t.Logf("Got request: %#v", gotr)
+}
+
+func TestFtruncate42(t *testing.T) {
+	testFtruncate(t, 42)
+}
+
+func TestFtruncate0(t *testing.T) {
+	testFtruncate(t, 0)
+}

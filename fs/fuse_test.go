@@ -99,10 +99,6 @@ var fuseTests = []struct {
 		test(string, *testing.T)
 	}
 }{
-	{"truncate42", &truncate{toSize: 42}},
-	{"truncate0", &truncate{toSize: 0}},
-	{"ftruncate42", &ftruncate{toSize: 42}},
-	{"ftruncate0", &ftruncate{toSize: 0}},
 	{"truncateWithOpen", &truncateWithOpen{}},
 	{"readdir", &readdir{}},
 	{"chmod", &chmod{}},
@@ -194,91 +190,6 @@ func (testFS) ReadDir(intr Intr) ([]fuse.Dirent, fuse.Error) {
 		}
 	}
 	return dirs, nil
-}
-
-// Test truncate
-
-type truncate struct {
-	toSize int64
-
-	file
-	seen struct {
-		gotr chan *fuse.SetattrRequest
-	}
-}
-
-func (f *truncate) Setattr(req *fuse.SetattrRequest, resp *fuse.SetattrResponse, intr Intr) fuse.Error {
-	f.seen.gotr <- req
-	return nil
-}
-
-func (f *truncate) setup(t *testing.T) {
-	f.seen.gotr = make(chan *fuse.SetattrRequest, 1)
-}
-
-func (f *truncate) test(path string, t *testing.T) {
-	err := os.Truncate(path, f.toSize)
-	if err != nil {
-		t.Fatalf("Truncate: %v", err)
-	}
-	gotr := <-f.seen.gotr
-	if gotr == nil {
-		t.Fatalf("no recorded SetattrRequest")
-	}
-	if g, e := gotr.Size, uint64(f.toSize); g != e {
-		t.Errorf("got Size = %q; want %q", g, e)
-	}
-	if g, e := gotr.Valid&^fuse.SetattrLockOwner, fuse.SetattrSize; g != e {
-		t.Errorf("got Valid = %q; want %q", g, e)
-	}
-	t.Logf("Got request: %#v", gotr)
-}
-
-// Test ftruncate
-
-type ftruncate struct {
-	toSize int64
-
-	file
-	seen struct {
-		gotr chan *fuse.SetattrRequest
-	}
-}
-
-func (f *ftruncate) Setattr(req *fuse.SetattrRequest, resp *fuse.SetattrResponse, intr Intr) fuse.Error {
-	f.seen.gotr <- req
-	return nil
-}
-
-func (f *ftruncate) setup(t *testing.T) {
-	f.seen.gotr = make(chan *fuse.SetattrRequest, 1)
-}
-
-func (f *ftruncate) test(path string, t *testing.T) {
-	{
-		fil, err := os.OpenFile(path, os.O_WRONLY, 0666)
-		if err != nil {
-			t.Error(err)
-			return
-		}
-		defer fil.Close()
-
-		err = fil.Truncate(f.toSize)
-		if err != nil {
-			t.Fatalf("Ftruncate: %v", err)
-		}
-	}
-	gotr := <-f.seen.gotr
-	if gotr == nil {
-		t.Fatalf("no recorded SetattrRequest")
-	}
-	if g, e := gotr.Size, uint64(f.toSize); g != e {
-		t.Errorf("got Size = %q; want %q", g, e)
-	}
-	if g, e := gotr.Valid&^fuse.SetattrLockOwner, fuse.SetattrHandle|fuse.SetattrSize; g != e {
-		t.Errorf("got Valid = %q; want %q", g, e)
-	}
-	t.Logf("Got request: %#v", gotr)
 }
 
 // Test opening existing file truncates
