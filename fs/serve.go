@@ -271,12 +271,27 @@ type HandleReleaser interface {
 	Release(*fuse.ReleaseRequest, Intr) fuse.Error
 }
 
+type Server struct {
+	FS FS
+
+	// Function to send debug log messages to. If nil, use fuse.Debug.
+	// Note that changing this or fuse.Debug may not affect existing
+	// calls to Serve.
+	Debug func(msg interface{})
+}
+
 // Serve serves the FUSE connection by making calls to the methods
 // of fs and the Nodes and Handles it makes available.  It returns only
 // when the connection has been closed or an unexpected error occurs.
-func Serve(c *fuse.Conn, fs FS) error {
-	sc := serveConn{}
-	sc.req = map[fuse.RequestID]*serveRequest{}
+func (s *Server) Serve(c *fuse.Conn) error {
+	sc := serveConn{
+		debug: s.Debug,
+		req:   map[fuse.RequestID]*serveRequest{},
+	}
+	if sc.debug == nil {
+		sc.debug = fuse.Debug
+	}
+	fs := s.FS
 
 	root, err := fs.Root()
 	if err != nil {
@@ -299,6 +314,15 @@ func Serve(c *fuse.Conn, fs FS) error {
 	return nil
 }
 
+// Serve serves a FUSE connection with the default settings. See
+// Server.Serve.
+func Serve(c *fuse.Conn, fs FS) error {
+	server := Server{
+		FS: fs,
+	}
+	return server.Serve(c)
+}
+
 type nothing struct{}
 
 type serveConn struct {
@@ -309,6 +333,7 @@ type serveConn struct {
 	freeNode   []fuse.NodeID
 	freeHandle []fuse.HandleID
 	nodeGen    uint64
+	debug      func(msg interface{})
 }
 
 type serveRequest struct {
@@ -432,7 +457,7 @@ func (c *serveConn) dropNode(id fuse.NodeID, n uint64) (forget bool) {
 		// this should only happen if refcounts kernel<->us disagree
 		// *and* two ForgetRequests for the same node race each other;
 		// this indicates a bug somewhere
-		fuse.Debug(nodeRefcountDropBug{N: n, Node: id})
+		c.debug(nodeRefcountDropBug{N: n, Node: id})
 
 		// we may end up triggering Forget twice, but that's better
 		// than not even once, and that's the best we can do
@@ -440,7 +465,7 @@ func (c *serveConn) dropNode(id fuse.NodeID, n uint64) (forget bool) {
 	}
 
 	if n > snode.refs {
-		fuse.Debug(nodeRefcountDropBug{N: n, Refs: snode.refs, Node: id})
+		c.debug(nodeRefcountDropBug{N: n, Refs: snode.refs, Node: id})
 		n = snode.refs
 	}
 
@@ -481,7 +506,7 @@ func (c *serveConn) getHandle(id fuse.HandleID) (shandle *serveHandle) {
 		shandle = c.handle[uint(id)]
 	}
 	if shandle == nil {
-		fuse.Debug(missingHandle{
+		c.debug(missingHandle{
 			Handle:    id,
 			MaxHandle: fuse.HandleID(len(c.handle)),
 		})
@@ -560,7 +585,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 	intr := make(Intr)
 	req := &serveRequest{Request: r, Intr: intr}
 
-	fuse.Debug(request{
+	c.debug(request{
 		Op:      opName(r),
 		Request: r.Hdr(),
 		In:      r,
@@ -575,7 +600,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		}
 		if snode == nil {
 			c.meta.Unlock()
-			fuse.Debug(response{
+			c.debug(response{
 				Op:      opName(r),
 				Request: logResponseHeader{ID: hdr.ID},
 				Error:   fuse.ESTALE,
@@ -616,7 +641,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		} else {
 			msg.Out = resp
 		}
-		fuse.Debug(msg)
+		c.debug(msg)
 
 		c.meta.Lock()
 		delete(c.req, hdr.ID)
@@ -742,7 +767,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		}
 		c.meta.Unlock()
 		if oldNode == nil {
-			fuse.Debug(logLinkRequestOldNodeNotFound{
+			c.debug(logLinkRequestOldNodeNotFound{
 				Request: r.Hdr(),
 				In:      r,
 			})
@@ -1100,7 +1125,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		}
 		c.meta.Unlock()
 		if newDirNode == nil {
-			fuse.Debug(renameNewDirNodeNotFound{
+			c.debug(renameNewDirNodeNotFound{
 				Request: r.Hdr(),
 				In:      r,
 			})
