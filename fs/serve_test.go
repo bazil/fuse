@@ -981,3 +981,38 @@ func TestReadDir(t *testing.T) {
 		return
 	}
 }
+
+// Test Chmod.
+
+type chmod struct {
+	file
+	record.Setattrs
+}
+
+func (f *chmod) Setattr(req *fuse.SetattrRequest, resp *fuse.SetattrResponse, intr fs.Intr) fuse.Error {
+	if !req.Valid.Mode() {
+		log.Printf("setattr not a chmod: %v", req.Valid)
+		return fuse.EIO
+	}
+	f.Setattrs.Setattr(req, resp, intr)
+	return nil
+}
+
+func TestChmod(t *testing.T) {
+	f := &chmod{}
+	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	err = os.Chmod(mnt.Dir+"/child", 0764)
+	if err != nil {
+		t.Errorf("chmod: %v", err)
+		return
+	}
+	got := f.RecordedSetattr()
+	if g, e := got.Mode, os.FileMode(0764); g != e {
+		t.Errorf("wrong mode: %v != %v", g, e)
+	}
+}
