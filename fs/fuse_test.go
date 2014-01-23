@@ -101,7 +101,6 @@ var fuseTests = []struct {
 		test(string, *testing.T)
 	}
 }{
-	{"mknod1", &mknod1{}},
 	{"dataHandle", dataHandleTest{}},
 	{"interrupt", &interrupt{}},
 	{"truncate42", &truncate{toSize: 42}},
@@ -165,63 +164,11 @@ func (w *write) setup(t *testing.T) {
 	w.seen.fsync = make(chan bool, 1)
 }
 
-// Test mknod
-
-type mknod1 struct {
-	dir
-	seen struct {
-		gotr chan *fuse.MknodRequest
-	}
-}
-
-func (f *mknod1) Mknod(r *fuse.MknodRequest, intr Intr) (Node, fuse.Error) {
-	f.seen.gotr <- r
-	return fifo{}, nil
-}
-
-func (f *mknod1) setup(t *testing.T) {
-	f.seen.gotr = make(chan *fuse.MknodRequest, 1)
-}
-
-func (f *mknod1) test(path string, t *testing.T) {
-	if os.Getuid() != 0 {
-		t.Logf("skipping unless root")
-		return
-	}
-	defer syscall.Umask(syscall.Umask(0))
-	err := syscall.Mknod(path+"/node", syscall.S_IFIFO|0666, 123)
-	if err != nil {
-		t.Fatalf("Mknod: %v", err)
-	}
-	gotr := <-f.seen.gotr
-	if gotr == nil {
-		t.Fatalf("no recorded MknodRequest")
-	}
-	if g, e := gotr.Name, "node"; g != e {
-		t.Errorf("got Name = %q; want %q", g, e)
-	}
-	if g, e := gotr.Rdev, uint32(123); g != e {
-		if runtime.GOOS == "linux" {
-			// Linux fuse doesn't echo back the rdev if the node
-			// isn't a device (we're using a FIFO here, as that
-			// bit is portable.)
-		} else {
-			t.Errorf("got Rdev = %v; want %v", g, e)
-		}
-	}
-	if g, e := gotr.Mode, os.FileMode(os.ModeNamedPipe|0666); g != e {
-		t.Errorf("got Mode = %v; want %v", g, e)
-	}
-	t.Logf("Got request: %#v", gotr)
-}
-
 type file struct{}
 type dir struct{}
-type fifo struct{}
 
 func (f file) Attr() fuse.Attr { return fuse.Attr{Mode: 0666} }
 func (f dir) Attr() fuse.Attr  { return fuse.Attr{Mode: os.ModeDir | 0777} }
-func (f fifo) Attr() fuse.Attr { return fuse.Attr{Mode: os.ModeNamedPipe | 0666} }
 
 type testFS struct{}
 

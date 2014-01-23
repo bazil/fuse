@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"runtime"
 	"syscall"
 	"testing"
 	"time"
@@ -68,6 +69,11 @@ type symlink struct {
 }
 
 func (f symlink) Attr() fuse.Attr { return fuse.Attr{Mode: os.ModeSymlink | 0666} }
+
+// fifo can be embedded in a struct to make it look like a named pipe.
+type fifo struct{}
+
+func (f fifo) Attr() fuse.Attr { return fuse.Attr{Mode: os.ModeNamedPipe | 0666} }
 
 type badRootFS struct{}
 
@@ -649,5 +655,51 @@ func TestRename(t *testing.T) {
 	err = os.Rename(mnt.Dir+"/old2", mnt.Dir+"/new2")
 	if err == nil {
 		t.Fatal("expected error on second Rename; got nil")
+	}
+}
+
+// Test mknod
+
+type mknod1 struct {
+	dir
+	record.Mknods
+}
+
+func (f *mknod1) Mknod(r *fuse.MknodRequest, intr fs.Intr) (fs.Node, fuse.Error) {
+	f.Mknods.Mknod(r, intr)
+	return fifo{}, nil
+}
+
+func TestMknod(t *testing.T) {
+	if os.Getuid() != 0 {
+		t.Skip("skipping unless root")
+	}
+
+	f := &mknod1{}
+	mnt, err := fstestutil.MountedT(t, simpleFS{f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	defer syscall.Umask(syscall.Umask(0))
+	err = syscall.Mknod(mnt.Dir+"/node", syscall.S_IFIFO|0666, 123)
+	if err != nil {
+		t.Fatalf("Mknod: %v", err)
+	}
+
+	want := fuse.MknodRequest{
+		Name: "node",
+		Mode: os.FileMode(os.ModeNamedPipe | 0666),
+		Rdev: uint32(123),
+	}
+	if runtime.GOOS == "linux" {
+		// Linux fuse doesn't echo back the rdev if the node
+		// isn't a device (we're using a FIFO here, as that
+		// bit is portable.)
+		want.Rdev = 0
+	}
+	if g, e := f.RecordedMknod(), want; g != e {
+		t.Fatalf("mknod saw %+v, want %+v", g, e)
 	}
 }

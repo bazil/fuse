@@ -218,3 +218,28 @@ func (r *Links) RecordedLink() fuse.LinkRequest {
 	}
 	return *(val.(*fuse.LinkRequest))
 }
+
+// Mknods records a Mknod request and its fields.
+type Mknods struct {
+	rec RequestRecorder
+}
+
+var _ = fs.NodeMknoder(&Mknods{})
+
+// Mknod records the request and returns an error. Most callers should
+// wrap this call in a function that returns a more useful result.
+func (r *Mknods) Mknod(req *fuse.MknodRequest, intr fs.Intr) (fs.Node, fuse.Error) {
+	tmp := *req
+	r.rec.RecordRequest(&tmp)
+	return nil, fuse.EIO
+}
+
+// RecordedMknod returns information about the Mknod request.
+// If no request was seen, returns a zero value.
+func (r *Mknods) RecordedMknod() fuse.MknodRequest {
+	val := r.rec.Recorded()
+	if val == nil {
+		return fuse.MknodRequest{}
+	}
+	return *(val.(*fuse.MknodRequest))
+}
