@@ -97,7 +97,6 @@ var fuseTests = []struct {
 		test(string, *testing.T)
 	}
 }{
-	{"listxattrSize", &listxattrSize{}},
 	{"setxattr", &setxattr{}},
 	{"removexattr", &removexattr{}},
 }
@@ -178,28 +177,6 @@ func (testFS) ReadDir(intr Intr) ([]fuse.Dirent, fuse.Error) {
 		}
 	}
 	return dirs, nil
-}
-
-// Test Listxattr used to probe result size
-
-type listxattrSize struct {
-	file
-}
-
-func (f *listxattrSize) Listxattr(req *fuse.ListxattrRequest, resp *fuse.ListxattrResponse, intr Intr) fuse.Error {
-	resp.Xattr = []byte("one\x00two\x00")
-	return nil
-}
-
-func (f *listxattrSize) test(path string, t *testing.T) {
-	n, err := syscallx.Listxattr(path, nil)
-	if err != nil {
-		t.Errorf("Listxattr unexpected error: %v", err)
-		return
-	}
-	if g, e := n, len("one\x00two\x00"); g != e {
-		t.Errorf("Getxattr incorrect size: %d != %d", g, e)
-	}
 }
 
 // Test Setxattr

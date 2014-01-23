@@ -1282,3 +1282,32 @@ func TestListxattrTooSmall(t *testing.T) {
 		return
 	}
 }
+
+// Test Listxattr used to probe result size
+
+type listxattrSize struct {
+	file
+}
+
+func (f *listxattrSize) Listxattr(req *fuse.ListxattrRequest, resp *fuse.ListxattrResponse, intr fs.Intr) fuse.Error {
+	resp.Xattr = []byte("one\x00two\x00")
+	return nil
+}
+
+func TestListxattrSize(t *testing.T) {
+	f := &listxattrSize{}
+	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	n, err := syscallx.Listxattr(mnt.Dir+"/child", nil)
+	if err != nil {
+		t.Errorf("Listxattr unexpected error: %v", err)
+		return
+	}
+	if g, e := n, len("one\x00two\x00"); g != e {
+		t.Errorf("Getxattr incorrect size: %d != %d", g, e)
+	}
+}
