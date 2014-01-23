@@ -180,3 +180,28 @@ func (r *Symlinks) RecordedSymlink() fuse.SymlinkRequest {
 	}
 	return *(val.(*fuse.SymlinkRequest))
 }
+
+// Links records a Link request and its fields.
+type Links struct {
+	rec RequestRecorder
+}
+
+var _ = fs.NodeLinker(&Links{})
+
+// Link records the request and returns an error. Most callers should
+// wrap this call in a function that returns a more useful result.
+func (r *Links) Link(req *fuse.LinkRequest, old fs.Node, intr fs.Intr) (fs.Node, fuse.Error) {
+	tmp := *req
+	r.rec.RecordRequest(&tmp)
+	return nil, fuse.EIO
+}
+
+// RecordedLink returns information about the Link request.
+// If no request was seen, returns a zero value.
+func (r *Links) RecordedLink() fuse.LinkRequest {
+	val := r.rec.Recorded()
+	if val == nil {
+		return fuse.LinkRequest{}
+	}
+	return *(val.(*fuse.LinkRequest))
+}

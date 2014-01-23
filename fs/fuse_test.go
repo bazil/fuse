@@ -102,7 +102,6 @@ var fuseTests = []struct {
 		test(string, *testing.T)
 	}
 }{
-	{"link1", &link1{}},
 	{"rename1", &rename1{}},
 	{"mknod1", &mknod1{}},
 	{"dataHandle", dataHandleTest{}},
@@ -166,41 +165,6 @@ func (w *write) Release(r *fuse.ReleaseRequest, intr Intr) fuse.Error {
 func (w *write) setup(t *testing.T) {
 	w.seen.data = make(chan []byte, 10)
 	w.seen.fsync = make(chan bool, 1)
-}
-
-// Test link
-
-type link1 struct {
-	dir
-	seen struct {
-		newName chan string
-	}
-}
-
-func (f *link1) Lookup(name string, intr Intr) (Node, fuse.Error) {
-	if name == "old" {
-		return file{}, nil
-	}
-	return nil, fuse.ENOENT
-}
-
-func (f *link1) Link(r *fuse.LinkRequest, old Node, intr Intr) (Node, fuse.Error) {
-	f.seen.newName <- r.NewName
-	return file{}, nil
-}
-
-func (f *link1) setup(t *testing.T) {
-	f.seen.newName = make(chan string, 1)
-}
-
-func (f *link1) test(path string, t *testing.T) {
-	err := os.Link(path+"/old", path+"/new")
-	if err != nil {
-		t.Fatalf("Link: %v", err)
-	}
-	if got := <-f.seen.newName; got != "new" {
-		t.Fatalf("saw Link for newName %q; want %q", got, "new")
-	}
 }
 
 // Test Rename

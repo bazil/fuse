@@ -565,3 +565,46 @@ func TestSymlink(t *testing.T) {
 		t.Errorf("os.Readlink = %q; want %q", gotName, target)
 	}
 }
+
+// Test link
+
+type link1 struct {
+	dir
+	record.Links
+}
+
+func (f *link1) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
+	if name == "old" {
+		return file{}, nil
+	}
+	return nil, fuse.ENOENT
+}
+
+func (f *link1) Link(r *fuse.LinkRequest, old fs.Node, intr fs.Intr) (fs.Node, fuse.Error) {
+	f.Links.Link(r, old, intr)
+	return file{}, nil
+}
+
+func TestLink(t *testing.T) {
+	f := &link1{}
+	mnt, err := fstestutil.MountedT(t, simpleFS{f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	err = os.Link(mnt.Dir+"/old", mnt.Dir+"/new")
+	if err != nil {
+		t.Fatalf("Link: %v", err)
+	}
+
+	got := f.RecordedLink()
+	want := fuse.LinkRequest{
+		NewName: "new",
+		// unpredictable
+		OldNode: got.OldNode,
+	}
+	if g, e := got, want; g != e {
+		t.Fatalf("link saw %+v, want %+v", g, e)
+	}
+}
