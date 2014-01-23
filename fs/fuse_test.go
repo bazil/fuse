@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"syscall"
 	"testing"
 	"time"
 )
@@ -98,7 +97,6 @@ var fuseTests = []struct {
 		test(string, *testing.T)
 	}
 }{
-	{"listxattrTooSmall", &listxattrTooSmall{}},
 	{"listxattrSize", &listxattrSize{}},
 	{"setxattr", &setxattr{}},
 	{"removexattr", &removexattr{}},
@@ -180,29 +178,6 @@ func (testFS) ReadDir(intr Intr) ([]fuse.Dirent, fuse.Error) {
 		}
 	}
 	return dirs, nil
-}
-
-// Test Listxattr that has no space to return value
-
-type listxattrTooSmall struct {
-	file
-}
-
-func (f *listxattrTooSmall) Listxattr(req *fuse.ListxattrRequest, resp *fuse.ListxattrResponse, intr Intr) fuse.Error {
-	resp.Xattr = []byte("one\x00two\x00")
-	return nil
-}
-
-func (f *listxattrTooSmall) test(path string, t *testing.T) {
-	buf := make([]byte, 3)
-	_, err := syscallx.Listxattr(path, buf)
-	if err == nil {
-		t.Error("Listxattr = nil; want some error")
-	}
-	if err != syscall.ERANGE {
-		t.Errorf("unexpected error: %v", err)
-		return
-	}
 }
 
 // Test Listxattr used to probe result size

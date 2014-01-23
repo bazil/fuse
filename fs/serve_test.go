@@ -1252,3 +1252,33 @@ func TestListxattr(t *testing.T) {
 		t.Fatalf("listxattr saw %+v, want %+v", g, e)
 	}
 }
+
+// Test Listxattr that has no space to return value
+
+type listxattrTooSmall struct {
+	file
+}
+
+func (f *listxattrTooSmall) Listxattr(req *fuse.ListxattrRequest, resp *fuse.ListxattrResponse, intr fs.Intr) fuse.Error {
+	resp.Xattr = []byte("one\x00two\x00")
+	return nil
+}
+
+func TestListxattrTooSmall(t *testing.T) {
+	f := &listxattrTooSmall{}
+	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	buf := make([]byte, 3)
+	_, err = syscallx.Listxattr(mnt.Dir+"/child", buf)
+	if err == nil {
+		t.Error("Listxattr = nil; want some error")
+	}
+	if err != syscall.ERANGE {
+		t.Errorf("unexpected error: %v", err)
+		return
+	}
+}
