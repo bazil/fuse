@@ -752,6 +752,14 @@ type bugShortKernelWrite struct {
 	Stack   string
 }
 
+// safe to call even with nil error
+func errorString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
+
 func (c *Conn) respond(out *outHeader, n uintptr) {
 	c.wio.Lock()
 	defer c.wio.Unlock()
@@ -761,7 +769,7 @@ func (c *Conn) respond(out *outHeader, n uintptr) {
 	if nn != len(msg) || err != nil {
 		Debug(bugShortKernelWrite{
 			Written: int64(nn),
-			Error:   err.Error(),
+			Error:   errorString(err),
 			Stack:   stack(),
 		})
 	}
