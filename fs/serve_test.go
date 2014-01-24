@@ -147,7 +147,7 @@ func TestStatfs(t *testing.T) {
 		}
 		t.Logf("Statfs got: %#v", st)
 		if g, e := st.Blocks, uint64(42); g != e {
-			t.Errorf("got Blocks = %q; want %q", g, e)
+			t.Errorf("got Blocks = %d; want %d", g, e)
 		}
 		if g, e := st.Files, uint64(13); g != e {
 			t.Errorf("got Files = %d; want %d", g, e)
@@ -167,7 +167,7 @@ func TestStatfs(t *testing.T) {
 		}
 		t.Logf("Fstatfs got: %#v", st)
 		if g, e := st.Blocks, uint64(42); g != e {
-			t.Errorf("got Blocks = %q; want %q", g, e)
+			t.Errorf("got Blocks = %d; want %d", g, e)
 		}
 		if g, e := st.Files, uint64(13); g != e {
 			t.Errorf("got Files = %d; want %d", g, e)
