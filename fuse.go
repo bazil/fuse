@@ -752,6 +752,10 @@ type bugShortKernelWrite struct {
 	Stack   string
 }
 
+func (b bugShortKernelWrite) String() string {
+	return fmt.Sprintf("short kernel write: written=%d error=%q stack=\n%s", b.Written, b.Error, b.Stack)
+}
+
 // safe to call even with nil error
 func errorString(err error) string {
 	if err == nil {
