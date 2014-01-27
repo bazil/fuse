@@ -748,12 +748,13 @@ unrecognized:
 
 type bugShortKernelWrite struct {
 	Written int64
+	Length  int64
 	Error   string
 	Stack   string
 }
 
 func (b bugShortKernelWrite) String() string {
-	return fmt.Sprintf("short kernel write: written=%d error=%q stack=\n%s", b.Written, b.Error, b.Stack)
+	return fmt.Sprintf("short kernel write: written=%d/%d error=%q stack=\n%s", b.Written, b.Length, b.Error, b.Stack)
 }
 
 // safe to call even with nil error
@@ -773,6 +774,7 @@ func (c *Conn) respond(out *outHeader, n uintptr) {
 	if nn != len(msg) || err != nil {
 		Debug(bugShortKernelWrite{
 			Written: int64(nn),
+			Length:  int64(len(msg)),
 			Error:   errorString(err),
 			Stack:   stack(),
 		})
