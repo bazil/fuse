@@ -315,7 +315,13 @@ func (c *Conn) fd() int {
 func (c *Conn) ReadRequest() (Request, error) {
 	// TODO: Some kind of buffer reuse.
 	m := newMessage(c)
+loop:
 	n, err := syscall.Read(c.fd(), m.buf)
+	if err == syscall.EINTR {
+		// OSXFUSE sends EINTR to userspace when a request interrupt
+		// completed before it got sent to userspace?
+		goto loop
+	}
 	if err != nil && err != syscall.ENODEV {
 		return nil, err
 	}
