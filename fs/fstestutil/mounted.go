@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"testing"
+	"time"
 )
 
 // Mount contains information about the mount for the test to use.
@@ -32,10 +33,15 @@ func (mnt *Mount) Close() {
 		return
 	}
 	mnt.closed = true
-	err := fuse.Unmount(mnt.Dir)
-	if err != nil {
-		// TODO do more than log?
-		log.Printf("unmount error: %v", err)
+	for tries := 0; tries < 1000; tries++ {
+		err := fuse.Unmount(mnt.Dir)
+		if err != nil {
+			// TODO do more than log?
+			log.Printf("unmount error: %v", err)
+			time.Sleep(10 * time.Millisecond)
+			continue
+		}
+		break
 	}
 	<-mnt.done
 	os.Remove(mnt.Dir)

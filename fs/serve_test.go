@@ -100,6 +100,9 @@ func TestRootErr(t *testing.T) {
 		// path for synchronous mounts (linux): started out fine, now
 		// wait for Serve to cycle through
 		err = <-mnt.Error
+		// without this, unmount will keep failing with EBUSY; nudge
+		// kernel into realizing InitResponse will not happen
+		mnt.Conn.Close()
 		mnt.Close()
 	}
 
