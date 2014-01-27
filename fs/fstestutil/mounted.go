@@ -4,6 +4,7 @@ import (
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
 	"io/ioutil"
+	"log"
 	"os"
 )
 
@@ -27,7 +28,11 @@ func (mnt *Mount) Close() {
 		return
 	}
 	mnt.closed = true
-	_ = fuse.Unmount(mnt.Dir)
+	err := fuse.Unmount(mnt.Dir)
+	if err != nil {
+		// TODO do more than log?
+		log.Printf("unmount error: %v", err)
+	}
 	<-mnt.done
 	os.Remove(mnt.Dir)
 }
