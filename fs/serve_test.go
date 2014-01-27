@@ -95,6 +95,7 @@ func (badRootFS) Root() (fs.Node, fuse.Error) {
 }
 
 func TestRootErr(t *testing.T) {
+	t.Parallel()
 	mnt, err := fstestutil.MountedT(t, badRootFS{})
 	if err == nil {
 		// path for synchronous mounts (linux): started out fine, now
@@ -133,6 +134,7 @@ func (f testStatFS) Statfs(req *fuse.StatfsRequest, resp *fuse.StatfsResponse, i
 }
 
 func TestStatfs(t *testing.T) {
+	t.Parallel()
 	mnt, err := fstestutil.MountedT(t, testStatFS{})
 	if err != nil {
 		t.Fatal(err)
@@ -189,6 +191,7 @@ func (root) Attr() fuse.Attr {
 }
 
 func TestStatRoot(t *testing.T) {
+	t.Parallel()
 	mnt, err := fstestutil.MountedT(t, root{})
 	if err != nil {
 		t.Fatal(err)
@@ -244,6 +247,7 @@ func testReadAll(t *testing.T, path string) {
 }
 
 func TestReadAll(t *testing.T) {
+	t.Parallel()
 	mnt, err := fstestutil.MountedT(t, childMapFS{"child": readAll{}})
 	if err != nil {
 		t.Fatal(err)
@@ -263,6 +267,7 @@ func (readWithHandleRead) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, i
 }
 
 func TestReadAllWithHandleRead(t *testing.T) {
+	t.Parallel()
 	mnt, err := fstestutil.MountedT(t, childMapFS{"child": readWithHandleRead{}})
 	if err != nil {
 		t.Fatal(err)
@@ -280,6 +285,7 @@ type release struct {
 }
 
 func TestRelease(t *testing.T) {
+	t.Parallel()
 	r := &release{}
 	mnt, err := fstestutil.MountedT(t, childMapFS{"child": r})
 	if err != nil {
@@ -306,6 +312,7 @@ type write struct {
 }
 
 func TestWrite(t *testing.T) {
+	t.Parallel()
 	w := &write{}
 	mnt, err := fstestutil.MountedT(t, childMapFS{"child": w})
 	if err != nil {
@@ -353,6 +360,7 @@ type writeTruncateFlush struct {
 }
 
 func TestWriteTruncateFlush(t *testing.T) {
+	t.Parallel()
 	w := &writeTruncateFlush{}
 	mnt, err := fstestutil.MountedT(t, childMapFS{"child": w})
 	if err != nil {
@@ -388,6 +396,7 @@ func (f *mkdir1) Mkdir(req *fuse.MkdirRequest, intr fs.Intr) (fs.Node, fuse.Erro
 }
 
 func TestMkdir(t *testing.T) {
+	t.Parallel()
 	f := &mkdir1{}
 	mnt, err := fstestutil.MountedT(t, simpleFS{f})
 	if err != nil {
@@ -441,6 +450,7 @@ func (f *create1) Create(req *fuse.CreateRequest, resp *fuse.CreateResponse, int
 }
 
 func TestCreate(t *testing.T) {
+	t.Parallel()
 	f := &create1{}
 	mnt, err := fstestutil.MountedT(t, simpleFS{f})
 	if err != nil {
@@ -508,6 +518,7 @@ func (f *create3) Remove(r *fuse.RemoveRequest, intr fs.Intr) fuse.Error {
 }
 
 func TestCreateWriteRemove(t *testing.T) {
+	t.Parallel()
 	f := &create3{}
 	mnt, err := fstestutil.MountedT(t, simpleFS{f})
 	if err != nil {
@@ -556,6 +567,7 @@ func (f *symlink1) Symlink(req *fuse.SymlinkRequest, intr fs.Intr) (fs.Node, fus
 }
 
 func TestSymlink(t *testing.T) {
+	t.Parallel()
 	f := &symlink1{}
 	mnt, err := fstestutil.MountedT(t, simpleFS{f})
 	if err != nil {
@@ -604,6 +616,7 @@ func (f *link1) Link(r *fuse.LinkRequest, old fs.Node, intr fs.Intr) (fs.Node, f
 }
 
 func TestLink(t *testing.T) {
+	t.Parallel()
 	f := &link1{}
 	mnt, err := fstestutil.MountedT(t, simpleFS{f})
 	if err != nil {
@@ -650,6 +663,7 @@ func (f *rename1) Rename(r *fuse.RenameRequest, newDir fs.Node, intr fs.Intr) fu
 }
 
 func TestRename(t *testing.T) {
+	t.Parallel()
 	f := &rename1{}
 	mnt, err := fstestutil.MountedT(t, simpleFS{f})
 	if err != nil {
@@ -683,6 +697,7 @@ func (f *mknod1) Mknod(r *fuse.MknodRequest, intr fs.Intr) (fs.Node, fuse.Error)
 }
 
 func TestMknod(t *testing.T) {
+	t.Parallel()
 	if os.Getuid() != 0 {
 		t.Skip("skipping unless root")
 	}
@@ -727,6 +742,7 @@ func (dataHandleTest) Open(*fuse.OpenRequest, *fuse.OpenResponse, fs.Intr) (fs.H
 }
 
 func TestDataHandle(t *testing.T) {
+	t.Parallel()
 	f := &dataHandleTest{}
 	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
 	if err != nil {
@@ -763,6 +779,7 @@ func (it *interrupt) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, intr f
 }
 
 func TestInterrupt(t *testing.T) {
+	t.Parallel()
 	f := &interrupt{}
 	f.hanging = make(chan struct{}, 1)
 	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
@@ -827,6 +844,7 @@ type truncate struct {
 }
 
 func testTruncate(t *testing.T, toSize int64) {
+	t.Parallel()
 	f := &truncate{}
 	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
 	if err != nil {
@@ -867,6 +885,7 @@ type ftruncate struct {
 }
 
 func testFtruncate(t *testing.T, toSize int64) {
+	t.Parallel()
 	f := &ftruncate{}
 	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
 	if err != nil {
@@ -916,6 +935,7 @@ type truncateWithOpen struct {
 }
 
 func TestTruncateWithOpen(t *testing.T) {
+	t.Parallel()
 	f := &truncateWithOpen{}
 	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
 	if err != nil {
@@ -959,6 +979,7 @@ func (d *readdir) ReadDir(intr fs.Intr) ([]fuse.Dirent, fuse.Error) {
 }
 
 func TestReadDir(t *testing.T) {
+	t.Parallel()
 	f := &readdir{}
 	mnt, err := fstestutil.MountedT(t, simpleFS{f})
 	if err != nil {
@@ -1010,6 +1031,7 @@ func (f *chmod) Setattr(req *fuse.SetattrRequest, resp *fuse.SetattrResponse, in
 }
 
 func TestChmod(t *testing.T) {
+	t.Parallel()
 	f := &chmod{}
 	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
 	if err != nil {
@@ -1043,6 +1065,7 @@ func (f *open) Open(req *fuse.OpenRequest, resp *fuse.OpenResponse, intr fs.Intr
 }
 
 func TestOpen(t *testing.T) {
+	t.Parallel()
 	f := &open{}
 	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
 	if err != nil {
@@ -1091,6 +1114,7 @@ type fsyncDir struct {
 }
 
 func TestFsyncDir(t *testing.T) {
+	t.Parallel()
 	f := &fsyncDir{}
 	mnt, err := fstestutil.MountedT(t, simpleFS{f})
 	if err != nil {
@@ -1141,6 +1165,7 @@ func (f *getxattr) Getxattr(req *fuse.GetxattrRequest, resp *fuse.GetxattrRespon
 }
 
 func TestGetxattr(t *testing.T) {
+	t.Parallel()
 	f := &getxattr{}
 	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
 	if err != nil {
@@ -1176,6 +1201,7 @@ func (f *getxattrTooSmall) Getxattr(req *fuse.GetxattrRequest, resp *fuse.Getxat
 }
 
 func TestGetxattrTooSmall(t *testing.T) {
+	t.Parallel()
 	f := &getxattrTooSmall{}
 	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
 	if err != nil {
@@ -1206,6 +1232,7 @@ func (f *getxattrSize) Getxattr(req *fuse.GetxattrRequest, resp *fuse.GetxattrRe
 }
 
 func TestGetxattrSize(t *testing.T) {
+	t.Parallel()
 	f := &getxattrSize{}
 	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
 	if err != nil {
@@ -1237,6 +1264,7 @@ func (f *listxattr) Listxattr(req *fuse.ListxattrRequest, resp *fuse.ListxattrRe
 }
 
 func TestListxattr(t *testing.T) {
+	t.Parallel()
 	f := &listxattr{}
 	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
 	if err != nil {
@@ -1275,6 +1303,7 @@ func (f *listxattrTooSmall) Listxattr(req *fuse.ListxattrRequest, resp *fuse.Lis
 }
 
 func TestListxattrTooSmall(t *testing.T) {
+	t.Parallel()
 	f := &listxattrTooSmall{}
 	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
 	if err != nil {
@@ -1305,6 +1334,7 @@ func (f *listxattrSize) Listxattr(req *fuse.ListxattrRequest, resp *fuse.Listxat
 }
 
 func TestListxattrSize(t *testing.T) {
+	t.Parallel()
 	f := &listxattrSize{}
 	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
 	if err != nil {
@@ -1330,6 +1360,7 @@ type setxattr struct {
 }
 
 func TestSetxattr(t *testing.T) {
+	t.Parallel()
 	f := &setxattr{}
 	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
 	if err != nil {
@@ -1368,6 +1399,7 @@ type removexattr struct {
 }
 
 func TestRemovexattr(t *testing.T) {
+	t.Parallel()
 	f := &removexattr{}
 	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
 	if err != nil {
