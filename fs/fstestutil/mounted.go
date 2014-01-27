@@ -44,6 +44,7 @@ func (mnt *Mount) Close() {
 		break
 	}
 	<-mnt.done
+	mnt.Conn.Close()
 	os.Remove(mnt.Dir)
 }
 

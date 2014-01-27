@@ -110,6 +110,9 @@ type Conn struct {
 // Mount mounts a new FUSE connection on the named directory
 // and returns a connection for reading and writing FUSE messages.
 //
+// After a successful return, caller must call Close to free
+// resources.
+//
 // Even on successful return, the new mount is not guaranteed to be
 // visible until after Conn.Ready is closed. See Conn.MountError for
 // possible errors. Incoming requests on Conn must be served to make
@@ -323,6 +326,11 @@ type malformedMessage struct {
 
 func (malformedMessage) String() string {
 	return "malformed message"
+}
+
+// Close closes the FUSE connection.
+func (c *Conn) Close() error {
+	return c.dev.Close()
 }
 
 func (c *Conn) fd() int {
