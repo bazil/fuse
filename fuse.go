@@ -95,6 +95,13 @@ import (
 
 // A Conn represents a connection to a mounted FUSE file system.
 type Conn struct {
+	// Ready is closed when the mount is complete or has failed.
+	Ready <-chan struct{}
+
+	// MountError stores any error from the mount process. Only valid
+	// after Ready is closed.
+	MountError error
+
 	dev *os.File
 	buf []byte
 	wio sync.Mutex
@@ -102,13 +109,23 @@ type Conn struct {
 
 // Mount mounts a new FUSE connection on the named directory
 // and returns a connection for reading and writing FUSE messages.
+//
+// Even on successful return, the new mount is not guaranteed to be
+// visible until after Conn.Ready is closed. See Conn.MountError for
+// possible errors. Incoming requests on Conn must be served to make
+// progress.
 func Mount(dir string) (*Conn, error) {
 	// TODO(rsc): mount options (...string?)
-	f, err := mount(dir)
+	ready := make(chan struct{}, 1)
+	c := &Conn{
+		Ready: ready,
+	}
+	f, err := mount(dir, ready, &c.MountError)
 	if err != nil {
 		return nil, err
 	}
-	return &Conn{dev: f}, nil
+	c.dev = f
+	return c, nil
 }
 
 // A Request represents a single FUSE request received from the kernel.

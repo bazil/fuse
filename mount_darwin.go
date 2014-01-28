@@ -1,6 +1,7 @@
 package fuse
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"os/exec"
@@ -49,7 +50,7 @@ func openOSXFUSEDev() (*os.File, error) {
 	}
 }
 
-func callMount(dir string, f *os.File) error {
+func callMount(dir string, f *os.File, ready chan<- struct{}, errp *error) error {
 	bin := "/Library/Filesystems/osxfusefs.fs/Support/mount_osxfusefs"
 	cmd := exec.Command(
 		bin,
@@ -62,14 +63,31 @@ func callMount(dir string, f *os.File) error {
 	cmd.Env = append(cmd.Env, "MOUNT_FUSEFS_CALL_BY_LIB=")
 	// TODO this is used for fs typenames etc, let app influence it
 	cmd.Env = append(cmd.Env, "MOUNT_FUSEFS_DAEMON_PATH="+bin)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	// TODO wait for error; needs InitRequest rewrite
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+	cmd.Stderr = &buf
+
 	err := cmd.Start()
+	if err != nil {
+		return err
+	}
+	go func() {
+		err = cmd.Wait()
+		if err != nil {
+			if buf.Len() > 0 {
+				output := buf.Bytes()
+				output = bytes.TrimRight(output, "\n")
+				msg := err.Error() + ": " + string(output)
+				err = errors.New(msg)
+			}
+		}
+		*errp = err
+		close(ready)
+	}()
 	return err
 }
 
-func mount(dir string) (*os.File, error) {
+func mount(dir string, ready chan<- struct{}, errp *error) (*os.File, error) {
 	f, err := openOSXFUSEDev()
 	if err == errNotLoaded {
 		err = loadOSXFUSE()
@@ -82,7 +100,7 @@ func mount(dir string) (*os.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = callMount(dir, f)
+	err = callMount(dir, f, ready, errp)
 	if err != nil {
 		f.Close()
 		return nil, err

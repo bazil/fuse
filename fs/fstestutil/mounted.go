@@ -3,6 +3,7 @@ package fstestutil
 import (
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
+	"errors"
 	"io/ioutil"
 	"log"
 	"os"
@@ -13,6 +14,8 @@ import (
 type Mount struct {
 	// Dir is the temporary directory where the filesystem is mounted.
 	Dir string
+
+	Conn *fuse.Conn
 
 	// Error will receive the return value of Serve.
 	Error <-chan error
@@ -55,6 +58,7 @@ func Mounted(srv *fs.Server) (*Mount, error) {
 	serveErr := make(chan error, 1)
 	mnt := &Mount{
 		Dir:   dir,
+		Conn:  c,
 		Error: serveErr,
 		done:  done,
 	}
@@ -88,8 +92,18 @@ func MountedT(t testing.TB, filesys fs.FS) (*Mount, error) {
 	if err != nil {
 		return mnt, err
 	}
-	// the wait logic is in MountedT and not Mounted for ease of log
-	// integration; we just pass on t
-	waitForMount(t, mnt.Dir, mnt.done)
-	return mnt, err
+
+	select {
+	case <-mnt.Conn.Ready:
+		if mnt.Conn.MountError != nil {
+			return nil, err
+		}
+		return mnt, err
+	case err = <-mnt.Error:
+		// Serve quit early
+		if err != nil {
+			return nil, err
+		}
+		return nil, errors.New("Serve exited early")
+	}
 }

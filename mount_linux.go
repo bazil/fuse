@@ -8,7 +8,10 @@ import (
 	"syscall"
 )
 
-func mount(dir string) (fusefd *os.File, err error) {
+func mount(dir string, ready chan<- struct{}, errp *error) (fusefd *os.File, err error) {
+	// linux mount is never delayed
+	close(ready)
+
 	fds, err := syscall.Socketpair(syscall.AF_FILE, syscall.SOCK_STREAM, 0)
 	if err != nil {
 		return nil, fmt.Errorf("socketpair error: %v", err)
