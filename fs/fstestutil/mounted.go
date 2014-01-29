@@ -49,6 +49,9 @@ func (mnt *Mount) Close() {
 
 // Mounted mounts the fuse.Server at a temporary directory.
 //
+// It also waits until the filesystem is known to be visible (OS X
+// workaround).
+//
 // After successful return, caller must clean up by calling Close.
 func Mounted(srv *fs.Server) (*Mount, error) {
 	dir, err := ioutil.TempDir("", "fusetest")
@@ -72,32 +75,6 @@ func Mounted(srv *fs.Server) (*Mount, error) {
 		defer close(done)
 		serveErr <- srv.Serve(c)
 	}()
-	return mnt, nil
-}
-
-// MountedT mounts the filesystem at a temporary directory,
-// directing it's debug log to the testing logger.
-//
-// It also waits until the filesystem is known to be visible (OS X
-// workaround).
-//
-// See Mounted for usage.
-//
-// The debug log is not enabled by default. Use `-fuse.debug` or call
-// DebugByDefault to enable.
-func MountedT(t testing.TB, filesys fs.FS) (*Mount, error) {
-	srv := &fs.Server{
-		FS: filesys,
-	}
-	if debug {
-		srv.Debug = func(msg interface{}) {
-			t.Logf("FUSE: %s", msg)
-		}
-	}
-	mnt, err := Mounted(srv)
-	if err != nil {
-		return mnt, err
-	}
 
 	select {
 	case <-mnt.Conn.Ready:
@@ -112,4 +89,23 @@ func MountedT(t testing.TB, filesys fs.FS) (*Mount, error) {
 		}
 		return nil, errors.New("Serve exited early")
 	}
+}
+
+// MountedT mounts the filesystem at a temporary directory,
+// directing it's debug log to the testing logger.
+//
+// See Mounted for usage.
+//
+// The debug log is not enabled by default. Use `-fuse.debug` or call
+// DebugByDefault to enable.
+func MountedT(t testing.TB, filesys fs.FS) (*Mount, error) {
+	srv := &fs.Server{
+		FS: filesys,
+	}
+	if debug {
+		srv.Debug = func(msg interface{}) {
+			t.Logf("FUSE: %s", msg)
+		}
+	}
+	return Mounted(srv)
 }
