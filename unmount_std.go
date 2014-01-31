@@ -3,20 +3,14 @@
 package fuse
 
 import (
-	"bytes"
-	"errors"
-	"os/exec"
+	"os"
+	"syscall"
 )
 
 func unmount(dir string) error {
-	cmd := exec.Command("umount", dir)
-	output, err := cmd.CombinedOutput()
+	err := syscall.Unmount(dir, 0)
 	if err != nil {
-		if len(output) > 0 {
-			output = bytes.TrimRight(output, "\n")
-			msg := err.Error() + ": " + string(output)
-			err = errors.New(msg)
-		}
+		err = &os.PathError{Op: "unmount", Path: dir, Err: err}
 		return err
 	}
 	return nil
