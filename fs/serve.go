@@ -1,3 +1,5 @@
+// +build linux darwin
+
 // FUSE service loop, for servers that wish to use it.
 
 package fs
