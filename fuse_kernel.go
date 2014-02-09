@@ -1,3 +1,5 @@
+// +build linux darwin
+
 // See the file LICENSE for copyright and licensing information.
 
 // Derived from FUSE's fuse_kernel.h
