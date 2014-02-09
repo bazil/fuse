@@ -54,6 +54,8 @@ func callMount(dir string, f *os.File, ready chan<- struct{}, errp *error) error
 	bin := "/Library/Filesystems/osxfusefs.fs/Support/mount_osxfusefs"
 	cmd := exec.Command(
 		bin,
+		"-o",
+		"iosize=4096",
 		// refers to fd passed in cmd.ExtraFiles
 		"3",
 		dir,
