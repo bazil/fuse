@@ -68,6 +68,25 @@ type FSDestroyer interface {
 	Destroy()
 }
 
+type FSInodeGenerator interface {
+	// GenerateInode is called to pick a dynamic inode number when it
+	// would otherwise be 0.
+	//
+	// Not all filesystems bother tracking inodes, but FUSE requires
+	// the inode to be set, and fewer duplicates in general makes UNIX
+	// tools work better.
+	//
+	// Operations where the nodes may return 0 inodes include Getattr,
+	// Setattr and ReadDir.
+	//
+	// If FS does not implement FSInodeGenerator, GenerateDynamicInode
+	// is used.
+	//
+	// Implementing this is useful to e.g. constrain the range of
+	// inode values used for dynamic inodes.
+	GenerateInode(parentInode uint64, name string) uint64
+}
+
 // A Node is the interface required of a file or directory.
 // See the documentation for type FS for general information
 // pertaining to all methods.
@@ -285,12 +304,16 @@ type Server struct {
 // when the connection has been closed or an unexpected error occurs.
 func (s *Server) Serve(c *fuse.Conn) error {
 	sc := serveConn{
-		fs:    s.FS,
-		debug: s.Debug,
-		req:   map[fuse.RequestID]*serveRequest{},
+		fs:           s.FS,
+		debug:        s.Debug,
+		req:          map[fuse.RequestID]*serveRequest{},
+		dynamicInode: GenerateDynamicInode,
 	}
 	if sc.debug == nil {
 		sc.debug = fuse.Debug
+	}
+	if dyn, ok := sc.fs.(FSInodeGenerator); ok {
+		sc.dynamicInode = dyn.GenerateInode
 	}
 
 	root, err := sc.fs.Root()
@@ -326,15 +349,16 @@ func Serve(c *fuse.Conn, fs FS) error {
 type nothing struct{}
 
 type serveConn struct {
-	meta       sync.Mutex
-	fs         FS
-	req        map[fuse.RequestID]*serveRequest
-	node       []*serveNode
-	handle     []*serveHandle
-	freeNode   []fuse.NodeID
-	freeHandle []fuse.HandleID
-	nodeGen    uint64
-	debug      func(msg interface{})
+	meta         sync.Mutex
+	fs           FS
+	req          map[fuse.RequestID]*serveRequest
+	node         []*serveNode
+	handle       []*serveHandle
+	freeNode     []fuse.NodeID
+	freeHandle   []fuse.HandleID
+	nodeGen      uint64
+	debug        func(msg interface{})
+	dynamicInode func(parent uint64, name string) uint64
 }
 
 type serveRequest struct {
@@ -1004,7 +1028,7 @@ func (c *serveConn) serve(r fuse.Request) {
 					var data []byte
 					for _, dir := range dirs {
 						if dir.Inode == 0 {
-							dir.Inode = GenerateDynamicInode(snode.inode, dir.Name)
+							dir.Inode = c.dynamicInode(snode.inode, dir.Name)
 						}
 						data = fuse.AppendDirent(data, dir)
 					}
@@ -1218,7 +1242,7 @@ func (c *serveConn) serve(r fuse.Request) {
 func (c *serveConn) saveLookup(s *fuse.LookupResponse, snode *serveNode, elem string, n2 Node) {
 	s.Attr = nodeAttr(n2)
 	if s.Attr.Inode == 0 {
-		s.Attr.Inode = GenerateDynamicInode(snode.inode, elem)
+		s.Attr.Inode = c.dynamicInode(snode.inode, elem)
 	}
 
 	s.Node, s.Generation = c.saveNode(s.Attr.Inode, n2)
