@@ -285,15 +285,15 @@ type Server struct {
 // when the connection has been closed or an unexpected error occurs.
 func (s *Server) Serve(c *fuse.Conn) error {
 	sc := serveConn{
+		fs:    s.FS,
 		debug: s.Debug,
 		req:   map[fuse.RequestID]*serveRequest{},
 	}
 	if sc.debug == nil {
 		sc.debug = fuse.Debug
 	}
-	fs := s.FS
 
-	root, err := fs.Root()
+	root, err := sc.fs.Root()
 	if err != nil {
 		return fmt.Errorf("cannot obtain root node: %v", syscall.Errno(err.(fuse.Errno)).Error())
 	}
@@ -309,7 +309,7 @@ func (s *Server) Serve(c *fuse.Conn) error {
 			return err
 		}
 
-		go sc.serve(fs, req)
+		go sc.serve(req)
 	}
 	return nil
 }
@@ -327,6 +327,7 @@ type nothing struct{}
 
 type serveConn struct {
 	meta       sync.Mutex
+	fs         FS
 	req        map[fuse.RequestID]*serveRequest
 	node       []*serveNode
 	handle     []*serveHandle
@@ -589,7 +590,7 @@ func (m *renameNewDirNodeNotFound) String() string {
 	return fmt.Sprintf("In RenameRequest (request %#x), node %d not found", m.Request.Hdr().ID, m.In.NewDir)
 }
 
-func (c *serveConn) serve(fs FS, r fuse.Request) {
+func (c *serveConn) serve(r fuse.Request) {
 	intr := make(Intr)
 	req := &serveRequest{Request: r, Intr: intr}
 
@@ -669,7 +670,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		s := &fuse.InitResponse{
 			MaxWrite: 4096,
 		}
-		if fs, ok := fs.(FSIniter); ok {
+		if fs, ok := c.fs.(FSIniter); ok {
 			if err := fs.Init(r, s, intr); err != nil {
 				done(err)
 				r.RespondError(err)
@@ -681,7 +682,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 
 	case *fuse.StatfsRequest:
 		s := &fuse.StatfsResponse{}
-		if fs, ok := fs.(FSStatfser); ok {
+		if fs, ok := c.fs.(FSStatfser); ok {
 			if err := fs.Statfs(r, s, intr); err != nil {
 				done(err)
 				r.RespondError(err)
@@ -1119,7 +1120,7 @@ func (c *serveConn) serve(fs FS, r fuse.Request) {
 		r.Respond()
 
 	case *fuse.DestroyRequest:
-		if fs, ok := fs.(FSDestroyer); ok {
+		if fs, ok := c.fs.(FSDestroyer); ok {
 			fs.Destroy()
 		}
 		done(nil)
