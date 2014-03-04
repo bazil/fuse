@@ -3,10 +3,10 @@
 package fs
 
 import (
+	"encoding/binary"
 	"fmt"
 	"hash/fnv"
 	"io"
-	"path"
 	"reflect"
 	"strings"
 	"sync"
@@ -297,7 +297,7 @@ func (s *Server) Serve(c *fuse.Conn) error {
 	if err != nil {
 		return fmt.Errorf("cannot obtain root node: %v", syscall.Errno(err.(fuse.Errno)).Error())
 	}
-	sc.node = append(sc.node, nil, &serveNode{name: "/", node: root, refs: 1})
+	sc.node = append(sc.node, nil, &serveNode{inode: 1, node: root, refs: 1})
 	sc.handle = append(sc.handle, nil)
 
 	for {
@@ -343,23 +343,17 @@ type serveRequest struct {
 }
 
 type serveNode struct {
-	name string
-	node Node
-	refs uint64
+	inode uint64
+	node  Node
+	refs  uint64
 }
 
 func (sn *serveNode) attr() (attr fuse.Attr) {
 	attr = nodeAttr(sn.node)
 	if attr.Inode == 0 {
-		attr.Inode = hash(sn.name)
+		attr.Inode = sn.inode
 	}
 	return
-}
-
-func hash(s string) uint64 {
-	f := fnv.New64()
-	f.Write([]byte(s))
-	return f.Sum64()
 }
 
 type serveHandle struct {
@@ -388,7 +382,7 @@ type nodeRef interface {
 	nodeRef() *NodeRef
 }
 
-func (c *serveConn) saveNode(name string, node Node) (id fuse.NodeID, gen uint64, sn *serveNode) {
+func (c *serveConn) saveNode(inode uint64, node Node) (id fuse.NodeID, gen uint64) {
 	c.meta.Lock()
 	defer c.meta.Unlock()
 
@@ -400,13 +394,13 @@ func (c *serveConn) saveNode(name string, node Node) (id fuse.NodeID, gen uint64
 			// dropNode guarantees that NodeRef is zeroed at the same
 			// time as the NodeID is removed from serveConn.node, as
 			// guarded by c.meta; this means sn cannot be nil here
-			sn = c.node[ref.id]
+			sn := c.node[ref.id]
 			sn.refs++
-			return ref.id, ref.generation, sn
+			return ref.id, ref.generation
 		}
 	}
 
-	sn = &serveNode{name: name, node: node, refs: 1}
+	sn := &serveNode{inode: inode, node: node, refs: 1}
 	if n := len(c.freeNode); n > 0 {
 		id = c.freeNode[n-1]
 		c.freeNode = c.freeNode[:n-1]
@@ -1010,7 +1004,7 @@ func (c *serveConn) serve(r fuse.Request) {
 					var data []byte
 					for _, dir := range dirs {
 						if dir.Inode == 0 {
-							dir.Inode = hash(path.Join(snode.name, dir.Name))
+							dir.Inode = GenerateDynamicInode(snode.inode, dir.Name)
 						}
 						data = fuse.AppendDirent(data, dir)
 					}
@@ -1222,16 +1216,18 @@ func (c *serveConn) serve(r fuse.Request) {
 }
 
 func (c *serveConn) saveLookup(s *fuse.LookupResponse, snode *serveNode, elem string, n2 Node) {
-	name := path.Join(snode.name, elem)
-	var sn *serveNode
-	s.Node, s.Generation, sn = c.saveNode(name, n2)
+	s.Attr = nodeAttr(n2)
+	if s.Attr.Inode == 0 {
+		s.Attr.Inode = GenerateDynamicInode(snode.inode, elem)
+	}
+
+	s.Node, s.Generation = c.saveNode(s.Attr.Inode, n2)
 	if s.EntryValid == 0 {
 		s.EntryValid = entryValidTime
 	}
 	if s.AttrValid == 0 {
 		s.AttrValid = attrValidTime
 	}
-	s.Attr = sn.attr()
 }
 
 // DataHandle returns a read-only Handle that satisfies reads
@@ -1246,4 +1242,28 @@ type dataHandle struct {
 
 func (d *dataHandle) ReadAll(intr Intr) ([]byte, fuse.Error) {
 	return d.data, nil
+}
+
+// GenerateDynamicInode returns a dynamic inode.
+//
+// The parent inode and current entry name are used as the criteria
+// for choosing a pseudorandom inode. This makes it likely the same
+// entry will get the same inode on multiple runs.
+func GenerateDynamicInode(parent uint64, name string) uint64 {
+	h := fnv.New64a()
+	var buf [8]byte
+	binary.LittleEndian.PutUint64(buf[:], parent)
+	_, _ = h.Write(buf[:])
+	_, _ = h.Write([]byte(name))
+	var inode uint64
+	for {
+		inode = h.Sum64()
+		if inode != 0 {
+			break
+		}
+		// there's a tiny probability that result is zero; change the
+		// input a little and try again
+		_, _ = h.Write([]byte{'x'})
+	}
+	return inode
 }
