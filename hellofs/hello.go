@@ -68,7 +68,7 @@ func (Dir) ReadDir(intr fs.Intr) ([]fuse.Dirent, fuse.Error) {
 type File struct{}
 
 func (File) Attr() fuse.Attr {
-	return fuse.Attr{Mode: 0444}
+	return fuse.Attr{Inode: 2, Mode: 0444}
 }
 
 func (File) ReadAll(intr fs.Intr) ([]byte, fuse.Error) {
