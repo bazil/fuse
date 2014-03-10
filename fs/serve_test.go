@@ -438,7 +438,7 @@ func (f *create1) Create(req *fuse.CreateRequest, resp *fuse.CreateResponse, int
 	// OS X does not pass O_TRUNC here, Linux does; as this is a
 	// Create, that's acceptable
 	flags &^= fuse.OpenFlags(os.O_TRUNC)
-	if g, e := flags, fuse.OpenFlags(os.O_CREATE|os.O_RDWR); g != e {
+	if g, e := flags, fuse.OpenFlags(os.O_CREATE|os.O_RDWR|syscall.O_CLOEXEC); g != e {
 		log.Printf("ERROR create1.Create unexpected flags: %v != %v\n", g, e)
 		return nil, nil, fuse.EPERM
 	}
@@ -1091,7 +1091,7 @@ func TestOpen(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	want := fuse.OpenRequest{Dir: false, Flags: fuse.OpenFlags(os.O_WRONLY | os.O_APPEND)}
+	want := fuse.OpenRequest{Dir: false, Flags: fuse.OpenFlags(os.O_WRONLY | os.O_APPEND | syscall.O_CLOEXEC)}
 	if runtime.GOOS == "darwin" {
 		// osxfuse does not let O_APPEND through at all
 		//
