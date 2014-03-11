@@ -178,7 +178,23 @@ func (h *Header) Hdr() *Header {
 }
 
 // An Error is a FUSE error.
-type Error interface {
+//
+// Errors messages will be visible in the debug log as part of the
+// response.
+//
+// The FUSE interface can only communicate POSIX errno error numbers
+// to file system clients, the message is not visible to file system
+// clients. The returned error can implement ErrorNumber to control
+// the errno returned. Without ErrorNumber, a generic errno (EIO) is
+// returned.
+type Error error
+
+// An ErrorNumber is an error with a specific error number.
+//
+// Operations may return an error value that implements ErrorNumber to
+// control what specific error number (errno) to return.
+type ErrorNumber interface {
+	// Errno returns the the error number (errno) for this error.
 	Errno() Errno
 }
 
@@ -202,6 +218,10 @@ const (
 	ENOTSUP = Errno(syscall.ENOTSUP)
 )
 
+// DefaultErrno is the errno used when error returned does not
+// implement ErrorNumber.
+const DefaultErrno = EIO
+
 var errnoNames = map[Errno]string{
 	ENOSYS:  "ENOSYS",
 	ESTALE:  "ESTALE",
@@ -212,10 +232,12 @@ var errnoNames = map[Errno]string{
 	ENODATA: "ENODATA",
 }
 
-// Errno implements Error using a syscall.Errno.
+// Errno implements Error and ErrorNumber using a syscall.Errno.
 type Errno syscall.Errno
 
+var _ = ErrorNumber(Errno(0))
 var _ = Error(Errno(0))
+var _ = error(Errno(0))
 
 func (e Errno) Errno() Errno {
 	return e
@@ -225,18 +247,33 @@ func (e Errno) String() string {
 	return syscall.Errno(e).Error()
 }
 
-func (e Errno) MarshalText() ([]byte, error) {
+func (e Errno) Error() string {
+	return syscall.Errno(e).Error()
+}
+
+// ErrnoName returns the short non-numeric identifier for this errno.
+// For example, "EIO".
+func (e Errno) ErrnoName() string {
 	s := errnoNames[e]
 	if s == "" {
 		s = fmt.Sprint(e.Errno())
 	}
+	return s
+}
+
+func (e Errno) MarshalText() ([]byte, error) {
+	s := e.ErrnoName()
 	return []byte(s), nil
 }
 
 func (h *Header) RespondError(err Error) {
+	errno := DefaultErrno
+	if ferr, ok := err.(ErrorNumber); ok {
+		errno = ferr.Errno()
+	}
 	// FUSE uses negative errors!
 	// TODO: File bug report against OSXFUSE: positive error causes kernel panic.
-	out := &outHeader{Error: -int32(err.Errno()), Unique: uint64(h.ID)}
+	out := &outHeader{Error: -int32(errno), Unique: uint64(h.ID)}
 	h.Conn.respond(out, unsafe.Sizeof(*out))
 }
 
