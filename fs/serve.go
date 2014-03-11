@@ -555,15 +555,27 @@ type response struct {
 	Op      string
 	Request logResponseHeader
 	Out     interface{} `json:",omitempty"`
-	Error   fuse.Error  `json:",omitempty"`
+	// Errno contains the errno value as a string, for example "EPERM".
+	Errno string `json:",omitempty"`
+	// Error may contain a free form error message.
+	Error string `json:",omitempty"`
+}
+
+func (r response) errstr() string {
+	s := r.Errno
+	if r.Error != "" {
+		// prefix the errno constant to the long form message
+		s = s + ": " + r.Error
+	}
+	return s
 }
 
 func (r response) String() string {
 	switch {
-	case r.Error != nil && r.Out != nil:
-		return fmt.Sprintf("-> %s error=%s %s", r.Request, r.Error, r.Out)
-	case r.Error != nil:
-		return fmt.Sprintf("-> %s error=%s", r.Request, r.Error)
+	case r.Errno != "" && r.Out != nil:
+		return fmt.Sprintf("-> %s error=%s %s", r.Request, r.errstr(), r.Out)
+	case r.Errno != "":
+		return fmt.Sprintf("-> %s error=%s", r.Request, r.errstr())
 	case r.Out != nil:
 		// make sure (seemingly) empty values are readable
 		switch r.Out.(type) {
@@ -630,7 +642,7 @@ func (c *serveConn) serve(r fuse.Request) {
 			c.debug(response{
 				Op:      opName(r),
 				Request: logResponseHeader{ID: hdr.ID},
-				Error:   fuse.ESTALE,
+				Error:   fuse.ESTALE.ErrnoName(),
 				// this is the only place that sets both Error and
 				// Out; not sure if i want to do that; might get rid
 				// of len(c.node) things altogether
@@ -662,9 +674,20 @@ func (c *serveConn) serve(r fuse.Request) {
 		msg := response{
 			Op:      opName(r),
 			Request: logResponseHeader{ID: hdr.ID},
+			// default value, to be overwritten below
+			Errno: fuse.DefaultErrno.ErrnoName(),
 		}
-		if err, ok := resp.(fuse.Error); ok {
-			msg.Error = err
+		if err, ok := resp.(error); ok {
+			msg.Error = err.Error()
+			if ferr, ok := err.(fuse.ErrorNumber); ok {
+				errno := ferr.Errno()
+				msg.Errno = errno.ErrnoName()
+				if errno == err {
+					// it's just a fuse.Errno with no extra detail;
+					// skip the textual message for log readability
+					msg.Error = ""
+				}
+			}
 		} else {
 			msg.Out = resp
 		}
