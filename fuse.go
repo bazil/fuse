@@ -179,7 +179,7 @@ func (h *Header) Hdr() *Header {
 
 // An Error is a FUSE error.
 type Error interface {
-	errno() int32
+	Errno() Errno
 }
 
 const (
@@ -215,8 +215,10 @@ var errnoNames = map[Errno]string{
 // Errno implements Error using a syscall.Errno.
 type Errno syscall.Errno
 
-func (e Errno) errno() int32 {
-	return int32(e)
+var _ = Error(Errno(0))
+
+func (e Errno) Errno() Errno {
+	return e
 }
 
 func (e Errno) String() string {
@@ -226,7 +228,7 @@ func (e Errno) String() string {
 func (e Errno) MarshalText() ([]byte, error) {
 	s := errnoNames[e]
 	if s == "" {
-		s = fmt.Sprint(e.errno())
+		s = fmt.Sprint(e.Errno())
 	}
 	return []byte(s), nil
 }
@@ -234,7 +236,7 @@ func (e Errno) MarshalText() ([]byte, error) {
 func (h *Header) RespondError(err Error) {
 	// FUSE uses negative errors!
 	// TODO: File bug report against OSXFUSE: positive error causes kernel panic.
-	out := &outHeader{Error: -err.errno(), Unique: uint64(h.ID)}
+	out := &outHeader{Error: -int32(err.Errno()), Unique: uint64(h.ID)}
 	h.Conn.respond(out, unsafe.Sizeof(*out))
 }
 
