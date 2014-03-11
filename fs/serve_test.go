@@ -7,6 +7,7 @@ import (
 	"bazil.org/fuse/fs/fstestutil/record"
 	"bazil.org/fuse/fuseutil"
 	"bazil.org/fuse/syscallx"
+	"errors"
 	"io/ioutil"
 	"log"
 	"os"
@@ -1416,5 +1417,85 @@ func TestRemovexattr(t *testing.T) {
 	want := fuse.RemovexattrRequest{Name: "greeting"}
 	if g, e := f.RecordedRemovexattr(), want; g != e {
 		t.Errorf("removexattr saw %v, want %v", g, e)
+	}
+}
+
+// Test default error.
+
+type defaultErrno struct {
+	dir
+}
+
+func (f defaultErrno) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
+	return nil, errors.New("bork")
+}
+
+func TestDefaultErrno(t *testing.T) {
+	t.Parallel()
+	mnt, err := fstestutil.MountedT(t, simpleFS{defaultErrno{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	_, err = os.Stat(mnt.Dir + "/trigger")
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+
+	switch err2 := err.(type) {
+	case *os.PathError:
+		if err2.Err == syscall.EIO {
+			break
+		}
+		t.Errorf("unexpected inner error: Err=%v %#v", err2.Err, err2)
+	default:
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+// Test custom error.
+
+type customErrNode struct {
+	dir
+}
+
+type myCustomError struct {
+	fuse.ErrorNumber
+}
+
+var _ = fuse.ErrorNumber(myCustomError{})
+
+func (myCustomError) Error() string {
+	return "bork"
+}
+
+func (f customErrNode) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
+	return nil, myCustomError{
+		ErrorNumber: fuse.Errno(syscall.ENAMETOOLONG),
+	}
+}
+
+func TestCustomErrno(t *testing.T) {
+	t.Parallel()
+	mnt, err := fstestutil.MountedT(t, simpleFS{customErrNode{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	_, err = os.Stat(mnt.Dir + "/trigger")
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+
+	switch err2 := err.(type) {
+	case *os.PathError:
+		if err2.Err == syscall.ENAMETOOLONG {
+			break
+		}
+		t.Errorf("unexpected inner error: %#v", err2)
+	default:
+		t.Errorf("unexpected error: %v", err)
 	}
 }
