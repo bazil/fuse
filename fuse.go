@@ -212,12 +212,6 @@ var errnoNames = map[Errno]string{
 	ENODATA: "ENODATA",
 }
 
-type errno int
-
-func (e errno) errno() int32 {
-	return int32(e)
-}
-
 // Errno implements Error using a syscall.Errno.
 type Errno syscall.Errno
 
