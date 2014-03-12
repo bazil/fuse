@@ -1,14 +1,15 @@
 package fstestutil
 
 import (
-	"bazil.org/fuse"
-	"bazil.org/fuse/fs"
 	"errors"
 	"io/ioutil"
 	"log"
 	"os"
 	"testing"
 	"time"
+
+	"bazil.org/fuse"
+	"bazil.org/fuse/fs"
 )
 
 // Mount contains information about the mount for the test to use.

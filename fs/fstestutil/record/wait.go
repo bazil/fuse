@@ -1,10 +1,11 @@
 package record
 
 import (
-	"bazil.org/fuse"
-	"bazil.org/fuse/fs"
 	"sync"
 	"time"
+
+	"bazil.org/fuse"
+	"bazil.org/fuse/fs"
 )
 
 type nothing struct{}

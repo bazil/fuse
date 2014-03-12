@@ -1,10 +1,11 @@
 package record
 
 import (
-	"bazil.org/fuse"
-	"bazil.org/fuse/fs"
 	"sync"
 	"sync/atomic"
+
+	"bazil.org/fuse"
+	"bazil.org/fuse/fs"
 )
 
 // Writes gathers data from FUSE Write calls.
