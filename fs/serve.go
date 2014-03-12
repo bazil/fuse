@@ -674,8 +674,6 @@ func (c *serveConn) serve(r fuse.Request) {
 		msg := response{
 			Op:      opName(r),
 			Request: logResponseHeader{ID: hdr.ID},
-			// default value, to be overwritten below
-			Errno: fuse.DefaultErrno.ErrnoName(),
 		}
 		if err, ok := resp.(error); ok {
 			msg.Error = err.Error()
@@ -687,6 +685,8 @@ func (c *serveConn) serve(r fuse.Request) {
 					// skip the textual message for log readability
 					msg.Error = ""
 				}
+			} else {
+				msg.Errno = fuse.DefaultErrno.ErrnoName()
 			}
 		} else {
 			msg.Out = resp
