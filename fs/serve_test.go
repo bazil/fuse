@@ -436,9 +436,17 @@ func (f *create1) Create(req *fuse.CreateRequest, resp *fuse.CreateResponse, int
 		return nil, nil, fuse.EPERM
 	}
 	flags := req.Flags
+
 	// OS X does not pass O_TRUNC here, Linux does; as this is a
 	// Create, that's acceptable
 	flags &^= fuse.OpenFlags(os.O_TRUNC)
+
+	if runtime.GOOS == "linux" {
+		// Linux <3.7 accidentally leaks O_CLOEXEC through to FUSE;
+		// avoid spurious test failures
+		flags &^= fuse.OpenFlags(syscall.O_CLOEXEC)
+	}
+
 	if g, e := flags, fuse.OpenFlags(os.O_CREATE|os.O_RDWR); g != e {
 		log.Printf("ERROR create1.Create unexpected flags: %v != %v\n", g, e)
 		return nil, nil, fuse.EPERM
@@ -1101,7 +1109,15 @@ func TestOpen(t *testing.T) {
 		// https://code.google.com/p/macfuse/issues/detail?id=133
 		want.Flags &^= fuse.OpenFlags(os.O_APPEND)
 	}
-	if g, e := f.RecordedOpen(), want; g != e {
+	got := f.RecordedOpen()
+
+	if runtime.GOOS == "linux" {
+		// Linux <3.7 accidentally leaks O_CLOEXEC through to FUSE;
+		// avoid spurious test failures
+		got.Flags &^= fuse.OpenFlags(syscall.O_CLOEXEC)
+	}
+
+	if g, e := got, want; g != e {
 		t.Errorf("open saw %v, want %v", g, e)
 		return
 	}
