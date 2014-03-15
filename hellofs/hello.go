@@ -31,8 +31,18 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer c.Close()
 
-	fs.Serve(c, FS{})
+	err = fs.Serve(c, FS{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// check if the mount process has an error to report
+	<-c.Ready
+	if err := c.MountError; err != nil {
+		log.Fatal(err)
+	}
 }
 
 // FS implements the hello world file system.
