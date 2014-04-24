@@ -21,8 +21,9 @@ func mount(dir string, ready chan<- struct{}, errp *error, opts []string) (fusef
 	defer syscall.Close(fds[1])
 
 	var cmdline []string
-	if len(opts) > 0 {
-		cmdline = append(cmdline, fmt.Sprintf("-o%s", strings.Join(opts, ",")))
+	for _, o := range opts {
+		cmdline = append(cmdline, "-o")
+		cmdline = append(cmdline, o)
 	}
 	cmdline = append(cmdline, "--")
 	cmdline = append(cmdline, dir)

@@ -87,6 +87,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -110,6 +111,7 @@ type Conn struct {
 type MountOptions struct {
 	AllowOther bool
 	AllowRoot  bool
+	ExtraFlags string
 }
 
 // Mount mounts a new FUSE connection on the named directory
@@ -129,7 +131,6 @@ func Mount(dir string) (*Conn, error) {
 }
 
 func MountWithOpts(dir string, opts MountOptions) (*Conn, error) {
-	// TODO(rsc): mount options (...string?)
 	ready := make(chan struct{}, 1)
 	c := &Conn{
 		Ready: ready,
@@ -140,6 +141,9 @@ func MountWithOpts(dir string, opts MountOptions) (*Conn, error) {
 	}
 	if opts.AllowRoot {
 		string_opts = append(string_opts, "allow_root")
+	}
+	if len(opts.ExtraFlags) > 0 {
+		string_opts = append(string_opts, strings.Split(opts.ExtraFlags, ",")...)
 	}
 	f, err := mount(dir, ready, &c.MountError, string_opts)
 	if err != nil {
