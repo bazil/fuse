@@ -107,6 +107,11 @@ type Conn struct {
 	wio sync.Mutex
 }
 
+type MountOptions struct {
+	AllowOther bool
+	AllowRoot  bool
+}
+
 // Mount mounts a new FUSE connection on the named directory
 // and returns a connection for reading and writing FUSE messages.
 //
@@ -119,11 +124,24 @@ type Conn struct {
 // progress.
 func Mount(dir string) (*Conn, error) {
 	// TODO(rsc): mount options (...string?)
+	var opts MountOptions
+	return MountWithOpts(dir, opts)
+}
+
+func MountWithOpts(dir string, opts MountOptions) (*Conn, error) {
+	// TODO(rsc): mount options (...string?)
 	ready := make(chan struct{}, 1)
 	c := &Conn{
 		Ready: ready,
 	}
-	f, err := mount(dir, ready, &c.MountError)
+	var string_opts []string
+	if opts.AllowOther {
+		string_opts = append(string_opts, "allow_other")
+	}
+	if opts.AllowRoot {
+		string_opts = append(string_opts, "allow_root")
+	}
+	f, err := mount(dir, ready, &c.MountError, string_opts)
 	if err != nil {
 		return nil, err
 	}

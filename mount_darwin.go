@@ -87,7 +87,7 @@ func callMount(dir string, f *os.File, ready chan<- struct{}, errp *error) error
 	return err
 }
 
-func mount(dir string, ready chan<- struct{}, errp *error) (*os.File, error) {
+func mount(dir string, ready chan<- struct{}, errp *error, opts []string) (*os.File, error) {
 	f, err := openOSXFUSEDev()
 	if err == errNotLoaded {
 		err = loadOSXFUSE()
