@@ -19,7 +19,7 @@
 // OF ANY KIND CONCERNING THE MERCHANTABILITY OF THIS SOFTWARE OR ITS
 // FITNESS FOR ANY PARTICULAR PURPOSE.
 
-// Package fuse enables writing FUSE file systems on FreeBSD, Linux, and OS X.
+// Package fuse enables writing FUSE file systems on Linux, OS X, and FreeBSD.
 //
 // On OS X, it requires OSXFUSE (http://osxfuse.github.com/).
 //
