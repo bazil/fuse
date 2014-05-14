@@ -1,7 +1,9 @@
 package fs_test
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -349,6 +351,42 @@ func TestWrite(t *testing.T) {
 
 	if got := string(w.RecordedWriteData()); got != hi {
 		t.Errorf("write = %q, want %q", got, hi)
+	}
+}
+
+func TestWriteLarge(t *testing.T) {
+	// blows up on OSX for l > 8128
+	l := 8129
+	input := bytes.Repeat([]byte("a"), l)
+	want := fmt.Sprintf("a{%d}", l)
+
+	t.Parallel()
+	w := &write{}
+	mnt, err := fstestutil.MountedT(t, childMapFS{"child": w})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	f, err := os.Create(mnt.Dir + "/child")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	n, err := f.Write([]byte(input))
+	if err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if n != len(input) {
+		t.Fatalf("short write; n=%d; input=%d", n, len(input))
+	}
+
+	err = f.Close()
+	if err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	if got := shortenString(string(w.RecordedWriteData())); got != want {
+		t.Errorf("write = %q, want %q", got, want)
 	}
 }
 
@@ -1515,4 +1553,36 @@ func TestCustomErrno(t *testing.T) {
 	default:
 		t.Errorf("unexpected error: %v", err)
 	}
+}
+
+// shortenString reduces any run of 5 or more identical bytes to "x{17}".
+// "hello" => "hello"
+// "fooooooooooooooooo" => "fo{17}"
+func shortenString(v string) string {
+	var buf bytes.Buffer
+	var last byte
+	var run int
+	flush := func() {
+		switch {
+		case run == 0:
+		case run < 5:
+			for i := 0; i < run; i++ {
+				buf.WriteByte(last)
+			}
+		default:
+			buf.WriteByte(last)
+			fmt.Fprintf(&buf, "{%d}", run)
+		}
+		run = 0
+	}
+	for i := 0; i < len(v); i++ {
+		b := v[i]
+		if b != last {
+			flush()
+		}
+		last = b
+		run++
+	}
+	flush()
+	return buf.String()
 }
