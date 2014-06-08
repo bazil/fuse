@@ -54,6 +54,13 @@ func callMount(dir string, f *os.File, ready chan<- struct{}, errp *error) error
 	bin := "/Library/Filesystems/osxfusefs.fs/Support/mount_osxfusefs"
 	cmd := exec.Command(
 		bin,
+		// Tell osxfuse-kext how large our buffer is. It must split
+		// writes larger than this into multiple writes.
+		//
+		// TODO add buffer reuse, bump this up significantly
+		//
+		// TODO what's the relation of `-o iosize=` vs InitResponse.MaxWrite?
+		"-o", "iosize=4096",
 		// refers to fd passed in cmd.ExtraFiles
 		"3",
 		dir,

@@ -1,12 +1,14 @@
 package fs_test
 
 import (
+	"bytes"
 	"errors"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -349,6 +351,50 @@ func TestWrite(t *testing.T) {
 
 	if got := string(w.RecordedWriteData()); got != hi {
 		t.Errorf("write = %q, want %q", got, hi)
+	}
+}
+
+// Test Write of a larger buffer.
+
+type writeLarge struct {
+	file
+	record.Writes
+}
+
+func TestWriteLarge(t *testing.T) {
+	t.Parallel()
+	w := &write{}
+	mnt, err := fstestutil.MountedT(t, childMapFS{"child": w})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	f, err := os.Create(mnt.Dir + "/child")
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	const one = "xyzzyfoo"
+	large := bytes.Repeat([]byte(one), 8192)
+	n, err := f.Write(large)
+	if err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if g, e := n, len(large); g != e {
+		t.Fatalf("short write: %d != %d", g, e)
+	}
+
+	err = f.Close()
+	if err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	got := w.RecordedWriteData()
+	if g, e := len(got), len(large); g != e {
+		t.Errorf("write wrong length: %d != %d", g, e)
+	}
+	if g := strings.Replace(string(got), one, "", -1); g != "" {
+		t.Errorf("write wrong data: expected repeats of %q, also got %q", one, g)
 	}
 }
 
