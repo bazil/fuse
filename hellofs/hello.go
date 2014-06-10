@@ -9,6 +9,7 @@ import (
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
+	_ "bazil.org/fuse/fs/fstestutil"
 )
 
 var Usage = func() {
