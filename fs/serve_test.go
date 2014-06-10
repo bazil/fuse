@@ -328,6 +328,7 @@ func TestWrite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
+	defer f.Close()
 	n, err := f.Write([]byte(hi))
 	if err != nil {
 		t.Fatalf("Write: %v", err)
@@ -374,6 +375,7 @@ func TestWriteLarge(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
+	defer f.Close()
 	const one = "xyzzyfoo"
 	large := bytes.Repeat([]byte(one), 8192)
 	n, err := f.Write(large)
@@ -521,6 +523,7 @@ func TestCreate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create1 WriteFile: %v", err)
 	}
+	defer ff.Close()
 
 	err = syscall.Fsync(int(ff.Fd()))
 	if err != nil {
