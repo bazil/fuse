@@ -265,6 +265,13 @@ type readAll struct{ file }
 
 const hi = "hello, world"
 
+func (readAll) Attr() fuse.Attr {
+	return fuse.Attr{
+		Mode: 0666,
+		Size: uint64(len(hi)),
+	}
+}
+
 func (readAll) ReadAll(intr fs.Intr) ([]byte, fuse.Error) {
 	return []byte(hi), nil
 }
@@ -293,6 +300,13 @@ func TestReadAll(t *testing.T) {
 // Test Read.
 
 type readWithHandleRead struct{ file }
+
+func (readWithHandleRead) Attr() fuse.Attr {
+	return fuse.Attr{
+		Mode: 0666,
+		Size: uint64(len(hi)),
+	}
+}
 
 func (readWithHandleRead) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, intr fs.Intr) fuse.Error {
 	fuseutil.HandleRead(req, resp, []byte(hi))
@@ -823,6 +837,13 @@ func TestMknod(t *testing.T) {
 
 type dataHandleTest struct {
 	file
+}
+
+func (dataHandleTest) Attr() fuse.Attr {
+	return fuse.Attr{
+		Mode: 0666,
+		Size: uint64(len(hi)),
+	}
 }
 
 func (dataHandleTest) Open(*fuse.OpenRequest, *fuse.OpenResponse, fs.Intr) (fs.Handle, fuse.Error) {
@@ -1608,13 +1629,6 @@ func (f *inMemoryFile) Attr() fuse.Attr {
 	}
 }
 
-// TODO remove me, make this default
-func (f *inMemoryFile) Open(req *fuse.OpenRequest, resp *fuse.OpenResponse, intr fs.Intr) (fs.Handle, fuse.Error) {
-	// allow kernel to use buffer cache
-	resp.Flags &^= fuse.OpenDirectIO
-	return f, nil
-}
-
 func (f *inMemoryFile) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, intr fs.Intr) fuse.Error {
 	fuseutil.HandleRead(req, resp, f.data)
 	return nil
@@ -1707,4 +1721,32 @@ func TestMmap(t *testing.T) {
 			t.Errorf("wrong byte at offset %d: %q != %q", i, g, e)
 		}
 	}
+}
+
+// Test direct Read.
+
+type directRead struct{ file }
+
+// explicitly not defining Attr and setting Size
+
+func (f directRead) Open(req *fuse.OpenRequest, resp *fuse.OpenResponse, intr fs.Intr) (fs.Handle, fuse.Error) {
+	// do not allow the kernel to use page cache
+	resp.Flags |= fuse.OpenDirectIO
+	return f, nil
+}
+
+func (directRead) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, intr fs.Intr) fuse.Error {
+	fuseutil.HandleRead(req, resp, []byte(hi))
+	return nil
+}
+
+func TestDirectRead(t *testing.T) {
+	t.Parallel()
+	mnt, err := fstestutil.MountedT(t, childMapFS{"child": directRead{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	testReadAll(t, mnt.Dir+"/child")
 }

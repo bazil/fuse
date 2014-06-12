@@ -904,7 +904,7 @@ func (c *serveConn) serve(r fuse.Request) {
 		r.Respond(s)
 
 	case *fuse.OpenRequest:
-		s := &fuse.OpenResponse{Flags: fuse.OpenDirectIO}
+		s := &fuse.OpenResponse{}
 		var h2 Handle
 		if n, ok := node.(NodeOpener); ok {
 			hh, err := n.Open(r, s, intr)
@@ -929,7 +929,7 @@ func (c *serveConn) serve(r fuse.Request) {
 			r.RespondError(fuse.EPERM)
 			break
 		}
-		s := &fuse.CreateResponse{OpenResponse: fuse.OpenResponse{Flags: fuse.OpenDirectIO}}
+		s := &fuse.CreateResponse{OpenResponse: fuse.OpenResponse{}}
 		n2, h2, err := n.Create(r, s, intr)
 		if err != nil {
 			done(err)
