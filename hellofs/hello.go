@@ -78,10 +78,12 @@ func (Dir) ReadDir(intr fs.Intr) ([]fuse.Dirent, fuse.Error) {
 // File implements both Node and Handle for the hello file.
 type File struct{}
 
+const greeting = "hello, world\n"
+
 func (File) Attr() fuse.Attr {
-	return fuse.Attr{Inode: 2, Mode: 0444}
+	return fuse.Attr{Inode: 2, Mode: 0444, Size: uint64(len(greeting))}
 }
 
 func (File) ReadAll(intr fs.Intr) ([]byte, fuse.Error) {
-	return []byte("hello, world\n"), nil
+	return []byte(greeting), nil
 }
