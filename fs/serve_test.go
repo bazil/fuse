@@ -878,6 +878,13 @@ type interrupt struct {
 	hanging chan struct{}
 }
 
+func (interrupt) Attr() fuse.Attr {
+	return fuse.Attr{
+		Mode: 0666,
+		Size: 1,
+	}
+}
+
 func (it *interrupt) Read(req *fuse.ReadRequest, resp *fuse.ReadResponse, intr fs.Intr) fuse.Error {
 	select {
 	case it.hanging <- struct{}{}:
