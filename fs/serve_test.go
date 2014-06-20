@@ -1685,6 +1685,10 @@ func TestMmap(t *testing.T) {
 			data[i] = b
 		}
 
+		if err := syscallx.Msync(data, syscall.MS_SYNC); err != nil {
+			t.Fatalf("Msync: %v", err)
+		}
+
 		if err := syscall.Munmap(data); err != nil {
 			t.Fatalf("Munmap: %v", err)
 		}
