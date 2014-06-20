@@ -1669,7 +1669,7 @@ func TestMmap(t *testing.T) {
 		}
 		defer f.Close()
 
-		data, err := syscall.Mmap(int(f.Fd()), 0, size, syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED|syscall.MAP_POPULATE)
+		data, err := syscall.Mmap(int(f.Fd()), 0, size, syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 		if err != nil {
 			t.Fatalf("Mmap: %v", err)
 		}
