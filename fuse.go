@@ -838,7 +838,13 @@ func (c *Conn) respond(out *outHeader, n uintptr) {
 	out.Len = uint32(n)
 	msg := (*[1 << 30]byte)(unsafe.Pointer(out))[:n]
 	nn, err := syscall.Write(c.fd(), msg)
-	if nn != len(msg) || err != nil {
+	if nn != len(msg) && err == nil {
+		Debug(bugShortKernelWrite{
+			Written: int64(nn),
+			Error:   "short write with nil err in Conn.respond",
+			Stack:   stack(),
+		})
+	} else if err != nil {
 		Debug(bugShortKernelWrite{
 			Written: int64(nn),
 			Length:  int64(len(msg)),
