@@ -52,17 +52,16 @@ func openOSXFUSEDev() (*os.File, error) {
 }
 
 func callMount(dir string, options []string, f *os.File, ready chan<- struct{}, errp *error) error {
-	optionsArgs := []string{}
 	iosize := false
 	for _, o := range options {
 		if strings.HasPrefix(o, "iosize=") {
 			iosize = true
 		}
-		optionsArgs = append(optionsArgs, "-o", o)
 	}
 	if !iosize {
-		optionsArgs = append(optionsArgs, "-o", "iosize=4096")
+		options = append(options, "iosize=4096")
 	}
+	options = append([]string{}, "-o", strings.Join(options, ","))
 
 	bin := "/Library/Filesystems/osxfusefs.fs/Support/mount_osxfusefs"
 	cmd := exec.Command(
@@ -73,7 +72,7 @@ func callMount(dir string, options []string, f *os.File, ready chan<- struct{}, 
 		// TODO add buffer reuse, bump this up significantly
 		//
 		// TODO what's the relation of `-o iosize=` vs InitResponse.MaxWrite?
-		append(optionsArgs,
+		append(options,
 			"3", // refers to fd passed in cmd.ExtraFiles
 			dir)...,
 	)
