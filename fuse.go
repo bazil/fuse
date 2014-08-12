@@ -933,7 +933,7 @@ type StatfsResponse struct {
 	Ffree   uint64 // Free files in file system.
 	Bsize   uint32 // Block size
 	Namelen uint32 // Maximum file name length?
-	Frsize  uint32 // ?
+	Frsize  uint32 // Fragment size, smallest addressable data size in the file system.
 }
 
 func (r *StatfsResponse) String() string {
