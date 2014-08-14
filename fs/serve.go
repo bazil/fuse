@@ -709,7 +709,8 @@ func (c *serveConn) serve(r fuse.Request) {
 	// FS operations.
 	case *fuse.InitRequest:
 		s := &fuse.InitResponse{
-			MaxWrite: 4096,
+			MaxWrite: 128 * 1024,
+			Flags:    fuse.InitBigWrites,
 		}
 		if fs, ok := c.fs.(FSIniter); ok {
 			if err := fs.Init(r, s, intr); err != nil {
