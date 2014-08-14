@@ -279,8 +279,13 @@ func (h *Header) RespondError(err Error) {
 	h.Conn.respond(out, unsafe.Sizeof(*out))
 }
 
-var maxWrite = syscall.Getpagesize()
-var bufSize = 4096 + maxWrite
+// Maximum file write size we are prepared to receive from the kernel.
+const maxWrite = 4096
+
+// All requests read from the kernel, without data, are shorter than
+// this.
+var maxRequestSize = syscall.Getpagesize()
+var bufSize = maxRequestSize + maxWrite
 
 // a message represents the bytes of a single FUSE message
 type message struct {
