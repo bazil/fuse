@@ -194,8 +194,24 @@ var openResponseFlagNames = []flagName{
 type InitFlags uint32
 
 const (
-	InitAsyncRead  InitFlags = 1 << 0
-	InitPosixLocks InitFlags = 1 << 1
+	InitAsyncRead       InitFlags = 1 << 0
+	InitPosixLocks      InitFlags = 1 << 1
+	InitFileOps         InitFlags = 1 << 2
+	InitAtomicTrunc     InitFlags = 1 << 3
+	InitExportSupport   InitFlags = 1 << 4
+	InitBigWrites       InitFlags = 1 << 5
+	InitDontMask        InitFlags = 1 << 6
+	InitSpliceWrite     InitFlags = 1 << 7
+	InitSpliceMove      InitFlags = 1 << 8
+	InitSpliceRead      InitFlags = 1 << 9
+	InitFlockLocks      InitFlags = 1 << 10
+	InitHasIoctlDir     InitFlags = 1 << 11
+	InitAutoInvalData   InitFlags = 1 << 12
+	InitDoReaddirplus   InitFlags = 1 << 13
+	InitReaddirplusAuto InitFlags = 1 << 14
+	InitAsyncDIO        InitFlags = 1 << 15
+	InitWritebackCache  InitFlags = 1 << 16
+	InitNoOpenSupport   InitFlags = 1 << 17
 
 	InitCaseSensitive InitFlags = 1 << 29 // OS X only
 	InitVolRename     InitFlags = 1 << 30 // OS X only
@@ -210,6 +226,23 @@ type flagName struct {
 var initFlagNames = []flagName{
 	{uint32(InitAsyncRead), "InitAsyncRead"},
 	{uint32(InitPosixLocks), "InitPosixLocks"},
+	{uint32(InitFileOps), "InitFileOps"},
+	{uint32(InitAtomicTrunc), "InitAtomicTrunc"},
+	{uint32(InitExportSupport), "InitExportSupport"},
+	{uint32(InitBigWrites), "InitBigWrites"},
+	{uint32(InitDontMask), "InitDontMask"},
+	{uint32(InitSpliceWrite), "InitSpliceWrite"},
+	{uint32(InitSpliceMove), "InitSpliceMove"},
+	{uint32(InitSpliceRead), "InitSpliceRead"},
+	{uint32(InitFlockLocks), "InitFlockLocks"},
+	{uint32(InitHasIoctlDir), "InitHasIoctlDir"},
+	{uint32(InitAutoInvalData), "InitAutoInvalData"},
+	{uint32(InitDoReaddirplus), "InitDoReaddirplus"},
+	{uint32(InitReaddirplusAuto), "InitReaddirplusAuto"},
+	{uint32(InitAsyncDIO), "InitAsyncDIO"},
+	{uint32(InitWritebackCache), "InitWritebackCache"},
+	{uint32(InitNoOpenSupport), "InitNoOpenSupport"},
+
 	{uint32(InitCaseSensitive), "InitCaseSensitive"},
 	{uint32(InitVolRename), "InitVolRename"},
 	{uint32(InitXtimes), "InitXtimes"},
