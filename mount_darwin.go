@@ -59,8 +59,9 @@ func callMount(dir string, f *os.File, ready chan<- struct{}, errp *error) error
 		//
 		// TODO add buffer reuse, bump this up significantly
 		//
-		// TODO what's the relation of `-o iosize=` vs InitResponse.MaxWrite?
-		"-o", "iosize=4096",
+		// OSXFUSE seems to ignore InitResponse.MaxWrite, and uses
+		// this instead.
+		"-o", "iosize="+strconv.FormatUint(maxWrite, 10),
 		// refers to fd passed in cmd.ExtraFiles
 		"3",
 		dir,
