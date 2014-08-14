@@ -900,6 +900,11 @@ func (r *InitRequest) Respond(resp *InitResponse) {
 		Flags:        uint32(resp.Flags),
 		MaxWrite:     resp.MaxWrite,
 	}
+	// MaxWrite larger than our receive buffer would just lead to
+	// errors on large writes.
+	if out.MaxWrite > maxWrite {
+		out.MaxWrite = maxWrite
+	}
 	r.Conn.respond(&out.outHeader, unsafe.Sizeof(*out))
 }
 
