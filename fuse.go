@@ -280,7 +280,7 @@ func (h *Header) RespondError(err Error) {
 }
 
 // Maximum file write size we are prepared to receive from the kernel.
-const maxWrite = 4096
+const maxWrite = 128 * 1024
 
 // All requests read from the kernel, without data, are shorter than
 // this.
