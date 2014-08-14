@@ -117,13 +117,12 @@ type Conn struct {
 // visible until after Conn.Ready is closed. See Conn.MountError for
 // possible errors. Incoming requests on Conn must be served to make
 // progress.
-func Mount(dir string) (*Conn, error) {
-	// TODO(rsc): mount options (...string?)
+func Mount(dir string, options ...string) (*Conn, error) {
 	ready := make(chan struct{}, 1)
 	c := &Conn{
 		Ready: ready,
 	}
-	f, err := mount(dir, ready, &c.MountError)
+	f, err := mount(dir, options, ready, &c.MountError)
 	if err != nil {
 		return nil, err
 	}
