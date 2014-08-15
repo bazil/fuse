@@ -45,7 +45,6 @@ type FS interface {
 type FSIniter interface {
 	// Init is called to initialize the FUSE connection.
 	// It can inspect the request and adjust the response as desired.
-	// The default response sets MaxReadahead to 0 and MaxWrite to 4096.
 	// Init must return promptly.
 	Init(req *fuse.InitRequest, resp *fuse.InitResponse, intr Intr) fuse.Error
 }
