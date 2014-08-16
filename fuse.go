@@ -868,9 +868,10 @@ func (c *Conn) respondData(out *outHeader, n uintptr, data []byte) {
 
 // An InitRequest is the first request sent on a FUSE file system.
 type InitRequest struct {
-	Header       `json:"-"`
-	Major        uint32
-	Minor        uint32
+	Header `json:"-"`
+	Major  uint32
+	Minor  uint32
+	// Maximum readahead in bytes that the kernel plans to use.
 	MaxReadahead uint32
 	Flags        InitFlags
 }
@@ -881,9 +882,13 @@ func (r *InitRequest) String() string {
 
 // An InitResponse is the response to an InitRequest.
 type InitResponse struct {
+	// Maximum readahead in bytes that the kernel can use. Ignored if
+	// greater than InitRequest.MaxReadahead.
 	MaxReadahead uint32
 	Flags        InitFlags
-	MaxWrite     uint32
+	// Maximum size of a single write operation.
+	// Linux enforces a minimum of 4 KiB.
+	MaxWrite uint32
 }
 
 func (r *InitResponse) String() string {
