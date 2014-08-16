@@ -367,9 +367,6 @@ const (
 	opExchange   = 63
 )
 
-// The read buffer is required to be at least 8k but may be much larger
-const minReadBuffer = 8192
-
 type entryOut struct {
 	outHeader
 	Nodeid         uint64 // Inode ID
