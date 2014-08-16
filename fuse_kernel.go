@@ -37,7 +37,6 @@ package fuse
 
 import (
 	"fmt"
-	"os"
 	"syscall"
 	"unsafe"
 )
@@ -158,8 +157,8 @@ type OpenFlags uint32
 
 func (fl OpenFlags) String() string {
 	// O_RDONLY, O_RWONLY, O_RDWR are not flags
-	s := accModeName(uint32(fl) & syscall.O_ACCMODE)
-	flags := uint32(fl) &^ syscall.O_ACCMODE
+	s := accModeName(fl & OpenAccessModeMask)
+	flags := uint32(fl &^ OpenAccessModeMask)
 	if flags != 0 {
 		s = s + "+" + flagString(flags, openFlagNames)
 	}
@@ -181,13 +180,13 @@ func (fl OpenFlags) IsReadWrite() bool {
 	return fl&OpenAccessModeMask == OpenReadWrite
 }
 
-func accModeName(flags uint32) string {
+func accModeName(flags OpenFlags) string {
 	switch flags {
-	case uint32(os.O_RDONLY):
+	case OpenReadOnly:
 		return "O_RDONLY"
-	case uint32(os.O_WRONLY):
+	case OpenWriteOnly:
 		return "O_WRONLY"
-	case uint32(os.O_RDWR):
+	case OpenReadWrite:
 		return "O_RDWR"
 	default:
 		return ""
@@ -195,11 +194,11 @@ func accModeName(flags uint32) string {
 }
 
 var openFlagNames = []flagName{
-	{uint32(os.O_CREATE), "O_CREATE"},
-	{uint32(os.O_EXCL), "O_EXCL"},
-	{uint32(os.O_TRUNC), "O_TRUNC"},
-	{uint32(os.O_APPEND), "O_APPEND"},
-	{uint32(os.O_SYNC), "O_SYNC"},
+	{uint32(OpenCreate), "O_CREATE"},
+	{uint32(OpenExclusive), "O_EXCL"},
+	{uint32(OpenTruncate), "O_TRUNC"},
+	{uint32(OpenAppend), "O_APPEND"},
+	{uint32(OpenSync), "O_SYNC"},
 }
 
 // The OpenResponseFlags are returned in the OpenResponse.
