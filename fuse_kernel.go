@@ -183,22 +183,22 @@ func (fl OpenFlags) IsReadWrite() bool {
 func accModeName(flags OpenFlags) string {
 	switch flags {
 	case OpenReadOnly:
-		return "O_RDONLY"
+		return "OpenReadOnly"
 	case OpenWriteOnly:
-		return "O_WRONLY"
+		return "OpenWriteOnly"
 	case OpenReadWrite:
-		return "O_RDWR"
+		return "OpenReadWrite"
 	default:
 		return ""
 	}
 }
 
 var openFlagNames = []flagName{
-	{uint32(OpenCreate), "O_CREATE"},
-	{uint32(OpenExclusive), "O_EXCL"},
-	{uint32(OpenTruncate), "O_TRUNC"},
-	{uint32(OpenAppend), "O_APPEND"},
-	{uint32(OpenSync), "O_SYNC"},
+	{uint32(OpenCreate), "OpenCreate"},
+	{uint32(OpenExclusive), "OpenExclusive"},
+	{uint32(OpenTruncate), "OpenTruncate"},
+	{uint32(OpenAppend), "OpenAppend"},
+	{uint32(OpenSync), "OpenSync"},
 }
 
 // The OpenResponseFlags are returned in the OpenResponse.

@@ -25,7 +25,7 @@ func TestOpenFlagsAccmodeMask(t *testing.T) {
 
 func TestOpenFlagsString(t *testing.T) {
 	var f = fuse.OpenFlags(os.O_RDWR | os.O_SYNC | os.O_APPEND)
-	if g, e := f.String(), "O_RDWR+O_APPEND+O_SYNC"; g != e {
+	if g, e := f.String(), "OpenReadWrite+OpenAppend+OpenSync"; g != e {
 		t.Fatalf("OpenFlags.String: %q != %q", g, e)
 	}
 }
