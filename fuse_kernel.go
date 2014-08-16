@@ -132,6 +132,26 @@ var setattrValidNames = []flagName{
 	{uint32(SetattrFlags), "SetattrFlags"},
 }
 
+// Flags that can be seen in OpenRequest.Flags.
+const (
+	// Access modes. These are not 1-bit flags, but alternatives where
+	// only one can be chosen. See the IsReadOnly etc convenience
+	// methods.
+	OpenReadOnly  OpenFlags = syscall.O_RDONLY
+	OpenWriteOnly OpenFlags = syscall.O_WRONLY
+	OpenReadWrite OpenFlags = syscall.O_RDWR
+
+	OpenAppend    OpenFlags = syscall.O_APPEND
+	OpenCreate    OpenFlags = syscall.O_CREAT
+	OpenExclusive OpenFlags = syscall.O_EXCL
+	OpenSync      OpenFlags = syscall.O_SYNC
+	OpenTruncate  OpenFlags = syscall.O_TRUNC
+)
+
+// OpenAccessModeMask is a bitmask that separates the access mode
+// from the other flags in OpenFlags.
+const OpenAccessModeMask OpenFlags = syscall.O_ACCMODE
+
 // OpenFlags are the O_FOO flags passed to open/create/etc calls. For
 // example, os.O_WRONLY | os.O_APPEND.
 type OpenFlags uint32
@@ -144,6 +164,21 @@ func (fl OpenFlags) String() string {
 		s = s + "+" + flagString(flags, openFlagNames)
 	}
 	return s
+}
+
+// Return true if OpenReadOnly is set.
+func (fl OpenFlags) IsReadOnly() bool {
+	return fl&OpenAccessModeMask == OpenReadOnly
+}
+
+// Return true if OpenWriteOnly is set.
+func (fl OpenFlags) IsWriteOnly() bool {
+	return fl&OpenAccessModeMask == OpenWriteOnly
+}
+
+// Return true if OpenReadWrite is set.
+func (fl OpenFlags) IsReadWrite() bool {
+	return fl&OpenAccessModeMask == OpenReadWrite
 }
 
 func accModeName(flags uint32) string {
