@@ -103,6 +103,7 @@ type Conn struct {
 	MountError error
 
 	dev *os.File
+	fd  int
 	buf []byte
 	wio sync.Mutex
 }
@@ -128,6 +129,7 @@ func Mount(dir string) (*Conn, error) {
 		return nil, err
 	}
 	c.dev = f
+	c.fd = int(f.Fd())
 	return c, nil
 }
 
@@ -373,15 +375,11 @@ func (c *Conn) Close() error {
 	return c.dev.Close()
 }
 
-func (c *Conn) fd() int {
-	return int(c.dev.Fd())
-}
-
 func (c *Conn) ReadRequest() (Request, error) {
 	// TODO: Some kind of buffer reuse.
 	m := newMessage(c)
 loop:
-	n, err := syscall.Read(c.fd(), m.buf)
+	n, err := syscall.Read(c.fd, m.buf)
 	if err == syscall.EINTR {
 		// OSXFUSE sends EINTR to userspace when a request interrupt
 		// completed before it got sent to userspace?
@@ -844,7 +842,7 @@ func (c *Conn) respond(out *outHeader, n uintptr) {
 	defer c.wio.Unlock()
 	out.Len = uint32(n)
 	msg := (*[1 << 30]byte)(unsafe.Pointer(out))[:n]
-	nn, err := syscall.Write(c.fd(), msg)
+	nn, err := syscall.Write(c.fd, msg)
 	if nn != len(msg) || err != nil {
 		Debug(bugShortKernelWrite{
 			Written: int64(nn),
@@ -863,7 +861,7 @@ func (c *Conn) respondData(out *outHeader, n uintptr, data []byte) {
 	msg := make([]byte, out.Len)
 	copy(msg, (*[1 << 30]byte)(unsafe.Pointer(out))[:n])
 	copy(msg[n:], data)
-	syscall.Write(c.fd(), msg)
+	syscall.Write(c.fd, msg)
 }
 
 // An InitRequest is the first request sent on a FUSE file system.
