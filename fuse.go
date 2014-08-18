@@ -102,9 +102,12 @@ type Conn struct {
 	// after Ready is closed.
 	MountError error
 
+	// File handle for kernel communication. Only safe to access if
+	// rio or wio is held.
 	dev *os.File
 	buf []byte
 	wio sync.Mutex
+	rio sync.RWMutex
 }
 
 // Mount mounts a new FUSE connection on the named directory
@@ -370,9 +373,14 @@ func (malformedMessage) String() string {
 
 // Close closes the FUSE connection.
 func (c *Conn) Close() error {
+	c.wio.Lock()
+	defer c.wio.Unlock()
+	c.rio.Lock()
+	defer c.rio.Unlock()
 	return c.dev.Close()
 }
 
+// caller must hold wio or rio
 func (c *Conn) fd() int {
 	return int(c.dev.Fd())
 }
@@ -381,7 +389,9 @@ func (c *Conn) ReadRequest() (Request, error) {
 	// TODO: Some kind of buffer reuse.
 	m := newMessage(c)
 loop:
+	c.rio.RLock()
 	n, err := syscall.Read(c.fd(), m.buf)
+	c.rio.RUnlock()
 	if err == syscall.EINTR {
 		// OSXFUSE sends EINTR to userspace when a request interrupt
 		// completed before it got sent to userspace?
