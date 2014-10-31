@@ -183,6 +183,10 @@ func (h *Header) Hdr() *Header {
 	return h
 }
 
+func (h *Header) noResponse() {
+	putMessage(h.msg)
+}
+
 func (h *Header) respond(out *outHeader, n uintptr) {
 	h.Conn.respond(out, n)
 	putMessage(h.msg)
@@ -1527,6 +1531,7 @@ func (r *ForgetRequest) String() string {
 // Respond replies to the request, indicating that the forgetfulness has been recorded.
 func (r *ForgetRequest) Respond() {
 	// Don't reply to forget messages.
+	r.noResponse()
 }
 
 // A Dirent represents a single directory entry.
@@ -1923,6 +1928,7 @@ type InterruptRequest struct {
 
 func (r *InterruptRequest) Respond() {
 	// nothing to do here
+	r.noResponse()
 }
 
 func (r *InterruptRequest) String() string {
