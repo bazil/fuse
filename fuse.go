@@ -426,14 +426,17 @@ loop:
 		goto loop
 	}
 	if err != nil && err != syscall.ENODEV {
+		putMessage(m)
 		return nil, err
 	}
 	if n <= 0 {
+		putMessage(m)
 		return nil, io.EOF
 	}
 	m.buf = m.buf[:n]
 
 	if n < inHeaderSize {
+		putMessage(m)
 		return nil, errors.New("fuse: message too short")
 	}
 
@@ -449,7 +452,10 @@ loop:
 	}
 
 	if m.hdr.Len != uint32(n) {
-		return nil, fmt.Errorf("fuse: read %d opcode %d but expected %d", n, m.hdr.Opcode, m.hdr.Len)
+		// prepare error message before returning m to pool
+		err := fmt.Errorf("fuse: read %d opcode %d but expected %d", n, m.hdr.Opcode, m.hdr.Len)
+		putMessage(m)
+		return nil, err
 	}
 
 	m.off = inHeaderSize
@@ -849,6 +855,7 @@ loop:
 
 corrupt:
 	Debug(malformedMessage{})
+	putMessage(m)
 	return nil, fmt.Errorf("fuse: malformed message")
 
 unrecognized:
