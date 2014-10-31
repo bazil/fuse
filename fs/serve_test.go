@@ -1483,7 +1483,12 @@ type setxattr struct {
 	record.Setxattrs
 }
 
-func TestSetxattr(t *testing.T) {
+func testSetxattr(t *testing.T, size int) {
+	const linux_XATTR_NAME_MAX = 64 * 1024
+	if size > linux_XATTR_NAME_MAX && runtime.GOOS == "linux" {
+		t.Skip("large xattrs are not supported by linux")
+	}
+
 	t.Parallel()
 	f := &setxattr{}
 	mnt, err := fstestutil.MountedT(t, childMapFS{"child": f})
@@ -1492,7 +1497,9 @@ func TestSetxattr(t *testing.T) {
 	}
 	defer mnt.Close()
 
-	err = syscallx.Setxattr(mnt.Dir+"/child", "greeting", []byte("hello, world"), 0)
+	const g = "hello, world"
+	greeting := strings.Repeat(g, size/len(g)+1)[:size]
+	err = syscallx.Setxattr(mnt.Dir+"/child", "greeting", []byte(greeting), 0)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 		return
@@ -1510,9 +1517,21 @@ func TestSetxattr(t *testing.T) {
 		t.Errorf("Setxattr incorrect flags: %d != %d", g, e)
 	}
 
-	if g, e := string(got.Xattr), "hello, world"; g != e {
+	if g, e := string(got.Xattr), greeting; g != e {
 		t.Errorf("Setxattr incorrect data: %q != %q", g, e)
 	}
+}
+
+func TestSetxattr(t *testing.T) {
+	testSetxattr(t, 20)
+}
+
+func TestSetxattr64kB(t *testing.T) {
+	testSetxattr(t, 64*1024)
+}
+
+func TestSetxattr16MB(t *testing.T) {
+	testSetxattr(t, 16*1024*1024)
 }
 
 // Test Removexattr
