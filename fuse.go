@@ -183,6 +183,16 @@ func (h *Header) Hdr() *Header {
 	return h
 }
 
+func (h *Header) respond(out *outHeader, n uintptr) {
+	h.Conn.respond(out, n)
+	putMessage(h.msg)
+}
+
+func (h *Header) respondData(out *outHeader, n uintptr, data []byte) {
+	h.Conn.respondData(out, n, data)
+	putMessage(h.msg)
+}
+
 // An Error is a FUSE error.
 //
 // Errors messages will be visible in the debug log as part of the
@@ -282,8 +292,7 @@ func (h *Header) RespondError(err Error) {
 	// FUSE uses negative errors!
 	// TODO: File bug report against OSXFUSE: positive error causes kernel panic.
 	out := &outHeader{Error: -int32(errno), Unique: uint64(h.ID)}
-	h.Conn.respond(out, unsafe.Sizeof(*out))
-	putMessage(h.msg)
+	h.respond(out, unsafe.Sizeof(*out))
 }
 
 // Maximum file write size we are prepared to receive from the kernel.
@@ -968,7 +977,7 @@ func (r *InitRequest) Respond(resp *InitResponse) {
 	if out.MaxWrite > maxWrite {
 		out.MaxWrite = maxWrite
 	}
-	r.Conn.respond(&out.outHeader, unsafe.Sizeof(*out))
+	r.respond(&out.outHeader, unsafe.Sizeof(*out))
 }
 
 // A StatfsRequest requests information about the mounted file system.
@@ -994,7 +1003,7 @@ func (r *StatfsRequest) Respond(resp *StatfsResponse) {
 			Frsize:  resp.Frsize,
 		},
 	}
-	r.Conn.respond(&out.outHeader, unsafe.Sizeof(*out))
+	r.respond(&out.outHeader, unsafe.Sizeof(*out))
 }
 
 // A StatfsResponse is the response to a StatfsRequest.
@@ -1028,7 +1037,7 @@ func (r *AccessRequest) String() string {
 // To deny access, use RespondError.
 func (r *AccessRequest) Respond() {
 	out := &outHeader{Unique: uint64(r.ID)}
-	r.Conn.respond(out, unsafe.Sizeof(*out))
+	r.respond(out, unsafe.Sizeof(*out))
 }
 
 // An Attr is the metadata for a single file or directory.
@@ -1117,7 +1126,7 @@ func (r *GetattrRequest) Respond(resp *GetattrResponse) {
 		AttrValidNsec: uint32(resp.AttrValid % time.Second / time.Nanosecond),
 		Attr:          resp.Attr.attr(),
 	}
-	r.Conn.respond(&out.outHeader, unsafe.Sizeof(*out))
+	r.respond(&out.outHeader, unsafe.Sizeof(*out))
 }
 
 // A GetattrResponse is the response to a GetattrRequest.
@@ -1158,10 +1167,10 @@ func (r *GetxattrRequest) Respond(resp *GetxattrResponse) {
 			outHeader: outHeader{Unique: uint64(r.ID)},
 			Size:      uint32(len(resp.Xattr)),
 		}
-		r.Conn.respond(&out.outHeader, unsafe.Sizeof(*out))
+		r.respond(&out.outHeader, unsafe.Sizeof(*out))
 	} else {
 		out := &outHeader{Unique: uint64(r.ID)}
-		r.Conn.respondData(out, unsafe.Sizeof(*out), resp.Xattr)
+		r.respondData(out, unsafe.Sizeof(*out), resp.Xattr)
 	}
 }
 
@@ -1197,10 +1206,10 @@ func (r *ListxattrRequest) Respond(resp *ListxattrResponse) {
 			outHeader: outHeader{Unique: uint64(r.ID)},
 			Size:      uint32(len(resp.Xattr)),
 		}
-		r.Conn.respond(&out.outHeader, unsafe.Sizeof(*out))
+		r.respond(&out.outHeader, unsafe.Sizeof(*out))
 	} else {
 		out := &outHeader{Unique: uint64(r.ID)}
-		r.Conn.respondData(out, unsafe.Sizeof(*out), resp.Xattr)
+		r.respondData(out, unsafe.Sizeof(*out), resp.Xattr)
 	}
 }
 
@@ -1234,7 +1243,7 @@ func (r *RemovexattrRequest) String() string {
 // Respond replies to the request, indicating that the attribute was removed.
 func (r *RemovexattrRequest) Respond() {
 	out := &outHeader{Unique: uint64(r.ID)}
-	r.Conn.respond(out, unsafe.Sizeof(*out))
+	r.respond(out, unsafe.Sizeof(*out))
 }
 
 func (r *RemovexattrRequest) RespondError(err Error) {
@@ -1274,7 +1283,7 @@ func (r *SetxattrRequest) String() string {
 // Respond replies to the request, indicating that the extended attribute was set.
 func (r *SetxattrRequest) Respond() {
 	out := &outHeader{Unique: uint64(r.ID)}
-	r.Conn.respond(out, unsafe.Sizeof(*out))
+	r.respond(out, unsafe.Sizeof(*out))
 }
 
 func (r *SetxattrRequest) RespondError(err Error) {
@@ -1304,7 +1313,7 @@ func (r *LookupRequest) Respond(resp *LookupResponse) {
 		AttrValidNsec:  uint32(resp.AttrValid % time.Second / time.Nanosecond),
 		Attr:           resp.Attr.attr(),
 	}
-	r.Conn.respond(&out.outHeader, unsafe.Sizeof(*out))
+	r.respond(&out.outHeader, unsafe.Sizeof(*out))
 }
 
 // A LookupResponse is the response to a LookupRequest.
@@ -1338,7 +1347,7 @@ func (r *OpenRequest) Respond(resp *OpenResponse) {
 		Fh:        uint64(resp.Handle),
 		OpenFlags: uint32(resp.Flags),
 	}
-	r.Conn.respond(&out.outHeader, unsafe.Sizeof(*out))
+	r.respond(&out.outHeader, unsafe.Sizeof(*out))
 }
 
 // A OpenResponse is the response to a OpenRequest.
@@ -1379,7 +1388,7 @@ func (r *CreateRequest) Respond(resp *CreateResponse) {
 		Fh:        uint64(resp.Handle),
 		OpenFlags: uint32(resp.Flags),
 	}
-	r.Conn.respond(&out.outHeader, unsafe.Sizeof(*out))
+	r.respond(&out.outHeader, unsafe.Sizeof(*out))
 }
 
 // A CreateResponse is the response to a CreateRequest.
@@ -1416,7 +1425,7 @@ func (r *MkdirRequest) Respond(resp *MkdirResponse) {
 		AttrValidNsec:  uint32(resp.AttrValid % time.Second / time.Nanosecond),
 		Attr:           resp.Attr.attr(),
 	}
-	r.Conn.respond(&out.outHeader, unsafe.Sizeof(*out))
+	r.respond(&out.outHeader, unsafe.Sizeof(*out))
 }
 
 // A MkdirResponse is the response to a MkdirRequest.
@@ -1444,7 +1453,7 @@ func (r *ReadRequest) String() string {
 // Respond replies to the request with the given response.
 func (r *ReadRequest) Respond(resp *ReadResponse) {
 	out := &outHeader{Unique: uint64(r.ID)}
-	r.Conn.respondData(out, unsafe.Sizeof(*out), resp.Data)
+	r.respondData(out, unsafe.Sizeof(*out), resp.Data)
 }
 
 // A ReadResponse is the response to a ReadRequest.
@@ -1484,7 +1493,7 @@ func (r *ReleaseRequest) String() string {
 // Respond replies to the request, indicating that the handle has been released.
 func (r *ReleaseRequest) Respond() {
 	out := &outHeader{Unique: uint64(r.ID)}
-	r.Conn.respond(out, unsafe.Sizeof(*out))
+	r.respond(out, unsafe.Sizeof(*out))
 }
 
 // A DestroyRequest is sent by the kernel when unmounting the file system.
@@ -1501,7 +1510,7 @@ func (r *DestroyRequest) String() string {
 // Respond replies to the request.
 func (r *DestroyRequest) Respond() {
 	out := &outHeader{Unique: uint64(r.ID)}
-	r.Conn.respond(out, unsafe.Sizeof(*out))
+	r.respond(out, unsafe.Sizeof(*out))
 }
 
 // A ForgetRequest is sent by the kernel when forgetting about r.Node
@@ -1637,7 +1646,7 @@ func (r *WriteRequest) Respond(resp *WriteResponse) {
 		outHeader: outHeader{Unique: uint64(r.ID)},
 		Size:      uint32(resp.Size),
 	}
-	r.Conn.respond(&out.outHeader, unsafe.Sizeof(*out))
+	r.respond(&out.outHeader, unsafe.Sizeof(*out))
 }
 
 // A WriteResponse replies to a write indicating how many bytes were written.
@@ -1728,7 +1737,7 @@ func (r *SetattrRequest) Respond(resp *SetattrResponse) {
 		AttrValidNsec: uint32(resp.AttrValid % time.Second / time.Nanosecond),
 		Attr:          resp.Attr.attr(),
 	}
-	r.Conn.respond(&out.outHeader, unsafe.Sizeof(*out))
+	r.respond(&out.outHeader, unsafe.Sizeof(*out))
 }
 
 // A SetattrResponse is the response to a SetattrRequest.
@@ -1758,7 +1767,7 @@ func (r *FlushRequest) String() string {
 // Respond replies to the request, indicating that the flush succeeded.
 func (r *FlushRequest) Respond() {
 	out := &outHeader{Unique: uint64(r.ID)}
-	r.Conn.respond(out, unsafe.Sizeof(*out))
+	r.respond(out, unsafe.Sizeof(*out))
 }
 
 // A RemoveRequest asks to remove a file or directory.
@@ -1775,7 +1784,7 @@ func (r *RemoveRequest) String() string {
 // Respond replies to the request, indicating that the file was removed.
 func (r *RemoveRequest) Respond() {
 	out := &outHeader{Unique: uint64(r.ID)}
-	r.Conn.respond(out, unsafe.Sizeof(*out))
+	r.respond(out, unsafe.Sizeof(*out))
 }
 
 // A SymlinkRequest is a request to create a symlink making NewName point to Target.
@@ -1800,7 +1809,7 @@ func (r *SymlinkRequest) Respond(resp *SymlinkResponse) {
 		AttrValidNsec:  uint32(resp.AttrValid % time.Second / time.Nanosecond),
 		Attr:           resp.Attr.attr(),
 	}
-	r.Conn.respond(&out.outHeader, unsafe.Sizeof(*out))
+	r.respond(&out.outHeader, unsafe.Sizeof(*out))
 }
 
 // A SymlinkResponse is the response to a SymlinkRequest.
@@ -1819,7 +1828,7 @@ func (r *ReadlinkRequest) String() string {
 
 func (r *ReadlinkRequest) Respond(target string) {
 	out := &outHeader{Unique: uint64(r.ID)}
-	r.Conn.respondData(out, unsafe.Sizeof(*out), []byte(target))
+	r.respondData(out, unsafe.Sizeof(*out), []byte(target))
 }
 
 // A LinkRequest is a request to create a hard link.
@@ -1844,7 +1853,7 @@ func (r *LinkRequest) Respond(resp *LookupResponse) {
 		AttrValidNsec:  uint32(resp.AttrValid % time.Second / time.Nanosecond),
 		Attr:           resp.Attr.attr(),
 	}
-	r.Conn.respond(&out.outHeader, unsafe.Sizeof(*out))
+	r.respond(&out.outHeader, unsafe.Sizeof(*out))
 }
 
 // A RenameRequest is a request to rename a file.
@@ -1860,7 +1869,7 @@ func (r *RenameRequest) String() string {
 
 func (r *RenameRequest) Respond() {
 	out := &outHeader{Unique: uint64(r.ID)}
-	r.Conn.respond(out, unsafe.Sizeof(*out))
+	r.respond(out, unsafe.Sizeof(*out))
 }
 
 type MknodRequest struct {
@@ -1885,7 +1894,7 @@ func (r *MknodRequest) Respond(resp *LookupResponse) {
 		AttrValidNsec:  uint32(resp.AttrValid % time.Second / time.Nanosecond),
 		Attr:           resp.Attr.attr(),
 	}
-	r.Conn.respond(&out.outHeader, unsafe.Sizeof(*out))
+	r.respond(&out.outHeader, unsafe.Sizeof(*out))
 }
 
 type FsyncRequest struct {
@@ -1902,7 +1911,7 @@ func (r *FsyncRequest) String() string {
 
 func (r *FsyncRequest) Respond() {
 	out := &outHeader{Unique: uint64(r.ID)}
-	r.Conn.respond(out, unsafe.Sizeof(*out))
+	r.respond(out, unsafe.Sizeof(*out))
 }
 
 // An InterruptRequest is a request to interrupt another pending request. The
@@ -1938,7 +1947,7 @@ func (r *XXXRequest) Respond(resp *XXXResponse) {
 		outHeader: outHeader{Unique: uint64(r.ID)},
 		xxx,
 	}
-	r.Conn.respond(&out.outHeader, unsafe.Sizeof(*out))
+	r.respond(&out.outHeader, unsafe.Sizeof(*out))
 }
 
 // A XXXResponse is the response to a XXXRequest.
