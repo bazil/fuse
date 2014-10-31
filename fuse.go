@@ -170,6 +170,9 @@ type Header struct {
 	Uid  uint32    // user ID of process making request
 	Gid  uint32    // group ID of process making request
 	Pid  uint32    // process ID of process making request
+
+	// for returning to reqPool
+	msg *message
 }
 
 func (h *Header) String() string {
@@ -280,6 +283,7 @@ func (h *Header) RespondError(err Error) {
 	// TODO: File bug report against OSXFUSE: positive error causes kernel panic.
 	out := &outHeader{Error: -int32(errno), Unique: uint64(h.ID)}
 	h.Conn.respond(out, unsafe.Sizeof(*out))
+	putMessage(h.msg)
 }
 
 // Maximum file write size we are prepared to receive from the kernel.
@@ -347,7 +351,16 @@ func (m *message) bytes() []byte {
 
 func (m *message) Header() Header {
 	h := m.hdr
-	return Header{Conn: m.conn, ID: RequestID(h.Unique), Node: NodeID(h.Nodeid), Uid: h.Uid, Gid: h.Gid, Pid: h.Pid}
+	return Header{
+		Conn: m.conn,
+		ID:   RequestID(h.Unique),
+		Node: NodeID(h.Nodeid),
+		Uid:  h.Uid,
+		Gid:  h.Gid,
+		Pid:  h.Pid,
+
+		msg: m,
+	}
 }
 
 // fileMode returns a Go os.FileMode from a Unix mode.
