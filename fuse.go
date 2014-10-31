@@ -290,18 +290,43 @@ const maxWrite = 128 * 1024
 var maxRequestSize = syscall.Getpagesize()
 var bufSize = maxRequestSize + maxWrite
 
+// reqPool is a pool of messages.
+//
+// Lifetime of a logical message is from getMessage to putMessage.
+// getMessage is called by ReadRequest. putMessage is called by
+// Conn.ReadRequest, Request.Respond, or Request.RespondError.
+//
+// Messages in the pool are guaranteed to have conn and off zeroed,
+// buf allocated and len==bufSize, and hdr set.
+var reqPool = sync.Pool{
+	New: allocMessage,
+}
+
+func allocMessage() interface{} {
+	m := &message{buf: make([]byte, bufSize)}
+	m.hdr = (*inHeader)(unsafe.Pointer(&m.buf[0]))
+	return m
+}
+
+func getMessage(c *Conn) *message {
+	m := reqPool.Get().(*message)
+	m.conn = c
+	return m
+}
+
+func putMessage(m *message) {
+	m.buf = m.buf[:bufSize]
+	m.conn = nil
+	m.off = 0
+	reqPool.Put(m)
+}
+
 // a message represents the bytes of a single FUSE message
 type message struct {
 	conn *Conn
 	buf  []byte    // all bytes
 	hdr  *inHeader // header
 	off  int       // offset for reading additional fields
-}
-
-func newMessage(c *Conn) *message {
-	m := &message{conn: c, buf: make([]byte, bufSize)}
-	m.hdr = (*inHeader)(unsafe.Pointer(&m.buf[0]))
-	return m
 }
 
 func (m *message) len() uintptr {
@@ -390,8 +415,7 @@ func (c *Conn) fd() int {
 // Caller must call either Request.Respond or Request.RespondError in
 // a reasonable time. Caller must not retain Request after that call.
 func (c *Conn) ReadRequest() (Request, error) {
-	// TODO: Some kind of buffer reuse.
-	m := newMessage(c)
+	m := getMessage(c)
 loop:
 	c.rio.RLock()
 	n, err := syscall.Read(c.fd(), m.buf)
