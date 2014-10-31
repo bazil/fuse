@@ -295,6 +295,8 @@ type Server struct {
 	// Function to send debug log messages to. If nil, use fuse.Debug.
 	// Note that changing this or fuse.Debug may not affect existing
 	// calls to Serve.
+	//
+	// See fuse.Debug for the rules that log functions must follow.
 	Debug func(msg interface{})
 }
 
