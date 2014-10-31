@@ -385,6 +385,10 @@ func (c *Conn) fd() int {
 	return int(c.dev.Fd())
 }
 
+// ReadRequest returns the next FUSE request from the kernel.
+//
+// Caller must call either Request.Respond or Request.RespondError in
+// a reasonable time. Caller must not retain Request after that call.
 func (c *Conn) ReadRequest() (Request, error) {
 	// TODO: Some kind of buffer reuse.
 	m := newMessage(c)
