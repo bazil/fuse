@@ -5,10 +5,11 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 )
 
-func mount(dir string, ready chan<- struct{}, errp *error) (fusefd *os.File, err error) {
+func mount(dir string, ready chan<- struct{}, errp *error, opts []string) (fusefd *os.File, err error) {
 	// linux mount is never delayed
 	close(ready)
 
@@ -19,7 +20,14 @@ func mount(dir string, ready chan<- struct{}, errp *error) (fusefd *os.File, err
 	defer syscall.Close(fds[0])
 	defer syscall.Close(fds[1])
 
-	cmd := exec.Command("fusermount", "--", dir)
+	var cmdline []string
+	for _, o := range opts {
+		cmdline = append(cmdline, "-o")
+		cmdline = append(cmdline, o)
+	}
+	cmdline = append(cmdline, "--")
+	cmdline = append(cmdline, dir)
+	cmd := exec.Command("fusermount", cmdline...)
 	cmd.Env = append(os.Environ(), "_FUSE_COMMFD=3")
 
 	writeFile := os.NewFile(uintptr(fds[0]), "fusermount-child-writes")
