@@ -1280,8 +1280,16 @@ type SetxattrRequest struct {
 	Xattr []byte
 }
 
+func trunc(b []byte, max int) ([]byte, string) {
+	if len(b) > max {
+		return b[:max], "..."
+	}
+	return b, ""
+}
+
 func (r *SetxattrRequest) String() string {
-	return fmt.Sprintf("Setxattr [%s] %q %x fl=%v @%#x", &r.Header, r.Name, r.Xattr, r.Flags, r.Position)
+	xattr, tail := trunc(r.Xattr, 16)
+	return fmt.Sprintf("Setxattr [%s] %q %x%s fl=%v @%#x", &r.Header, r.Name, xattr, tail, r.Flags, r.Position)
 }
 
 // Respond replies to the request, indicating that the extended attribute was set.
