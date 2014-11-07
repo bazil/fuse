@@ -947,6 +947,8 @@ type InitRequest struct {
 	Flags        InitFlags
 }
 
+var _ = Request(&InitRequest{})
+
 func (r *InitRequest) String() string {
 	return fmt.Sprintf("Init [%s] %d.%d ra=%d fl=%v", &r.Header, r.Major, r.Minor, r.MaxReadahead, r.Flags)
 }
@@ -988,6 +990,8 @@ func (r *InitRequest) Respond(resp *InitResponse) {
 type StatfsRequest struct {
 	Header `json:"-"`
 }
+
+var _ = Request(&StatfsRequest{})
 
 func (r *StatfsRequest) String() string {
 	return fmt.Sprintf("Statfs [%s]\n", &r.Header)
@@ -1032,6 +1036,8 @@ type AccessRequest struct {
 	Header `json:"-"`
 	Mask   uint32
 }
+
+var _ = Request(&AccessRequest{})
 
 func (r *AccessRequest) String() string {
 	return fmt.Sprintf("Access [%s] mask=%#x", &r.Header, r.Mask)
@@ -1118,6 +1124,8 @@ type GetattrRequest struct {
 	Header `json:"-"`
 }
 
+var _ = Request(&GetattrRequest{})
+
 func (r *GetattrRequest) String() string {
 	return fmt.Sprintf("Getattr [%s]", &r.Header)
 }
@@ -1160,6 +1168,8 @@ type GetxattrRequest struct {
 	Position uint32
 }
 
+var _ = Request(&GetxattrRequest{})
+
 func (r *GetxattrRequest) String() string {
 	return fmt.Sprintf("Getxattr [%s] %q %d @%d", &r.Header, r.Name, r.Size, r.Position)
 }
@@ -1198,6 +1208,8 @@ type ListxattrRequest struct {
 	Size     uint32 // maximum size to return
 	Position uint32 // offset within attribute list
 }
+
+var _ = Request(&ListxattrRequest{})
 
 func (r *ListxattrRequest) String() string {
 	return fmt.Sprintf("Listxattr [%s] %d @%d", &r.Header, r.Size, r.Position)
@@ -1240,6 +1252,8 @@ type RemovexattrRequest struct {
 	Name   string // name of extended attribute
 }
 
+var _ = Request(&RemovexattrRequest{})
+
 func (r *RemovexattrRequest) String() string {
 	return fmt.Sprintf("Removexattr [%s] %q", &r.Header, r.Name)
 }
@@ -1280,6 +1294,8 @@ type SetxattrRequest struct {
 	Xattr []byte
 }
 
+var _ = Request(&SetxattrRequest{})
+
 func trunc(b []byte, max int) ([]byte, string) {
 	if len(b) > max {
 		return b[:max], "..."
@@ -1308,6 +1324,8 @@ type LookupRequest struct {
 	Header `json:"-"`
 	Name   string
 }
+
+var _ = Request(&LookupRequest{})
 
 func (r *LookupRequest) String() string {
 	return fmt.Sprintf("Lookup [%s] %q", &r.Header, r.Name)
@@ -1348,6 +1366,8 @@ type OpenRequest struct {
 	Flags  OpenFlags
 }
 
+var _ = Request(&OpenRequest{})
+
 func (r *OpenRequest) String() string {
 	return fmt.Sprintf("Open [%s] dir=%v fl=%v", &r.Header, r.Dir, r.Flags)
 }
@@ -1379,6 +1399,8 @@ type CreateRequest struct {
 	Flags  OpenFlags
 	Mode   os.FileMode
 }
+
+var _ = Request(&CreateRequest{})
 
 func (r *CreateRequest) String() string {
 	return fmt.Sprintf("Create [%s] %q fl=%v mode=%v", &r.Header, r.Name, r.Flags, r.Mode)
@@ -1421,6 +1443,8 @@ type MkdirRequest struct {
 	Mode   os.FileMode
 }
 
+var _ = Request(&MkdirRequest{})
+
 func (r *MkdirRequest) String() string {
 	return fmt.Sprintf("Mkdir [%s] %q mode=%v", &r.Header, r.Name, r.Mode)
 }
@@ -1457,6 +1481,8 @@ type ReadRequest struct {
 	Offset int64
 	Size   int
 }
+
+var _ = Request(&ReadRequest{})
 
 func (r *ReadRequest) String() string {
 	return fmt.Sprintf("Read [%s] %#x %d @%#x dir=%v", &r.Header, r.Handle, r.Size, r.Offset, r.Dir)
@@ -1498,6 +1524,8 @@ type ReleaseRequest struct {
 	LockOwner    uint32
 }
 
+var _ = Request(&ReleaseRequest{})
+
 func (r *ReleaseRequest) String() string {
 	return fmt.Sprintf("Release [%s] %#x fl=%v rfl=%v owner=%#x", &r.Header, r.Handle, r.Flags, r.ReleaseFlags, r.LockOwner)
 }
@@ -1515,6 +1543,8 @@ type DestroyRequest struct {
 	Header `json:"-"`
 }
 
+var _ = Request(&DestroyRequest{})
+
 func (r *DestroyRequest) String() string {
 	return fmt.Sprintf("Destroy [%s]", &r.Header)
 }
@@ -1531,6 +1561,8 @@ type ForgetRequest struct {
 	Header `json:"-"`
 	N      uint64
 }
+
+var _ = Request(&ForgetRequest{})
 
 func (r *ForgetRequest) String() string {
 	return fmt.Sprintf("Forget [%s] %d", &r.Header, r.N)
@@ -1632,6 +1664,8 @@ type WriteRequest struct {
 	Flags  WriteFlags
 }
 
+var _ = Request(&WriteRequest{})
+
 func (r *WriteRequest) String() string {
 	return fmt.Sprintf("Write [%s] %#x %d @%d fl=%v", &r.Header, r.Handle, len(r.Data), r.Offset, r.Flags)
 }
@@ -1690,6 +1724,8 @@ type SetattrRequest struct {
 	Crtime   time.Time
 	Flags    uint32 // see chflags(2)
 }
+
+var _ = Request(&SetattrRequest{})
 
 func (r *SetattrRequest) String() string {
 	var buf bytes.Buffer
@@ -1773,6 +1809,8 @@ type FlushRequest struct {
 	LockOwner uint64
 }
 
+var _ = Request(&FlushRequest{})
+
 func (r *FlushRequest) String() string {
 	return fmt.Sprintf("Flush [%s] %#x fl=%#x lk=%#x", &r.Header, r.Handle, r.Flags, r.LockOwner)
 }
@@ -1790,6 +1828,8 @@ type RemoveRequest struct {
 	Dir    bool   // is this rmdir?
 }
 
+var _ = Request(&RemoveRequest{})
+
 func (r *RemoveRequest) String() string {
 	return fmt.Sprintf("Remove [%s] %q dir=%v", &r.Header, r.Name, r.Dir)
 }
@@ -1805,6 +1845,8 @@ type SymlinkRequest struct {
 	Header          `json:"-"`
 	NewName, Target string
 }
+
+var _ = Request(&SymlinkRequest{})
 
 func (r *SymlinkRequest) String() string {
 	return fmt.Sprintf("Symlink [%s] from %q to target %q", &r.Header, r.NewName, r.Target)
@@ -1835,6 +1877,8 @@ type ReadlinkRequest struct {
 	Header `json:"-"`
 }
 
+var _ = Request(&ReadlinkRequest{})
+
 func (r *ReadlinkRequest) String() string {
 	return fmt.Sprintf("Readlink [%s]", &r.Header)
 }
@@ -1850,6 +1894,8 @@ type LinkRequest struct {
 	OldNode NodeID
 	NewName string
 }
+
+var _ = Request(&LinkRequest{})
 
 func (r *LinkRequest) String() string {
 	return fmt.Sprintf("Link [%s] node %d to %q", &r.Header, r.OldNode, r.NewName)
@@ -1876,6 +1922,8 @@ type RenameRequest struct {
 	OldName, NewName string
 }
 
+var _ = Request(&RenameRequest{})
+
 func (r *RenameRequest) String() string {
 	return fmt.Sprintf("Rename [%s] from %q to dirnode %d %q", &r.Header, r.OldName, r.NewDir, r.NewName)
 }
@@ -1891,6 +1939,8 @@ type MknodRequest struct {
 	Mode   os.FileMode
 	Rdev   uint32
 }
+
+var _ = Request(&MknodRequest{})
 
 func (r *MknodRequest) String() string {
 	return fmt.Sprintf("Mknod [%s] Name %q mode %v rdev %d", &r.Header, r.Name, r.Mode, r.Rdev)
@@ -1918,6 +1968,8 @@ type FsyncRequest struct {
 	Dir   bool
 }
 
+var _ = Request(&FsyncRequest{})
+
 func (r *FsyncRequest) String() string {
 	return fmt.Sprintf("Fsync [%s] Handle %v Flags %v", &r.Header, r.Handle, r.Flags)
 }
@@ -1933,6 +1985,8 @@ type InterruptRequest struct {
 	Header `json:"-"`
 	IntrID RequestID // ID of the request to be interrupt.
 }
+
+var _ = Request(&InterruptRequest{})
 
 func (r *InterruptRequest) Respond() {
 	// nothing to do here
@@ -1950,6 +2004,8 @@ type XXXRequest struct {
 	Header `json:"-"`
 	xxx
 }
+
+var _ = Request(&XXXRequest{})
 
 func (r *XXXRequest) String() string {
 	return fmt.Sprintf("XXX [%s] xxx", &r.Header)
