@@ -57,8 +57,6 @@ func callMount(dir string, f *os.File, ready chan<- struct{}, errp *error) error
 		// Tell osxfuse-kext how large our buffer is. It must split
 		// writes larger than this into multiple writes.
 		//
-		// TODO add buffer reuse, bump this up significantly
-		//
 		// OSXFUSE seems to ignore InitResponse.MaxWrite, and uses
 		// this instead.
 		"-o", "iosize="+strconv.FormatUint(maxWrite, 10),
