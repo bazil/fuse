@@ -1821,10 +1821,11 @@ func (r *FlushRequest) Respond() {
 	r.respond(out, unsafe.Sizeof(*out))
 }
 
-// A RemoveRequest asks to remove a file or directory.
+// A RemoveRequest asks to remove a file or directory from the
+// directory r.Node.
 type RemoveRequest struct {
 	Header `json:"-"`
-	Name   string // name of extended attribute
+	Name   string // name of the entry to remove
 	Dir    bool   // is this rmdir?
 }
 
