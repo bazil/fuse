@@ -74,7 +74,8 @@
 //
 // Mount Options
 //
-// XXX
+// Behavior and metadata of the mounted file system can be changed by
+// passing MountOption values to Mount.
 //
 package fuse
 
@@ -120,13 +121,21 @@ type Conn struct {
 // visible until after Conn.Ready is closed. See Conn.MountError for
 // possible errors. Incoming requests on Conn must be served to make
 // progress.
-func Mount(dir string) (*Conn, error) {
-	// TODO(rsc): mount options (...string?)
+func Mount(dir string, options ...MountOption) (*Conn, error) {
+	conf := MountConfig{
+		options: make(map[string]string),
+	}
+	for _, option := range options {
+		if err := option(&conf); err != nil {
+			return nil, err
+		}
+	}
+
 	ready := make(chan struct{}, 1)
 	c := &Conn{
 		Ready: ready,
 	}
-	f, err := mount(dir, ready, &c.MountError)
+	f, err := mount(dir, &conf, ready, &c.MountError)
 	if err != nil {
 		return nil, err
 	}
