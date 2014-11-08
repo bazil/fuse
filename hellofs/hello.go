@@ -33,6 +33,7 @@ func main() {
 		fuse.FSName("helloworld"),
 		fuse.Subtype("hellofs"),
 		fuse.LocalVolume,
+		fuse.VolumeName("Hello world!"),
 	)
 	if err != nil {
 		log.Fatal(err)

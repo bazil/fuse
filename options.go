@@ -66,6 +66,13 @@ func LocalVolume(conf *MountConfig) error {
 
 var _ MountOption = LocalVolume
 
+// VolumeName sets the volume name shown in Finder.
+//
+// OS X only. Others ignore this option.
+func VolumeName(name string) MountOption {
+	return volumeName(name)
+}
+
 var ErrCannotCombineAllowOtherAndAllowRoot = errors.New("cannot combine AllowOther and AllowRoot")
 
 // AllowOther allows other users to access the file system.
