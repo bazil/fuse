@@ -107,3 +107,35 @@ func TestMountOptionSubtype(t *testing.T) {
 }
 
 // TODO test LocalVolume
+
+// TODO test AllowOther; hard because needs system-level authorization
+
+func TestMountOptionAllowOtherThenAllowRoot(t *testing.T) {
+	t.Parallel()
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}},
+		fuse.AllowOther,
+		fuse.AllowRoot,
+	)
+	if err == nil {
+		mnt.Close()
+	}
+	if g, e := err, fuse.ErrCannotCombineAllowOtherAndAllowRoot; g != e {
+		t.Fatalf("wrong error: %v != %v", g, e)
+	}
+}
+
+// TODO test AllowRoot; hard because needs system-level authorization
+
+func TestMountOptionAllowRootThenAllowOther(t *testing.T) {
+	t.Parallel()
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}},
+		fuse.AllowRoot,
+		fuse.AllowOther,
+	)
+	if err == nil {
+		mnt.Close()
+	}
+	if g, e := err, fuse.ErrCannotCombineAllowOtherAndAllowRoot; g != e {
+		t.Fatalf("wrong error: %v != %v", g, e)
+	}
+}

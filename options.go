@@ -1,6 +1,9 @@
 package fuse
 
-import "strings"
+import (
+	"errors"
+	"strings"
+)
 
 // MountConfig holds the configuration for a mount operation.
 // Use it by passing MountOption values to Mount.
@@ -62,3 +65,31 @@ func LocalVolume(conf *MountConfig) error {
 }
 
 var _ MountOption = LocalVolume
+
+var ErrCannotCombineAllowOtherAndAllowRoot = errors.New("cannot combine AllowOther and AllowRoot")
+
+// AllowOther allows other users to access the file system.
+//
+// Only one of AllowOther or AllowRoot can be used.
+func AllowOther(conf *MountConfig) error {
+	if _, ok := conf.options["allow_root"]; ok {
+		return ErrCannotCombineAllowOtherAndAllowRoot
+	}
+	conf.options["allow_other"] = ""
+	return nil
+}
+
+var _ MountOption = AllowOther
+
+// AllowRoot allows other users to access the file system.
+//
+// Only one of AllowOther or AllowRoot can be used.
+func AllowRoot(conf *MountConfig) error {
+	if _, ok := conf.options["allow_other"]; ok {
+		return ErrCannotCombineAllowOtherAndAllowRoot
+	}
+	conf.options["allow_root"] = ""
+	return nil
+}
+
+var _ MountOption = AllowRoot
