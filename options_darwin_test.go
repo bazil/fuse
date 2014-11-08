@@ -12,7 +12,7 @@ func TestMountOptionCommaError(t *testing.T) {
 	// this test is not tied to FSName, but needs just some option
 	// with string content
 	var name = "FuseTest,Marker"
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{dir{}},
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}},
 		fuse.FSName(name),
 	)
 	switch {

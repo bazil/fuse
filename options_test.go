@@ -1,7 +1,6 @@
 package fuse_test
 
 import (
-	"os"
 	"runtime"
 	"testing"
 
@@ -13,16 +12,10 @@ func init() {
 	fstestutil.DebugByDefault()
 }
 
-//TODO share
-// dir can be embedded in a struct to make it look like a directory.
-type dir struct{}
-
-func (f dir) Attr() fuse.Attr { return fuse.Attr{Mode: os.ModeDir | 0777} }
-
 func TestMountOptionFSName(t *testing.T) {
 	t.Parallel()
 	const name = "FuseTestMarker"
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{dir{}},
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}},
 		fuse.FSName(name),
 	)
 	if err != nil {
@@ -42,7 +35,7 @@ func TestMountOptionFSName(t *testing.T) {
 func testMountOptionFSNameEvil(t *testing.T, evil string) {
 	t.Parallel()
 	var name = "FuseTest" + evil + "Marker"
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{dir{}},
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}},
 		fuse.FSName(name),
 	)
 	if err != nil {
@@ -96,7 +89,7 @@ func TestMountOptionSubtype(t *testing.T) {
 	}
 	t.Parallel()
 	const name = "FuseTestMarker"
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{dir{}},
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}},
 		fuse.Subtype(name),
 	)
 	if err != nil {
