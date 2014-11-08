@@ -113,8 +113,8 @@ func TestMountOptionSubtype(t *testing.T) {
 func TestMountOptionAllowOtherThenAllowRoot(t *testing.T) {
 	t.Parallel()
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}},
-		fuse.AllowOther,
-		fuse.AllowRoot,
+		fuse.AllowOther(),
+		fuse.AllowRoot(),
 	)
 	if err == nil {
 		mnt.Close()
@@ -129,8 +129,8 @@ func TestMountOptionAllowOtherThenAllowRoot(t *testing.T) {
 func TestMountOptionAllowRootThenAllowOther(t *testing.T) {
 	t.Parallel()
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}},
-		fuse.AllowRoot,
-		fuse.AllowOther,
+		fuse.AllowRoot(),
+		fuse.AllowOther(),
 	)
 	if err == nil {
 		mnt.Close()

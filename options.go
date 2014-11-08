@@ -60,11 +60,9 @@ func Subtype(fstype string) MountOption {
 // changing the behavior of Finder, Spotlight, and such.
 //
 // OS X only. Others ignore this option.
-func LocalVolume(conf *MountConfig) error {
-	return localVolume(conf)
+func LocalVolume() MountOption {
+	return localVolume
 }
-
-var _ MountOption = LocalVolume
 
 // VolumeName sets the volume name shown in Finder.
 //
@@ -78,25 +76,25 @@ var ErrCannotCombineAllowOtherAndAllowRoot = errors.New("cannot combine AllowOth
 // AllowOther allows other users to access the file system.
 //
 // Only one of AllowOther or AllowRoot can be used.
-func AllowOther(conf *MountConfig) error {
-	if _, ok := conf.options["allow_root"]; ok {
-		return ErrCannotCombineAllowOtherAndAllowRoot
+func AllowOther() MountOption {
+	return func(conf *MountConfig) error {
+		if _, ok := conf.options["allow_root"]; ok {
+			return ErrCannotCombineAllowOtherAndAllowRoot
+		}
+		conf.options["allow_other"] = ""
+		return nil
 	}
-	conf.options["allow_other"] = ""
-	return nil
 }
-
-var _ MountOption = AllowOther
 
 // AllowRoot allows other users to access the file system.
 //
 // Only one of AllowOther or AllowRoot can be used.
-func AllowRoot(conf *MountConfig) error {
-	if _, ok := conf.options["allow_other"]; ok {
-		return ErrCannotCombineAllowOtherAndAllowRoot
+func AllowRoot() MountOption {
+	return func(conf *MountConfig) error {
+		if _, ok := conf.options["allow_other"]; ok {
+			return ErrCannotCombineAllowOtherAndAllowRoot
+		}
+		conf.options["allow_root"] = ""
+		return nil
 	}
-	conf.options["allow_root"] = ""
-	return nil
 }
-
-var _ MountOption = AllowRoot
