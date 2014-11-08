@@ -32,6 +32,7 @@ func main() {
 		mountpoint,
 		fuse.FSName("helloworld"),
 		fuse.Subtype("hellofs"),
+		fuse.LocalVolume,
 	)
 	if err != nil {
 		log.Fatal(err)

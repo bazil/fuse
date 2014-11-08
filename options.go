@@ -52,3 +52,13 @@ func Subtype(fstype string) MountOption {
 		return nil
 	}
 }
+
+// LocalVolume sets the volume to be local (instead of network),
+// changing the behavior of Finder, Spotlight, and such.
+//
+// OS X only. Others ignore this option.
+func LocalVolume(conf *MountConfig) error {
+	return localVolume(conf)
+}
+
+var _ MountOption = LocalVolume
