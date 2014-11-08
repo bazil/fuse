@@ -10,7 +10,6 @@ import (
 	"reflect"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -319,7 +318,7 @@ func (s *Server) Serve(c *fuse.Conn) error {
 
 	root, err := sc.fs.Root()
 	if err != nil {
-		return fmt.Errorf("cannot obtain root node: %v", syscall.Errno(err.(fuse.Errno)).Error())
+		return fmt.Errorf("cannot obtain root node: %v", err)
 	}
 	sc.node = append(sc.node, nil, &serveNode{inode: 1, node: root, refs: 1})
 	sc.handle = append(sc.handle, nil)
