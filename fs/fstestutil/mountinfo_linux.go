@@ -51,6 +51,7 @@ func getMountInfo(mnt string) (*MountInfo, error) {
 	}
 	i := &MountInfo{
 		FSName: m.Fsname,
+		Type:   m.Type,
 	}
 	return i, nil
 }

@@ -3,6 +3,7 @@ package fstestutil
 // MountInfo describes a mounted file system.
 type MountInfo struct {
 	FSName string
+	Type   string
 }
 
 // GetMountInfo finds information about the mount at mnt. It is

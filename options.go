@@ -40,3 +40,15 @@ func FSName(name string) MountOption {
 		return nil
 	}
 }
+
+// Subtype sets the subtype of the mount. The main type is always
+// `fuse`. The type in a list of mounted file systems will look like
+// `fuse.foo`.
+//
+// OS X ignores this option.
+func Subtype(fstype string) MountOption {
+	return func(conf *MountConfig) error {
+		conf.options["subtype"] = fstype
+		return nil
+	}
+}

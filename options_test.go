@@ -102,3 +102,26 @@ func TestMountOptionFSNameEvilBackslashDouble(t *testing.T) {
 	// catch double-unescaping, if it were to happen
 	testMountOptionFSNameEvil(t, `\\`)
 }
+
+func TestMountOptionSubtype(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skip("OS X does not support Subtype")
+	}
+	t.Parallel()
+	const name = "FuseTestMarker"
+	mnt, err := fstestutil.MountedT(t, simpleFS{dir{}},
+		fuse.Subtype(name),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	info, err := fstestutil.GetMountInfo(mnt.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g, e := info.Type, "fuse."+name; g != e {
+		t.Errorf("wrong Subtype: %q != %q", g, e)
+	}
+}
