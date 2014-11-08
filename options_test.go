@@ -6,24 +6,11 @@ import (
 	"testing"
 
 	"bazil.org/fuse"
-	"bazil.org/fuse/fs"
 	"bazil.org/fuse/fs/fstestutil"
 )
 
 func init() {
 	fstestutil.DebugByDefault()
-}
-
-//TODO share
-// simpleFS is a trivial FS that just implements the Root method.
-type simpleFS struct {
-	node fs.Node
-}
-
-var _ = fs.FS(simpleFS{})
-
-func (f simpleFS) Root() (fs.Node, fuse.Error) {
-	return f.node, nil
 }
 
 //TODO share
@@ -35,7 +22,7 @@ func (f dir) Attr() fuse.Attr { return fuse.Attr{Mode: os.ModeDir | 0777} }
 func TestMountOptionFSName(t *testing.T) {
 	t.Parallel()
 	const name = "FuseTestMarker"
-	mnt, err := fstestutil.MountedT(t, simpleFS{dir{}},
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{dir{}},
 		fuse.FSName(name),
 	)
 	if err != nil {
@@ -55,7 +42,7 @@ func TestMountOptionFSName(t *testing.T) {
 func testMountOptionFSNameEvil(t *testing.T, evil string) {
 	t.Parallel()
 	var name = "FuseTest" + evil + "Marker"
-	mnt, err := fstestutil.MountedT(t, simpleFS{dir{}},
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{dir{}},
 		fuse.FSName(name),
 	)
 	if err != nil {
@@ -109,7 +96,7 @@ func TestMountOptionSubtype(t *testing.T) {
 	}
 	t.Parallel()
 	const name = "FuseTestMarker"
-	mnt, err := fstestutil.MountedT(t, simpleFS{dir{}},
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{dir{}},
 		fuse.Subtype(name),
 	)
 	if err != nil {

@@ -87,17 +87,6 @@ func (f childMapFS) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
 	return child, nil
 }
 
-// simpleFS is a trivial FS that just implements the Root method.
-type simpleFS struct {
-	node fs.Node
-}
-
-var _ = fs.FS(simpleFS{})
-
-func (f simpleFS) Root() (fs.Node, fuse.Error) {
-	return f.node, nil
-}
-
 // file can be embedded in a struct to make it look like a file.
 type file struct{}
 
@@ -491,7 +480,7 @@ func (f *mkdir1) Mkdir(req *fuse.MkdirRequest, intr fs.Intr) (fs.Node, fuse.Erro
 func TestMkdir(t *testing.T) {
 	t.Parallel()
 	f := &mkdir1{}
-	mnt, err := fstestutil.MountedT(t, simpleFS{f})
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -553,7 +542,7 @@ func (f *create1) Create(req *fuse.CreateRequest, resp *fuse.CreateResponse, int
 func TestCreate(t *testing.T) {
 	t.Parallel()
 	f := &create1{}
-	mnt, err := fstestutil.MountedT(t, simpleFS{f})
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -622,7 +611,7 @@ func (f *create3) Remove(r *fuse.RemoveRequest, intr fs.Intr) fuse.Error {
 func TestCreateWriteRemove(t *testing.T) {
 	t.Parallel()
 	f := &create3{}
-	mnt, err := fstestutil.MountedT(t, simpleFS{f})
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -671,7 +660,7 @@ func (f *symlink1) Symlink(req *fuse.SymlinkRequest, intr fs.Intr) (fs.Node, fus
 func TestSymlink(t *testing.T) {
 	t.Parallel()
 	f := &symlink1{}
-	mnt, err := fstestutil.MountedT(t, simpleFS{f})
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -720,7 +709,7 @@ func (f *link1) Link(r *fuse.LinkRequest, old fs.Node, intr fs.Intr) (fs.Node, f
 func TestLink(t *testing.T) {
 	t.Parallel()
 	f := &link1{}
-	mnt, err := fstestutil.MountedT(t, simpleFS{f})
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -767,7 +756,7 @@ func (f *rename1) Rename(r *fuse.RenameRequest, newDir fs.Node, intr fs.Intr) fu
 func TestRename(t *testing.T) {
 	t.Parallel()
 	f := &rename1{}
-	mnt, err := fstestutil.MountedT(t, simpleFS{f})
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -805,7 +794,7 @@ func TestMknod(t *testing.T) {
 	}
 
 	f := &mknod1{}
-	mnt, err := fstestutil.MountedT(t, simpleFS{f})
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1097,7 +1086,7 @@ func (d *readdir) ReadDir(intr fs.Intr) ([]fuse.Dirent, fuse.Error) {
 func TestReadDir(t *testing.T) {
 	t.Parallel()
 	f := &readdir{}
-	mnt, err := fstestutil.MountedT(t, simpleFS{f})
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1240,7 +1229,7 @@ type fsyncDir struct {
 func TestFsyncDir(t *testing.T) {
 	t.Parallel()
 	f := &fsyncDir{}
-	mnt, err := fstestutil.MountedT(t, simpleFS{f})
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1574,7 +1563,7 @@ func (f defaultErrno) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
 
 func TestDefaultErrno(t *testing.T) {
 	t.Parallel()
-	mnt, err := fstestutil.MountedT(t, simpleFS{defaultErrno{}})
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{defaultErrno{}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1620,7 +1609,7 @@ func (f customErrNode) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
 
 func TestCustomErrno(t *testing.T) {
 	t.Parallel()
-	mnt, err := fstestutil.MountedT(t, simpleFS{customErrNode{}})
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{customErrNode{}})
 	if err != nil {
 		t.Fatal(err)
 	}
