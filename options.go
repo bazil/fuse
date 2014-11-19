@@ -92,5 +92,5 @@ func AllowOther() MountOption {
 //
 // FreeBSD ignores this option.
 func AllowRoot() MountOption {
-  return allowRoot
+	return allowRoot
 }
