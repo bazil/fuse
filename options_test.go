@@ -13,6 +13,9 @@ func init() {
 }
 
 func TestMountOptionFSName(t *testing.T) {
+	if runtime.GOOS == "freebsd" {
+		t.Skip("FreeBSD does not support FSName")
+	}
 	t.Parallel()
 	const name = "FuseTestMarker"
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}},
@@ -33,6 +36,9 @@ func TestMountOptionFSName(t *testing.T) {
 }
 
 func testMountOptionFSNameEvil(t *testing.T, evil string) {
+	if runtime.GOOS == "freebsd" {
+		t.Skip("FreeBSD does not support FSName")
+	}
 	t.Parallel()
 	var name = "FuseTest" + evil + "Marker"
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}},
@@ -86,6 +92,9 @@ func TestMountOptionFSNameEvilBackslashDouble(t *testing.T) {
 func TestMountOptionSubtype(t *testing.T) {
 	if runtime.GOOS == "darwin" {
 		t.Skip("OS X does not support Subtype")
+	}
+	if runtime.GOOS == "freebsd" {
+		t.Skip("FreeBSD does not support Subtype")
 	}
 	t.Parallel()
 	const name = "FuseTestMarker"
