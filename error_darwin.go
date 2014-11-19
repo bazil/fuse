@@ -4,6 +4,8 @@ import (
 	"syscall"
 )
 
+const ENODATA = Errno(syscall.ENODATA)
+
 type getxattrError struct {
 	error
 }

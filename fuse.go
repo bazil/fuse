@@ -242,10 +242,10 @@ const (
 	// See also fs.Intr.
 	EINTR = Errno(syscall.EINTR)
 
-	ENODATA = Errno(syscall.ENODATA)
 	ERANGE  = Errno(syscall.ERANGE)
 	ENOTSUP = Errno(syscall.ENOTSUP)
 	EEXIST  = Errno(syscall.EEXIST)
+	// ENODATA is defined elsewhere, because it isn't available on freebsd.
 )
 
 // DefaultErrno is the errno used when error returned does not
@@ -259,8 +259,8 @@ var errnoNames = map[Errno]string{
 	EIO:     "EIO",
 	EPERM:   "EPERM",
 	EINTR:   "EINTR",
-	ENODATA: "ENODATA",
 	EEXIST:  "EEXIST",
+	ENODATA: "ENODATA",
 }
 
 // Errno implements Error and ErrorNumber using a syscall.Errno.
