@@ -78,7 +78,7 @@ var ErrCannotCombineAllowOtherAndAllowRoot = errors.New("cannot combine AllowOth
 // Only one of AllowOther or AllowRoot can be used.
 func AllowOther() MountOption {
 	return func(conf *MountConfig) error {
-		if _, ok := conf.options["allow_fo"]; ok {
+		if _, ok := conf.options["allow_root"]; ok {
 			return ErrCannotCombineAllowOtherAndAllowRoot
 		}
 		conf.options["allow_other"] = ""
