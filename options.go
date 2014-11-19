@@ -89,12 +89,8 @@ func AllowOther() MountOption {
 // AllowRoot allows other users to access the file system.
 //
 // Only one of AllowOther or AllowRoot can be used.
+//
+// FreeBSD ignores this option.
 func AllowRoot() MountOption {
-	return func(conf *MountConfig) error {
-		if _, ok := conf.options["allow_other"]; ok {
-			return ErrCannotCombineAllowOtherAndAllowRoot
-		}
-		conf.options["allow_root"] = ""
-		return nil
-	}
+	return allowRoot
 }
