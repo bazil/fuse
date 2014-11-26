@@ -16,7 +16,7 @@ func mount(dir string, conf *MountConfig, ready chan<- struct{}, errp *error) (*
 
 	cmd := exec.Command("/sbin/mount_fusefs",
 		"-o", conf.getOptions(),
-    "3",
+		"3",
 		dir)
 	cmd.ExtraFiles = []*os.File{f}
 	out, err := cmd.CombinedOutput()
