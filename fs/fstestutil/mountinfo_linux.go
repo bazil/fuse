@@ -2,56 +2,50 @@ package fstestutil
 
 import (
 	"errors"
-
-	"github.com/artyom/mtab"
+	"io/ioutil"
+	"strings"
 )
 
-// Inventory of mount information parsing packages out there:
+// Linux /proc/mounts shows current mounts.
+// Same format as /etc/fstab. Quoting getmntent(3):
 //
-// https://github.com/cratonica/gomounts
+// Since fields in the mtab and fstab files are separated by whitespace,
+// octal escapes are used to represent the four characters space (\040),
+// tab (\011), newline (\012) and backslash (\134) in those files when
+// they occur in one of the four strings in a mntent structure.
 //
-// Does it "right" by using getmntent(3), but that needs CGo which
-// prevents cross-compiling easily.
-//
-// https://github.com/antage/mntent
-//
-// Does not handle escaping at all.
-//
-// https://github.com/deniswernert/go-fstab
-//
-// Does not handle escaping at all. Has trivial bugs like
-// https://github.com/deniswernert/go-fstab/issues/1
-//
-// http://godoc.org/github.com/docker/docker/pkg/mount
-//
-// Does not handle escaping at all. Part of an overly large source
-// tree.
-//
-// https://github.com/artyom/mtab
-//
-// Does not split options. Otherwise seems to work.
+// http://linux.die.net/man/3/getmntent
 
-func findMount(mnt string) (*mtab.Entry, error) {
-	mounts, err := mtab.Entries("/proc/mounts")
-	if err != nil {
-		return nil, err
-	}
-	for _, m := range mounts {
-		if m.Dir == mnt {
-			return &m, nil
-		}
-	}
-	return nil, errors.New("mount not found")
-}
+var fstabUnescape = strings.NewReplacer(
+	`\040`, "\040",
+	`\011`, "\011",
+	`\012`, "\012",
+	`\134`, "\134",
+)
+
+var errNotFound = errors.New("mount not found")
 
 func getMountInfo(mnt string) (*MountInfo, error) {
-	m, err := findMount(mnt)
+	data, err := ioutil.ReadFile("/proc/mounts")
 	if err != nil {
 		return nil, err
 	}
-	i := &MountInfo{
-		FSName: m.Fsname,
-		Type:   m.Type,
+	for _, line := range strings.Split(string(data), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			continue
+		}
+		// Fields are: fsname dir type opts freq passno
+		fsname := fstabUnescape.Replace(fields[0])
+		dir := fstabUnescape.Replace(fields[1])
+		fstype := fstabUnescape.Replace(fields[2])
+		if mnt == dir {
+			info := &MountInfo{
+				FSName: fsname,
+				Type:   fstype,
+			}
+			return info, nil
+		}
 	}
-	return i, nil
+	return nil, errNotFound
 }
