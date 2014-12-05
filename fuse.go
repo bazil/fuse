@@ -1003,7 +1003,7 @@ type StatfsRequest struct {
 var _ = Request(&StatfsRequest{})
 
 func (r *StatfsRequest) String() string {
-	return fmt.Sprintf("Statfs [%s]\n", &r.Header)
+	return fmt.Sprintf("Statfs [%s]", &r.Header)
 }
 
 // Respond replies to the request with the given response.
