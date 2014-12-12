@@ -77,7 +77,7 @@
 // Behavior and metadata of the mounted file system can be changed by
 // passing MountOption values to Mount.
 //
-package fuse
+package fuse // import "bazil.org/fuse"
 
 // BUG(rsc): The mount code for FreeBSD has not been written yet.
 
