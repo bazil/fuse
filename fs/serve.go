@@ -370,7 +370,7 @@ type serveConn struct {
 
 type serveRequest struct {
 	Request fuse.Request
-	Intr    Intr
+	cancel  func()
 }
 
 type serveNode struct {
@@ -629,7 +629,7 @@ func (m *renameNewDirNodeNotFound) String() string {
 
 func (c *serveConn) serve(r fuse.Request) {
 	intr := make(Intr)
-	req := &serveRequest{Request: r, Intr: intr}
+	req := &serveRequest{Request: r, cancel: func() { close(intr) }}
 
 	c.debug(request{
 		Op:      opName(r),
@@ -1243,9 +1243,9 @@ func (c *serveConn) serve(r fuse.Request) {
 	case *fuse.InterruptRequest:
 		c.meta.Lock()
 		ireq := c.req[r.IntrID]
-		if ireq != nil && ireq.Intr != nil {
-			close(ireq.Intr)
-			ireq.Intr = nil
+		if ireq != nil && ireq.cancel != nil {
+			ireq.cancel()
+			ireq.cancel = nil
 		}
 		c.meta.Unlock()
 		done(nil)
