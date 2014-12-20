@@ -6,6 +6,8 @@ import (
 	"os"
 	pathpkg "path"
 	"strings"
+
+	"golang.org/x/net/context"
 )
 
 import (
@@ -79,7 +81,7 @@ func (t *tree) Attr() fuse.Attr {
 	return fuse.Attr{Mode: os.ModeDir | 0555}
 }
 
-func (t *tree) Lookup(name string, intr Intr) (Node, fuse.Error) {
+func (t *tree) Lookup(ctx context.Context, name string) (Node, fuse.Error) {
 	n := t.lookup(name)
 	if n != nil {
 		return n, nil
@@ -87,7 +89,7 @@ func (t *tree) Lookup(name string, intr Intr) (Node, fuse.Error) {
 	return nil, fuse.ENOENT
 }
 
-func (t *tree) ReadDir(intr Intr) ([]fuse.Dirent, fuse.Error) {
+func (t *tree) ReadDir(ctx context.Context) ([]fuse.Dirent, fuse.Error) {
 	var out []fuse.Dirent
 	for _, d := range t.dir {
 		out = append(out, fuse.Dirent{Name: d.name})

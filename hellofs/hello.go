@@ -10,6 +10,7 @@ import (
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
 	_ "bazil.org/fuse/fs/fstestutil"
+	"golang.org/x/net/context"
 )
 
 var Usage = func() {
@@ -66,7 +67,7 @@ func (Dir) Attr() fuse.Attr {
 	return fuse.Attr{Inode: 1, Mode: os.ModeDir | 0555}
 }
 
-func (Dir) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
+func (Dir) Lookup(ctx context.Context, name string) (fs.Node, fuse.Error) {
 	if name == "hello" {
 		return File{}, nil
 	}
@@ -77,7 +78,7 @@ var dirDirs = []fuse.Dirent{
 	{Inode: 2, Name: "hello", Type: fuse.DT_File},
 }
 
-func (Dir) ReadDir(intr fs.Intr) ([]fuse.Dirent, fuse.Error) {
+func (Dir) ReadDir(ctx context.Context) ([]fuse.Dirent, fuse.Error) {
 	return dirDirs, nil
 }
 
@@ -90,6 +91,6 @@ func (File) Attr() fuse.Attr {
 	return fuse.Attr{Inode: 2, Mode: 0444, Size: uint64(len(greeting))}
 }
 
-func (File) ReadAll(intr fs.Intr) ([]byte, fuse.Error) {
+func (File) ReadAll(ctx context.Context) ([]byte, fuse.Error) {
 	return []byte(greeting), nil
 }

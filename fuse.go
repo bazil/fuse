@@ -45,7 +45,7 @@
 // The required and optional methods for the FS, Node, and Handle interfaces
 // have the general form
 //
-//	Op(req *OpRequest, resp *OpResponse, intr Intr) Error
+//	Op(ctx context.Context, req *OpRequest, resp *OpResponse) Error
 //
 // where Op is the name of a FUSE operation.  Op reads request parameters
 // from req and writes results to resp.  An operation whose only result is
@@ -58,13 +58,13 @@
 // In some file systems, some operations
 // may take an undetermined amount of time.  For example, a Read waiting for
 // a network message or a matching Write might wait indefinitely.  If the request
-// is cancelled and no longer needed, the package will close intr, a chan struct{}.
-// Blocking operations should select on a receive from intr and attempt to
+// is cancelled and no longer needed, the context will be cancelled.
+// Blocking operations should select on a receive from ctx.Done() and attempt to
 // abort the operation early if the receive succeeds (meaning the channel is closed).
 // To indicate that the operation failed because it was aborted, return fuse.EINTR.
 //
-// If an operation does not block for an indefinite amount of time, the intr parameter
-// can be ignored.
+// If an operation does not block for an indefinite amount of time, supporting
+// cancellation is not necessary.
 //
 // Authentication
 //
