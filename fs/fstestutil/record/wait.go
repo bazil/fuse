@@ -28,7 +28,7 @@ func (r *ReleaseWaiter) init() {
 	})
 }
 
-func (r *ReleaseWaiter) Release(ctx context.Context, req *fuse.ReleaseRequest) fuse.Error {
+func (r *ReleaseWaiter) Release(ctx context.Context, req *fuse.ReleaseRequest) error {
 	r.init()
 	close(r.seen)
 	return nil

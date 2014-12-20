@@ -53,6 +53,17 @@
 // service methods simultaneously; the methods being called are responsible
 // for appropriate synchronization.
 //
+// Errors
+//
+// Operations can return errors. The FUSE interface can only
+// communicate POSIX errno error numbers to file system clients, the
+// message is not visible to file system clients. The returned error
+// can implement ErrorNumber to control the errno returned. Without
+// ErrorNumber, a generic errno (EIO) is returned.
+//
+// Errors messages will be visible in the debug log as part of the
+// response.
+//
 // Interrupted Operations
 //
 // In some file systems, some operations
@@ -151,7 +162,7 @@ type Request interface {
 	Hdr() *Header
 
 	// RespondError responds to the request with the given error.
-	RespondError(Error)
+	RespondError(error)
 
 	String() string
 }
@@ -206,18 +217,6 @@ func (h *Header) respondData(out *outHeader, n uintptr, data []byte) {
 	putMessage(h.msg)
 }
 
-// An Error is a FUSE error.
-//
-// Errors messages will be visible in the debug log as part of the
-// response.
-//
-// The FUSE interface can only communicate POSIX errno error numbers
-// to file system clients, the message is not visible to file system
-// clients. The returned error can implement ErrorNumber to control
-// the errno returned. Without ErrorNumber, a generic errno (EIO) is
-// returned.
-type Error error
-
 // An ErrorNumber is an error with a specific error number.
 //
 // Operations may return an error value that implements ErrorNumber to
@@ -267,7 +266,6 @@ var errnoNames = map[Errno]string{
 type Errno syscall.Errno
 
 var _ = ErrorNumber(Errno(0))
-var _ = Error(Errno(0))
 var _ = error(Errno(0))
 
 func (e Errno) Errno() Errno {
@@ -297,7 +295,7 @@ func (e Errno) MarshalText() ([]byte, error) {
 	return []byte(s), nil
 }
 
-func (h *Header) RespondError(err Error) {
+func (h *Header) RespondError(err error) {
 	errno := DefaultErrno
 	if ferr, ok := err.(ErrorNumber); ok {
 		errno = ferr.Errno()
@@ -1197,7 +1195,7 @@ func (r *GetxattrRequest) Respond(resp *GetxattrResponse) {
 	}
 }
 
-func (r *GetxattrRequest) RespondError(err Error) {
+func (r *GetxattrRequest) RespondError(err error) {
 	err = translateGetxattrError(err)
 	r.Header.RespondError(err)
 }
@@ -1273,7 +1271,7 @@ func (r *RemovexattrRequest) Respond() {
 	r.respond(out, unsafe.Sizeof(*out))
 }
 
-func (r *RemovexattrRequest) RespondError(err Error) {
+func (r *RemovexattrRequest) RespondError(err error) {
 	err = translateGetxattrError(err)
 	r.Header.RespondError(err)
 }
@@ -1323,7 +1321,7 @@ func (r *SetxattrRequest) Respond() {
 	r.respond(out, unsafe.Sizeof(*out))
 }
 
-func (r *SetxattrRequest) RespondError(err Error) {
+func (r *SetxattrRequest) RespondError(err error) {
 	err = translateGetxattrError(err)
 	r.Header.RespondError(err)
 }

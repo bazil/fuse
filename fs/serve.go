@@ -33,20 +33,20 @@ const (
 // FS* interfaces, for example FSIniter.
 type FS interface {
 	// Root is called to obtain the Node for the file system root.
-	Root() (Node, fuse.Error)
+	Root() (Node, error)
 }
 
 type FSIniter interface {
 	// Init is called to initialize the FUSE connection.
 	// It can inspect the request and adjust the response as desired.
 	// Init must return promptly.
-	Init(ctx context.Context, req *fuse.InitRequest, resp *fuse.InitResponse) fuse.Error
+	Init(ctx context.Context, req *fuse.InitRequest, resp *fuse.InitResponse) error
 }
 
 type FSStatfser interface {
 	// Statfs is called to obtain file system metadata.
 	// It should write that data to resp.
-	Statfs(ctx context.Context, req *fuse.StatfsRequest, resp *fuse.StatfsResponse) fuse.Error
+	Statfs(ctx context.Context, req *fuse.StatfsRequest, resp *fuse.StatfsResponse) error
 }
 
 type FSDestroyer interface {
@@ -96,38 +96,38 @@ type NodeGetattrer interface {
 	//
 	// If this method is not implemented, the attributes will be
 	// generated based on Attr(), with zero values filled in.
-	Getattr(ctx context.Context, req *fuse.GetattrRequest, resp *fuse.GetattrResponse) fuse.Error
+	Getattr(ctx context.Context, req *fuse.GetattrRequest, resp *fuse.GetattrResponse) error
 }
 
 type NodeSetattrer interface {
 	// Setattr sets the standard metadata for the receiver.
-	Setattr(ctx context.Context, req *fuse.SetattrRequest, resp *fuse.SetattrResponse) fuse.Error
+	Setattr(ctx context.Context, req *fuse.SetattrRequest, resp *fuse.SetattrResponse) error
 }
 
 type NodeSymlinker interface {
 	// Symlink creates a new symbolic link in the receiver, which must be a directory.
 	//
 	// TODO is the above true about directories?
-	Symlink(ctx context.Context, req *fuse.SymlinkRequest) (Node, fuse.Error)
+	Symlink(ctx context.Context, req *fuse.SymlinkRequest) (Node, error)
 }
 
 // This optional request will be called only for symbolic link nodes.
 type NodeReadlinker interface {
 	// Readlink reads a symbolic link.
-	Readlink(ctx context.Context, req *fuse.ReadlinkRequest) (string, fuse.Error)
+	Readlink(ctx context.Context, req *fuse.ReadlinkRequest) (string, error)
 }
 
 type NodeLinker interface {
 	// Link creates a new directory entry in the receiver based on an
 	// existing Node. Receiver must be a directory.
-	Link(ctx context.Context, req *fuse.LinkRequest, old Node) (Node, fuse.Error)
+	Link(ctx context.Context, req *fuse.LinkRequest, old Node) (Node, error)
 }
 
 type NodeRemover interface {
 	// Remove removes the entry with the given name from
 	// the receiver, which must be a directory.  The entry to be removed
 	// may correspond to a file (unlink) or to a directory (rmdir).
-	Remove(ctx context.Context, req *fuse.RemoveRequest) fuse.Error
+	Remove(ctx context.Context, req *fuse.RemoveRequest) error
 }
 
 type NodeAccesser interface {
@@ -139,7 +139,7 @@ type NodeAccesser interface {
 	// call but not the open(2) system call. If Access is not
 	// implemented, the Node behaves as if it always returns nil
 	// (permission granted), relying on checks in Open instead.
-	Access(ctx context.Context, req *fuse.AccessRequest) fuse.Error
+	Access(ctx context.Context, req *fuse.AccessRequest) error
 }
 
 type NodeStringLookuper interface {
@@ -149,17 +149,17 @@ type NodeStringLookuper interface {
 	// the directory, Lookup should return nil, err.
 	//
 	// Lookup need not to handle the names "." and "..".
-	Lookup(ctx context.Context, name string) (Node, fuse.Error)
+	Lookup(ctx context.Context, name string) (Node, error)
 }
 
 type NodeRequestLookuper interface {
 	// Lookup looks up a specific entry in the receiver.
 	// See NodeStringLookuper for more.
-	Lookup(ctx context.Context, req *fuse.LookupRequest, resp *fuse.LookupResponse) (Node, fuse.Error)
+	Lookup(ctx context.Context, req *fuse.LookupRequest, resp *fuse.LookupResponse) (Node, error)
 }
 
 type NodeMkdirer interface {
-	Mkdir(ctx context.Context, req *fuse.MkdirRequest) (Node, fuse.Error)
+	Mkdir(ctx context.Context, req *fuse.MkdirRequest) (Node, error)
 }
 
 type NodeOpener interface {
@@ -173,13 +173,13 @@ type NodeOpener interface {
 	// succeed, and the Node itself will be used as the Handle.
 	//
 	// XXX note about access.  XXX OpenFlags.
-	Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (Handle, fuse.Error)
+	Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (Handle, error)
 }
 
 type NodeCreater interface {
 	// Create creates a new directory entry in the receiver, which
 	// must be a directory.
-	Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse.CreateResponse) (Node, Handle, fuse.Error)
+	Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse.CreateResponse) (Node, Handle, error)
 }
 
 type NodeForgetter interface {
@@ -187,16 +187,16 @@ type NodeForgetter interface {
 }
 
 type NodeRenamer interface {
-	Rename(ctx context.Context, req *fuse.RenameRequest, newDir Node) fuse.Error
+	Rename(ctx context.Context, req *fuse.RenameRequest, newDir Node) error
 }
 
 type NodeMknoder interface {
-	Mknod(ctx context.Context, req *fuse.MknodRequest) (Node, fuse.Error)
+	Mknod(ctx context.Context, req *fuse.MknodRequest) (Node, error)
 }
 
 // TODO this should be on Handle not Node
 type NodeFsyncer interface {
-	Fsync(ctx context.Context, req *fuse.FsyncRequest) fuse.Error
+	Fsync(ctx context.Context, req *fuse.FsyncRequest) error
 }
 
 type NodeGetxattrer interface {
@@ -206,18 +206,18 @@ type NodeGetxattrer interface {
 	// If there is no xattr by that name, returns fuse.ENODATA. This
 	// will be translated to the platform-specific correct error code
 	// by the framework.
-	Getxattr(ctx context.Context, req *fuse.GetxattrRequest, resp *fuse.GetxattrResponse) fuse.Error
+	Getxattr(ctx context.Context, req *fuse.GetxattrRequest, resp *fuse.GetxattrResponse) error
 }
 
 type NodeListxattrer interface {
 	// Listxattr lists the extended attributes recorded for the node.
-	Listxattr(ctx context.Context, req *fuse.ListxattrRequest, resp *fuse.ListxattrResponse) fuse.Error
+	Listxattr(ctx context.Context, req *fuse.ListxattrRequest, resp *fuse.ListxattrResponse) error
 }
 
 type NodeSetxattrer interface {
 	// Setxattr sets an extended attribute with the given name and
 	// value for the node.
-	Setxattr(ctx context.Context, req *fuse.SetxattrRequest) fuse.Error
+	Setxattr(ctx context.Context, req *fuse.SetxattrRequest) error
 }
 
 type NodeRemovexattrer interface {
@@ -226,7 +226,7 @@ type NodeRemovexattrer interface {
 	// If there is no xattr by that name, returns fuse.ENODATA. This
 	// will be translated to the platform-specific correct error code
 	// by the framework.
-	Removexattr(ctx context.Context, req *fuse.RemovexattrRequest) fuse.Error
+	Removexattr(ctx context.Context, req *fuse.RemovexattrRequest) error
 }
 
 var startTime = time.Now()
@@ -267,27 +267,27 @@ type HandleFlusher interface {
 	// Flush is called each time the file or directory is closed.
 	// Because there can be multiple file descriptors referring to a
 	// single opened file, Flush can be called multiple times.
-	Flush(ctx context.Context, req *fuse.FlushRequest) fuse.Error
+	Flush(ctx context.Context, req *fuse.FlushRequest) error
 }
 
 type HandleReadAller interface {
-	ReadAll(ctx context.Context) ([]byte, fuse.Error)
+	ReadAll(ctx context.Context) ([]byte, error)
 }
 
 type HandleReadDirer interface {
-	ReadDir(ctx context.Context) ([]fuse.Dirent, fuse.Error)
+	ReadDir(ctx context.Context) ([]fuse.Dirent, error)
 }
 
 type HandleReader interface {
-	Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) fuse.Error
+	Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error
 }
 
 type HandleWriter interface {
-	Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) fuse.Error
+	Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error
 }
 
 type HandleReleaser interface {
-	Release(ctx context.Context, req *fuse.ReleaseRequest) fuse.Error
+	Release(ctx context.Context, req *fuse.ReleaseRequest) error
 }
 
 type Server struct {
@@ -867,7 +867,7 @@ func (c *serveConn) serve(r fuse.Request) {
 
 	case *fuse.LookupRequest:
 		var n2 Node
-		var err fuse.Error
+		var err error
 		s := &fuse.LookupResponse{}
 		if n, ok := node.(NodeStringLookuper); ok {
 			n2, err = n.Lookup(ctx, r.Name)
@@ -1289,7 +1289,7 @@ type dataHandle struct {
 	data []byte
 }
 
-func (d *dataHandle) ReadAll(ctx context.Context) ([]byte, fuse.Error) {
+func (d *dataHandle) ReadAll(ctx context.Context) ([]byte, error) {
 	return d.data, nil
 }
 

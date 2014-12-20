@@ -20,7 +20,7 @@ type Tree struct {
 	tree
 }
 
-func (t *Tree) Root() (Node, fuse.Error) {
+func (t *Tree) Root() (Node, error) {
 	return &t.tree, nil
 }
 
@@ -81,7 +81,7 @@ func (t *tree) Attr() fuse.Attr {
 	return fuse.Attr{Mode: os.ModeDir | 0555}
 }
 
-func (t *tree) Lookup(ctx context.Context, name string) (Node, fuse.Error) {
+func (t *tree) Lookup(ctx context.Context, name string) (Node, error) {
 	n := t.lookup(name)
 	if n != nil {
 		return n, nil
@@ -89,7 +89,7 @@ func (t *tree) Lookup(ctx context.Context, name string) (Node, fuse.Error) {
 	return nil, fuse.ENOENT
 }
 
-func (t *tree) ReadDir(ctx context.Context) ([]fuse.Dirent, fuse.Error) {
+func (t *tree) ReadDir(ctx context.Context) ([]fuse.Dirent, error) {
 	var out []fuse.Dirent
 	for _, d := range t.dir {
 		out = append(out, fuse.Dirent{Name: d.name})

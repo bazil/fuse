@@ -24,13 +24,13 @@ type benchFS struct {
 var _ = fs.FS(benchFS{})
 var _ = fs.FSIniter(benchFS{})
 
-func (benchFS) Init(ctx context.Context, req *fuse.InitRequest, resp *fuse.InitResponse) fuse.Error {
+func (benchFS) Init(ctx context.Context, req *fuse.InitRequest, resp *fuse.InitResponse) error {
 	resp.MaxReadahead = 64 * 1024 * 1024
 	resp.Flags |= fuse.InitAsyncRead
 	return nil
 }
 
-func (f benchFS) Root() (fs.Node, fuse.Error) {
+func (f benchFS) Root() (fs.Node, error) {
 	return benchDir{conf: f.conf}, nil
 }
 
@@ -47,14 +47,14 @@ func (benchDir) Attr() fuse.Attr {
 	return fuse.Attr{Inode: 1, Mode: os.ModeDir | 0555}
 }
 
-func (d benchDir) Lookup(ctx context.Context, name string) (fs.Node, fuse.Error) {
+func (d benchDir) Lookup(ctx context.Context, name string) (fs.Node, error) {
 	if name == "bench" {
 		return benchFile{conf: d.conf}, nil
 	}
 	return nil, fuse.ENOENT
 }
 
-func (benchDir) ReadDir(ctx context.Context) ([]fuse.Dirent, fuse.Error) {
+func (benchDir) ReadDir(ctx context.Context) ([]fuse.Dirent, error) {
 	l := []fuse.Dirent{
 		{Inode: 2, Name: "bench", Type: fuse.DT_File},
 	}
@@ -76,7 +76,7 @@ func (benchFile) Attr() fuse.Attr {
 	return fuse.Attr{Inode: 2, Mode: 0644, Size: 9999999999999999}
 }
 
-func (f benchFile) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, fuse.Error) {
+func (f benchFile) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
 	if f.conf.directIO {
 		resp.Flags |= fuse.OpenDirectIO
 	}
@@ -85,17 +85,17 @@ func (f benchFile) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.O
 	return f, nil
 }
 
-func (benchFile) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) fuse.Error {
+func (benchFile) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
 	resp.Data = resp.Data[:cap(resp.Data)]
 	return nil
 }
 
-func (benchFile) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) fuse.Error {
+func (benchFile) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
 	resp.Size = len(req.Data)
 	return nil
 }
 
-func (benchFile) Fsync(ctx context.Context, req *fuse.FsyncRequest) fuse.Error {
+func (benchFile) Fsync(ctx context.Context, req *fuse.FsyncRequest) error {
 	return nil
 }
 
