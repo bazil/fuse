@@ -168,9 +168,16 @@ type NodeMkdirer interface {
 }
 
 type NodeOpener interface {
-	// Open opens the receiver.
+	// Open opens the receiver. After a successful open, a client
+	// process has a file descriptor referring to this Handle.
+	//
+	// Open can also be also called on non-files. For example,
+	// directories are Opened for ReadDir or fchdir(2).
+	//
+	// If this method is not implemented, the open will always
+	// succeed, and the Node itself will be used as the Handle.
+	//
 	// XXX note about access.  XXX OpenFlags.
-	// XXX note that the Node may be a file or directory.
 	Open(req *fuse.OpenRequest, resp *fuse.OpenResponse, intr Intr) (Handle, fuse.Error)
 }
 
