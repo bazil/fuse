@@ -167,6 +167,9 @@ type NodeMkdirer interface {
 	Mkdir(req *fuse.MkdirRequest, intr Intr) (Node, fuse.Error)
 }
 
+// A NodeOpener knows how to open a handle for the file or directory associated
+// with the node. If the node does not implement NodeOpener, opens will
+// automatically succeed and the node itself will be used as the handle.
 type NodeOpener interface {
 	// Open opens the receiver. After a successful open, a client
 	// process has a file descriptor referring to this Handle.
