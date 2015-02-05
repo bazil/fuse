@@ -254,8 +254,8 @@ func nodeAttr(n Node) (attr fuse.Attr) {
 // pertaining to all methods.
 //
 // Other FUSE requests can be handled by implementing methods from the
-// Node* interfaces. The most common to implement are
-// HandleReader, HandleReadDirer, and HandleWriter.
+// Handle* interfaces. The most common to implement are HandleReader,
+// HandleReadDirer, and HandleWriter.
 //
 // TODO implement methods: Getlk, Setlk, Setlkw
 type Handle interface {
