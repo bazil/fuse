@@ -41,7 +41,7 @@ type benchDir struct {
 var _ = fs.Node(benchDir{})
 var _ = fs.NodeStringLookuper(benchDir{})
 var _ = fs.Handle(benchDir{})
-var _ = fs.HandleReadDirer(benchDir{})
+var _ = fs.HandleReadDirAller(benchDir{})
 
 func (benchDir) Attr() fuse.Attr {
 	return fuse.Attr{Inode: 1, Mode: os.ModeDir | 0555}
@@ -54,7 +54,7 @@ func (d benchDir) Lookup(ctx context.Context, name string) (fs.Node, error) {
 	return nil, fuse.ENOENT
 }
 
-func (benchDir) ReadDir(ctx context.Context) ([]fuse.Dirent, error) {
+func (benchDir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	l := []fuse.Dirent{
 		{Inode: 2, Name: "bench", Type: fuse.DT_File},
 	}

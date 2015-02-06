@@ -78,7 +78,7 @@ var dirDirs = []fuse.Dirent{
 	{Inode: 2, Name: "hello", Type: fuse.DT_File},
 }
 
-func (Dir) ReadDir(ctx context.Context) ([]fuse.Dirent, error) {
+func (Dir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	return dirDirs, nil
 }
 

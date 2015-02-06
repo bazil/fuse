@@ -89,7 +89,7 @@ func (t *tree) Lookup(ctx context.Context, name string) (Node, error) {
 	return nil, fuse.ENOENT
 }
 
-func (t *tree) ReadDir(ctx context.Context) ([]fuse.Dirent, error) {
+func (t *tree) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	var out []fuse.Dirent
 	for _, d := range t.dir {
 		out = append(out, fuse.Dirent{Name: d.name})

@@ -274,8 +274,8 @@ type HandleReadAller interface {
 	ReadAll(ctx context.Context) ([]byte, error)
 }
 
-type HandleReadDirer interface {
-	ReadDir(ctx context.Context) ([]fuse.Dirent, error)
+type HandleReadDirAller interface {
+	ReadDirAll(ctx context.Context) ([]fuse.Dirent, error)
 }
 
 type HandleReader interface {
@@ -1042,9 +1042,9 @@ func (c *serveConn) serve(r fuse.Request) {
 
 		s := &fuse.ReadResponse{Data: make([]byte, 0, r.Size)}
 		if r.Dir {
-			if h, ok := handle.(HandleReadDirer); ok {
+			if h, ok := handle.(HandleReadDirAller); ok {
 				if shandle.readData == nil {
-					dirs, err := h.ReadDir(ctx)
+					dirs, err := h.ReadDirAll(ctx)
 					if err != nil {
 						done(err)
 						r.RespondError(err)

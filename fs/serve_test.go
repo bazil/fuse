@@ -1070,7 +1070,7 @@ type readdir struct {
 	fstestutil.Dir
 }
 
-func (d *readdir) ReadDir(ctx context.Context) ([]fuse.Dirent, error) {
+func (d *readdir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	return []fuse.Dirent{
 		{Name: "one", Inode: 11, Type: fuse.DT_Dir},
 		{Name: "three", Inode: 13},
