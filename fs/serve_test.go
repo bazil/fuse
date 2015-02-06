@@ -1064,13 +1064,13 @@ func TestTruncateWithOpen(t *testing.T) {
 	t.Logf("Got request: %#v", gotr)
 }
 
-// Test readdir
+// Test readdir calling ReadDirAll
 
-type readdir struct {
+type readDirAll struct {
 	fstestutil.Dir
 }
 
-func (d *readdir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
+func (d *readDirAll) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	return []fuse.Dirent{
 		{Name: "one", Inode: 11, Type: fuse.DT_Dir},
 		{Name: "three", Inode: 13},
@@ -1078,9 +1078,9 @@ func (d *readdir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	}, nil
 }
 
-func TestReadDir(t *testing.T) {
+func TestReadDirAll(t *testing.T) {
 	t.Parallel()
-	f := &readdir{}
+	f := &readDirAll{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f})
 	if err != nil {
 		t.Fatal(err)
