@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"flag"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -1111,6 +1112,37 @@ func TestReadDirAll(t *testing.T) {
 		names[2] != "two" {
 		t.Errorf(`expected 3 entries of "one", "three", "two", got: %q`, names)
 		return
+	}
+}
+
+// Test readdir without any ReadDir methods implemented.
+
+type readDirNotImplemented struct {
+	fstestutil.Dir
+}
+
+func TestReadDirNotImplemented(t *testing.T) {
+	t.Parallel()
+	f := &readDirNotImplemented{}
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	fil, err := os.Open(mnt.Dir)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer fil.Close()
+
+	// go Readdir is just Readdirnames + Lstat, there's no point in
+	// testing that here; we have no consumption API for the real
+	// dirent data
+	names, err := fil.Readdirnames(100)
+	if len(names) > 0 || err != io.EOF {
+		t.Fatalf("expected EOF got names=%v err=%v", names, err)
 	}
 }
 
