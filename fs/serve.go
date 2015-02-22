@@ -624,6 +624,8 @@ func (m *renameNewDirNodeNotFound) String() string {
 
 func (c *serveConn) serve(r fuse.Request) {
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	req := &serveRequest{Request: r, cancel: cancel}
 
 	c.debug(request{
