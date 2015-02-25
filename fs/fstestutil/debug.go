@@ -1,10 +1,11 @@
 package fstestutil
 
 import (
-	"bazil.org/fuse"
 	"flag"
 	"log"
 	"strconv"
+
+	"bazil.org/fuse"
 )
 
 type flagDebug bool

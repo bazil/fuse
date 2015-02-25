@@ -1,10 +1,12 @@
 package record
 
 import (
-	"bazil.org/fuse"
-	"bazil.org/fuse/fs"
 	"sync"
 	"time"
+
+	"bazil.org/fuse"
+	"bazil.org/fuse/fs"
+	"golang.org/x/net/context"
 )
 
 type nothing struct{}
@@ -26,7 +28,7 @@ func (r *ReleaseWaiter) init() {
 	})
 }
 
-func (r *ReleaseWaiter) Release(req *fuse.ReleaseRequest, intr fs.Intr) fuse.Error {
+func (r *ReleaseWaiter) Release(ctx context.Context, req *fuse.ReleaseRequest) error {
 	r.init()
 	close(r.seen)
 	return nil

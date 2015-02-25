@@ -9,6 +9,8 @@ import (
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
+	_ "bazil.org/fuse/fs/fstestutil"
+	"golang.org/x/net/context"
 )
 
 var Usage = func() {
@@ -27,18 +29,34 @@ func main() {
 	}
 	mountpoint := flag.Arg(0)
 
-	c, err := fuse.Mount(mountpoint)
+	c, err := fuse.Mount(
+		mountpoint,
+		fuse.FSName("helloworld"),
+		fuse.Subtype("hellofs"),
+		fuse.LocalVolume(),
+		fuse.VolumeName("Hello world!"),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer c.Close()
+
+	err = fs.Serve(c, FS{})
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fs.Serve(c, FS{})
+	// check if the mount process has an error to report
+	<-c.Ready
+	if err := c.MountError; err != nil {
+		log.Fatal(err)
+	}
 }
 
 // FS implements the hello world file system.
 type FS struct{}
 
-func (FS) Root() (fs.Node, fuse.Error) {
+func (FS) Root() (fs.Node, error) {
 	return Dir{}, nil
 }
 
@@ -49,7 +67,7 @@ func (Dir) Attr() fuse.Attr {
 	return fuse.Attr{Inode: 1, Mode: os.ModeDir | 0555}
 }
 
-func (Dir) Lookup(name string, intr fs.Intr) (fs.Node, fuse.Error) {
+func (Dir) Lookup(ctx context.Context, name string) (fs.Node, error) {
 	if name == "hello" {
 		return File{}, nil
 	}
@@ -60,17 +78,19 @@ var dirDirs = []fuse.Dirent{
 	{Inode: 2, Name: "hello", Type: fuse.DT_File},
 }
 
-func (Dir) ReadDir(intr fs.Intr) ([]fuse.Dirent, fuse.Error) {
+func (Dir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	return dirDirs, nil
 }
 
 // File implements both Node and Handle for the hello file.
 type File struct{}
 
+const greeting = "hello, world\n"
+
 func (File) Attr() fuse.Attr {
-	return fuse.Attr{Mode: 0444}
+	return fuse.Attr{Inode: 2, Mode: 0444, Size: uint64(len(greeting))}
 }
 
-func (File) ReadAll(intr fs.Intr) ([]byte, fuse.Error) {
-	return []byte("hello, world\n"), nil
+func (File) ReadAll(ctx context.Context) ([]byte, error) {
+	return []byte(greeting), nil
 }

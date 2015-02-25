@@ -1,14 +1,15 @@
 package fstestutil
 
 import (
-	"bazil.org/fuse"
-	"bazil.org/fuse/fs"
 	"errors"
 	"io/ioutil"
 	"log"
 	"os"
 	"testing"
 	"time"
+
+	"bazil.org/fuse"
+	"bazil.org/fuse/fs"
 )
 
 // Mount contains information about the mount for the test to use.
@@ -54,12 +55,12 @@ func (mnt *Mount) Close() {
 // workaround).
 //
 // After successful return, caller must clean up by calling Close.
-func Mounted(srv *fs.Server) (*Mount, error) {
+func Mounted(srv *fs.Server, options ...fuse.MountOption) (*Mount, error) {
 	dir, err := ioutil.TempDir("", "fusetest")
 	if err != nil {
 		return nil, err
 	}
-	c, err := fuse.Mount(dir)
+	c, err := fuse.Mount(dir, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +100,7 @@ func Mounted(srv *fs.Server) (*Mount, error) {
 //
 // The debug log is not enabled by default. Use `-fuse.debug` or call
 // DebugByDefault to enable.
-func MountedT(t testing.TB, filesys fs.FS) (*Mount, error) {
+func MountedT(t testing.TB, filesys fs.FS, options ...fuse.MountOption) (*Mount, error) {
 	srv := &fs.Server{
 		FS: filesys,
 	}
@@ -108,5 +109,5 @@ func MountedT(t testing.TB, filesys fs.FS) (*Mount, error) {
 			t.Logf("FUSE: %s", msg)
 		}
 	}
-	return Mounted(srv)
+	return Mounted(srv, options...)
 }
