@@ -27,10 +27,12 @@ type Debugger interface {
 	Print(msg interface{})
 }
 
-type nopDebugger struct {}
+type nopDebugger struct{}
 
-func (nopDebugger) Begin(msg interface{}) interface{} {}
+func (nopDebugger) Begin(msg interface{}) interface{} {
+	return nil
+}
 func (nopDebugger) End(key, msg interface{}) {}
-func (nopDebugger) Print(msg interface{})
+func (nopDebugger) Print(msg interface{}) {}
 
 var Debug Debugger = nopDebugger{}

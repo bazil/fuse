@@ -498,7 +498,7 @@ loop:
 	var req Request
 	switch m.hdr.Opcode {
 	default:
-		Debug(noOpcode{Opcode: m.hdr.Opcode})
+		Debug.Print(noOpcode{Opcode: m.hdr.Opcode})
 		goto unrecognized
 
 	case opLookup:
@@ -887,7 +887,7 @@ loop:
 	return req, nil
 
 corrupt:
-	Debug(malformedMessage{})
+	Debug.Print(malformedMessage{})
 	putMessage(m)
 	return nil, fmt.Errorf("fuse: malformed message")
 
@@ -924,7 +924,7 @@ func (c *Conn) respond(out *outHeader, n uintptr) {
 	msg := (*[1 << 30]byte)(unsafe.Pointer(out))[:n]
 	nn, err := syscall.Write(c.fd(), msg)
 	if nn != len(msg) || err != nil {
-		Debug(bugShortKernelWrite{
+		Debug.Print(bugShortKernelWrite{
 			Written: int64(nn),
 			Length:  int64(len(msg)),
 			Error:   errorString(err),
