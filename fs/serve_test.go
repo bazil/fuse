@@ -1223,11 +1223,7 @@ func TestOpen(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-<<<<<<< HEAD
-	want := fuse.OpenRequest{Dir: false, Flags: fuse.OpenFlags(os.O_WRONLY | os.O_APPEND | syscall.O_CLOEXEC)}
-=======
 	want := fuse.OpenRequest{Dir: false, Flags: fuse.OpenWriteOnly | fuse.OpenAppend}
->>>>>>> upstream/master
 	if runtime.GOOS == "darwin" {
 		// osxfuse does not let O_APPEND through at all
 		//
