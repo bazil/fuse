@@ -241,7 +241,6 @@ const (
 	// See also fs.Intr.
 	EINTR = Errno(syscall.EINTR)
 
-	ENODATA = Errno(syscall.ENODATA)
 	ERANGE  = Errno(syscall.ERANGE)
 	ENOTSUP = Errno(syscall.ENOTSUP)
 	EEXIST  = Errno(syscall.EEXIST)
@@ -252,14 +251,13 @@ const (
 const DefaultErrno = EIO
 
 var errnoNames = map[Errno]string{
-	ENOSYS:  "ENOSYS",
-	ESTALE:  "ESTALE",
-	ENOENT:  "ENOENT",
-	EIO:     "EIO",
-	EPERM:   "EPERM",
-	EINTR:   "EINTR",
-	ENODATA: "ENODATA",
-	EEXIST:  "EEXIST",
+	ENOSYS: "ENOSYS",
+	ESTALE: "ESTALE",
+	ENOENT: "ENOENT",
+	EIO:    "EIO",
+	EPERM:  "EPERM",
+	EINTR:  "EINTR",
+	EEXIST: "EEXIST",
 }
 
 // Errno implements Error and ErrorNumber using a syscall.Errno.
@@ -1195,11 +1193,6 @@ func (r *GetxattrRequest) Respond(resp *GetxattrResponse) {
 	}
 }
 
-func (r *GetxattrRequest) RespondError(err error) {
-	err = translateGetxattrError(err)
-	r.Header.RespondError(err)
-}
-
 // A GetxattrResponse is the response to a GetxattrRequest.
 type GetxattrResponse struct {
 	Xattr []byte
@@ -1271,11 +1264,6 @@ func (r *RemovexattrRequest) Respond() {
 	r.respond(out, unsafe.Sizeof(*out))
 }
 
-func (r *RemovexattrRequest) RespondError(err error) {
-	err = translateGetxattrError(err)
-	r.Header.RespondError(err)
-}
-
 // A SetxattrRequest asks to set an extended attribute associated with a file.
 type SetxattrRequest struct {
 	Header `json:"-"`
@@ -1319,11 +1307,6 @@ func (r *SetxattrRequest) String() string {
 func (r *SetxattrRequest) Respond() {
 	out := &outHeader{Unique: uint64(r.ID)}
 	r.respond(out, unsafe.Sizeof(*out))
-}
-
-func (r *SetxattrRequest) RespondError(err error) {
-	err = translateGetxattrError(err)
-	r.Header.RespondError(err)
 }
 
 // A LookupRequest asks to look up the given name in the directory named by r.Node.
