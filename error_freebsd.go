@@ -1,8 +1,6 @@
 package fuse
 
-import (
-	"syscall"
-)
+import "syscall"
 
 const (
 	ENOATTR = Errno(syscall.ENOATTR)

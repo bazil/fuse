@@ -203,9 +203,7 @@ type NodeGetxattrer interface {
 	// Getxattr gets an extended attribute by the given name from the
 	// node.
 	//
-	// If there is no xattr by that name, returns fuse.ENODATA. This
-	// will be translated to the platform-specific correct error code
-	// by the framework.
+	// If there is no xattr by that name, returns fuse.ErrNoXattr.
 	Getxattr(ctx context.Context, req *fuse.GetxattrRequest, resp *fuse.GetxattrResponse) error
 }
 
@@ -223,9 +221,7 @@ type NodeSetxattrer interface {
 type NodeRemovexattrer interface {
 	// Removexattr removes an extended attribute for the name.
 	//
-	// If there is no xattr by that name, returns fuse.ENODATA. This
-	// will be translated to the platform-specific correct error code
-	// by the framework.
+	// If there is no xattr by that name, returns fuse.ErrNoXattr.
 	Removexattr(ctx context.Context, req *fuse.RemovexattrRequest) error
 }
 
