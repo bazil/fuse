@@ -5,6 +5,10 @@ import (
 	"strings"
 )
 
+func dummyOption(conf *MountConfig) error {
+	return nil
+}
+
 // MountConfig holds the configuration for a mount operation.
 // Use it by passing MountOption values to Mount.
 type MountConfig struct {
