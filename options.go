@@ -107,3 +107,13 @@ func AllowRoot() MountOption {
 		return nil
 	}
 }
+
+// DefaultPermissions tells the FUSE kernel layer to check inode permissions in
+// the usual way before calling the file system, rather than leaving it up to
+// the file system to implement access policies itself.
+func DefaultPermissions() MountOption {
+	return func(conf *MountConfig) error {
+		conf.options["default_permissions"] = ""
+		return nil
+	}
+}
