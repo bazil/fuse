@@ -107,3 +107,13 @@ func AllowRoot() MountOption {
 		return nil
 	}
 }
+
+// Set the supplied arbitrary (key, value) pair in the "-o" argument to the
+// fuse mount binary, overriding any previous setting for the key. If value is
+// empty, the '=' will be omitted from the argument.
+func SetOption(key, value string) MountOption {
+	return func(conf *MountConfig) error {
+		conf.options[key] = value
+		return nil
+	}
+}
