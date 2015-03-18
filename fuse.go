@@ -1113,9 +1113,6 @@ func (a *Attr) attr() (out attr) {
 		out.Mode |= syscall.S_ISGID
 	}
 	out.Nlink = a.Nlink
-	if out.Nlink < 1 {
-		out.Nlink = 1
-	}
 	out.Uid = a.Uid
 	out.Gid = a.Gid
 	out.Rdev = a.Rdev
