@@ -1,6 +1,7 @@
 package fuse_test
 
 import (
+	"os"
 	"runtime"
 	"testing"
 
@@ -146,5 +147,38 @@ func TestMountOptionAllowRootThenAllowOther(t *testing.T) {
 	}
 	if g, e := err, fuse.ErrCannotCombineAllowOtherAndAllowRoot; g != e {
 		t.Fatalf("wrong error: %v != %v", g, e)
+	}
+}
+
+type unwritableFile struct{}
+
+func (f unwritableFile) Attr() fuse.Attr { return fuse.Attr{Mode: 0000} }
+
+func TestMountOptionDefaultPermissions(t *testing.T) {
+	if runtime.GOOS == "freebsd" {
+		t.Skip("FreeBSD does not support DefaultPermissions")
+	}
+	t.Parallel()
+	mnt, err := fstestutil.MountedT(t,
+		fstestutil.SimpleFS{
+			fstestutil.ChildMap{"child": unwritableFile{}},
+		},
+		fuse.DefaultPermissions(),
+	)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	// This will be prevented by kernel-level access checking when
+	// DefaultPermissions is used.
+	f, err := os.OpenFile(mnt.Dir+"/child", os.O_WRONLY, 0000)
+	if err == nil {
+		f.Close()
+		t.Fatal("expected an error")
+	}
+	if !os.IsPermission(err) {
+		t.Fatalf("expected a permission error, got %T: %v", err, err)
 	}
 }
