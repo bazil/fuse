@@ -155,7 +155,9 @@ func TestMountOptionAllowRootThenAllowOther(t *testing.T) {
 
 type unwritableFile struct{}
 
-func (f unwritableFile) Attr() fuse.Attr { return fuse.Attr{Mode: 0000} }
+func (f unwritableFile) Attr(a *fuse.Attr) {
+	a.Mode = 0000
+}
 
 func TestMountOptionDefaultPermissions(t *testing.T) {
 	if runtime.GOOS == "freebsd" {

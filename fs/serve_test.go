@@ -43,12 +43,16 @@ type symlink struct {
 	target string
 }
 
-func (f symlink) Attr() fuse.Attr { return fuse.Attr{Mode: os.ModeSymlink | 0666} }
+func (f symlink) Attr(a *fuse.Attr) {
+	a.Mode = os.ModeSymlink | 0666
+}
 
 // fifo can be embedded in a struct to make it look like a named pipe.
 type fifo struct{}
 
-func (f fifo) Attr() fuse.Attr { return fuse.Attr{Mode: os.ModeNamedPipe | 0666} }
+func (f fifo) Attr(a *fuse.Attr) {
+	a.Mode = os.ModeNamedPipe | 0666
+}
 
 type badRootFS struct{}
 
@@ -86,8 +90,9 @@ func (f testStatFS) Root() (fs.Node, error) {
 	return f, nil
 }
 
-func (f testStatFS) Attr() fuse.Attr {
-	return fuse.Attr{Inode: 1, Mode: os.ModeDir | 0777}
+func (f testStatFS) Attr(a *fuse.Attr) {
+	a.Inode = 1
+	a.Mode = os.ModeDir | 0777
 }
 
 func (f testStatFS) Statfs(ctx context.Context, req *fuse.StatfsRequest, resp *fuse.StatfsResponse) error {
@@ -149,8 +154,9 @@ func (f root) Root() (fs.Node, error) {
 	return f, nil
 }
 
-func (root) Attr() fuse.Attr {
-	return fuse.Attr{Inode: 1, Mode: os.ModeDir | 0555}
+func (root) Attr(a *fuse.Attr) {
+	a.Inode = 1
+	a.Mode = os.ModeDir | 0555
 }
 
 func TestStatRoot(t *testing.T) {
@@ -197,11 +203,9 @@ type readAll struct {
 
 const hi = "hello, world"
 
-func (readAll) Attr() fuse.Attr {
-	return fuse.Attr{
-		Mode: 0666,
-		Size: uint64(len(hi)),
-	}
+func (readAll) Attr(a *fuse.Attr) {
+	a.Mode = 0666
+	a.Size = uint64(len(hi))
 }
 
 func (readAll) ReadAll(ctx context.Context) ([]byte, error) {
@@ -235,11 +239,9 @@ type readWithHandleRead struct {
 	fstestutil.File
 }
 
-func (readWithHandleRead) Attr() fuse.Attr {
-	return fuse.Attr{
-		Mode: 0666,
-		Size: uint64(len(hi)),
-	}
+func (readWithHandleRead) Attr(a *fuse.Attr) {
+	a.Mode = 0666
+	a.Size = uint64(len(hi))
 }
 
 func (readWithHandleRead) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
@@ -773,11 +775,9 @@ type dataHandleTest struct {
 	fstestutil.File
 }
 
-func (dataHandleTest) Attr() fuse.Attr {
-	return fuse.Attr{
-		Mode: 0666,
-		Size: uint64(len(hi)),
-	}
+func (dataHandleTest) Attr(a *fuse.Attr) {
+	a.Mode = 0666
+	a.Size = uint64(len(hi))
 }
 
 func (dataHandleTest) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
@@ -812,11 +812,9 @@ type interrupt struct {
 	hanging chan struct{}
 }
 
-func (interrupt) Attr() fuse.Attr {
-	return fuse.Attr{
-		Mode: 0666,
-		Size: 1,
-	}
+func (interrupt) Attr(a *fuse.Attr) {
+	a.Mode = 0666
+	a.Size = 1
 }
 
 func (it *interrupt) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
@@ -1621,14 +1619,12 @@ func (f *inMemoryFile) bytes() []byte {
 	return f.data
 }
 
-func (f *inMemoryFile) Attr() fuse.Attr {
+func (f *inMemoryFile) Attr(a *fuse.Attr) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	return fuse.Attr{
-		Mode: 0666,
-		Size: uint64(len(f.data)),
-	}
+	a.Mode = 0666
+	a.Size = uint64(len(f.data))
 }
 
 func (f *inMemoryFile) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
@@ -1813,5 +1809,35 @@ func TestDirectWrite(t *testing.T) {
 
 	if got := string(w.RecordedWriteData()); got != hi {
 		t.Errorf("write = %q, want %q", got, hi)
+	}
+}
+
+// Test Attr
+
+// attrUnlinked is a file that is unlinked (Nlink==0).
+type attrUnlinked struct {
+	fstestutil.File
+}
+
+var _ fs.Node = attrUnlinked{}
+
+func (f attrUnlinked) Attr(a *fuse.Attr) {
+	f.File.Attr(a)
+	a.Nlink = 0
+}
+
+func TestAttrUnlinked(t *testing.T) {
+	t.Parallel()
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.ChildMap{"child": attrUnlinked{}}})
+
+	fi, err := os.Stat(mnt.Dir + "/child")
+	if err != nil {
+		t.Fatalf("Stat failed with %v", err)
+	}
+	switch stat := fi.Sys().(type) {
+	case *syscall.Stat_t:
+		if stat.Nlink != 0 {
+			t.Errorf("wrong link count: %v", stat.Nlink)
+		}
 	}
 }
