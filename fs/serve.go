@@ -87,7 +87,7 @@ type FSInodeGenerator interface {
 // Other FUSE requests can be handled by implementing methods from the
 // Node* interfaces, for example NodeOpener.
 type Node interface {
-	Attr() fuse.Attr
+	Attr(*fuse.Attr)
 }
 
 type NodeGetattrer interface {
@@ -228,22 +228,12 @@ type NodeRemovexattrer interface {
 var startTime = time.Now()
 
 func nodeAttr(n Node) (attr fuse.Attr) {
-	attr = n.Attr()
-	if attr.Nlink == 0 {
-		attr.Nlink = 1
-	}
-	if attr.Atime.IsZero() {
-		attr.Atime = startTime
-	}
-	if attr.Mtime.IsZero() {
-		attr.Mtime = startTime
-	}
-	if attr.Ctime.IsZero() {
-		attr.Ctime = startTime
-	}
-	if attr.Crtime.IsZero() {
-		attr.Crtime = startTime
-	}
+	attr.Nlink = 1
+	attr.Atime = startTime
+	attr.Mtime = startTime
+	attr.Ctime = startTime
+	attr.Crtime = startTime
+	n.Attr(&attr)
 	return
 }
 
