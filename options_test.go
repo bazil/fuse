@@ -3,10 +3,13 @@ package fuse_test
 import (
 	"os"
 	"runtime"
+	"syscall"
 	"testing"
 
 	"bazil.org/fuse"
+	"bazil.org/fuse/fs"
 	"bazil.org/fuse/fs/fstestutil"
+	"golang.org/x/net/context"
 )
 
 func init() {
@@ -180,5 +183,44 @@ func TestMountOptionDefaultPermissions(t *testing.T) {
 	}
 	if !os.IsPermission(err) {
 		t.Fatalf("expected a permission error, got %T: %v", err, err)
+	}
+}
+
+type createrDir struct {
+	fstestutil.Dir
+}
+
+var _ fs.NodeCreater = createrDir{}
+
+func (createrDir) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse.CreateResponse) (fs.Node, fs.Handle, error) {
+	// pick a really distinct error, to identify it later
+	return nil, nil, fuse.Errno(syscall.ENAMETOOLONG)
+}
+
+func TestMountOptionReadOnly(t *testing.T) {
+	t.Parallel()
+	mnt, err := fstestutil.MountedT(t,
+		fstestutil.SimpleFS{createrDir{}},
+		fuse.ReadOnly(),
+	)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	// This will be prevented by kernel-level access checking when
+	// ReadOnly is used.
+	f, err := os.Create(mnt.Dir + "/child")
+	if err == nil {
+		f.Close()
+		t.Fatal("expected an error")
+	}
+	perr, ok := err.(*os.PathError)
+	if !ok {
+		t.Fatalf("expected PathError, got %T: %v", err, err)
+	}
+	if perr.Err != syscall.EROFS {
+		t.Fatalf("expected EROFS, got %T: %v", err, err)
 	}
 }

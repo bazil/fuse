@@ -122,3 +122,11 @@ func DefaultPermissions() MountOption {
 		return nil
 	}
 }
+
+// ReadOnly makes the mount read-only.
+func ReadOnly() MountOption {
+	return func(conf *MountConfig) error {
+		conf.options["ro"] = ""
+		return nil
+	}
+}
