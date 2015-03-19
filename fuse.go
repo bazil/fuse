@@ -47,11 +47,17 @@
 //
 //	Op(ctx context.Context, req *OpRequest, resp *OpResponse) Error
 //
-// where Op is the name of a FUSE operation.  Op reads request parameters
-// from req and writes results to resp.  An operation whose only result is
-// the error result omits the resp parameter.  Multiple goroutines may call
-// service methods simultaneously; the methods being called are responsible
-// for appropriate synchronization.
+// where Op is the name of a FUSE operation. Op reads request
+// parameters from req and writes results to resp. An operation whose
+// only result is the error result omits the resp parameter.
+//
+// Multiple goroutines may call service methods simultaneously; the
+// methods being called are responsible for appropriate
+// synchronization.
+//
+// The operation must not hold on to the request or response,
+// including any []byte fields such as WriteRequest.Data or
+// SetxattrRequest.Xattr.
 //
 // Errors
 //
