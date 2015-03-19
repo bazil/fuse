@@ -1750,3 +1750,50 @@ func TestDirectRead(t *testing.T) {
 
 	testReadAll(t, mnt.Dir+"/child")
 }
+
+// Test direct Write.
+
+type directWrite struct {
+	fstestutil.File
+	record.Writes
+}
+
+// explicitly not defining Attr / Setattr and managing Size
+
+func (f *directWrite) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
+	// do not allow the kernel to use page cache
+	resp.Flags |= fuse.OpenDirectIO
+	return f, nil
+}
+
+func TestDirectWrite(t *testing.T) {
+	t.Parallel()
+	w := &directWrite{}
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.ChildMap{"child": w}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	f, err := os.OpenFile(mnt.Dir+"/child", os.O_RDWR, 0666)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	defer f.Close()
+	n, err := f.Write([]byte(hi))
+	if err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if n != len(hi) {
+		t.Fatalf("short write; n=%d; hi=%d", n, len(hi))
+	}
+
+	err = f.Close()
+	if err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	if got := string(w.RecordedWriteData()); got != hi {
+		t.Errorf("write = %q, want %q", got, hi)
+	}
+}
