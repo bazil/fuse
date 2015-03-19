@@ -20,8 +20,7 @@ func (w *Writes) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.W
 	n, err := w.buf.Write(req.Data)
 	resp.Size = n
 	if err != nil {
-		// TODO hiding error
-		return fuse.EIO
+		return err
 	}
 	return nil
 }
