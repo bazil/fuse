@@ -85,9 +85,12 @@
 //
 // Authentication
 //
-// All requests types embed a Header, meaning that the method can inspect
-// req.Pid, req.Uid, and req.Gid as necessary to implement permission checking.
-// Alternately, XXX.
+// All requests types embed a Header, meaning that the method can
+// inspect req.Pid, req.Uid, and req.Gid as necessary to implement
+// permission checking. The kernel FUSE layer normally prevents other
+// users from accessing the FUSE file system (to change this, see
+// AllowOther, AllowRoot), but does not enforce access modes (to
+// change this, see DefaultPermissions).
 //
 // Mount Options
 //
