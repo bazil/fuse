@@ -90,8 +90,6 @@
 //
 package fuse // import "bazil.org/fuse"
 
-// BUG(rsc): The mount code for FreeBSD has not been written yet.
-
 import (
 	"bytes"
 	"encoding/json"
