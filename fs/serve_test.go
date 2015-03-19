@@ -3,14 +3,11 @@ package fs_test
 import (
 	"bytes"
 	"errors"
-	"flag"
 	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 	"syscall"
@@ -38,32 +35,6 @@ import (
 
 func init() {
 	fstestutil.DebugByDefault()
-}
-
-var childMode bool
-
-func init() {
-	flag.BoolVar(&childMode, "fuse.internal.childmode", false, "internal use only")
-}
-
-// childCmd prepares a test function to be run in a subprocess, with
-// childMode set to true. Caller must still call Run or Start.
-//
-// Re-using the test executable as the subprocess is useful because
-// now test executables can e.g. be cross-compiled, transferred
-// between hosts, and run in settings where the whole Go development
-// environment is not installed.
-func childCmd(testName string) (*exec.Cmd, error) {
-	// caller may set cwd, so we can't rely on relative paths
-	executable, err := filepath.Abs(os.Args[0])
-	if err != nil {
-		return nil, err
-	}
-	testName = regexp.QuoteMeta(testName)
-	cmd := exec.Command(executable, "-test.run=^"+testName+"$", "-fuse.internal.childmode")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd, nil
 }
 
 // symlink can be embedded in a struct to make it look like a symlink.
@@ -1658,6 +1629,54 @@ func (f *inMemoryFile) Write(ctx context.Context, req *fuse.WriteRequest, resp *
 	return nil
 }
 
+const mmapSize = 16 * 4096
+
+var mmapWrites = map[int]byte{
+	10:              'a',
+	4096:            'b',
+	4097:            'c',
+	mmapSize - 4096: 'd',
+	mmapSize - 1:    'z',
+}
+
+func helperMmap() {
+	f, err := os.Create("child")
+	if err != nil {
+		log.Fatalf("Create: %v", err)
+	}
+	defer f.Close()
+
+	data, err := syscall.Mmap(int(f.Fd()), 0, mmapSize, syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
+	if err != nil {
+		log.Fatalf("Mmap: %v", err)
+	}
+
+	for i, b := range mmapWrites {
+		data[i] = b
+	}
+
+	if err := syscallx.Msync(data, syscall.MS_SYNC); err != nil {
+		log.Fatalf("Msync: %v", err)
+	}
+
+	if err := syscall.Munmap(data); err != nil {
+		log.Fatalf("Munmap: %v", err)
+	}
+
+	if err := f.Sync(); err != nil {
+		log.Fatalf("Fsync = %v", err)
+	}
+
+	err = f.Close()
+	if err != nil {
+		log.Fatalf("Close: %v", err)
+	}
+}
+
+func init() {
+	childHelpers["mmap"] = helperMmap
+}
+
 type mmap struct {
 	inMemoryFile
 	// We don't actually care about whether the fsync happened or not;
@@ -1667,65 +1686,21 @@ type mmap struct {
 }
 
 func TestMmap(t *testing.T) {
-	const size = 16 * 4096
-	writes := map[int]byte{
-		10:          'a',
-		4096:        'b',
-		4097:        'c',
-		size - 4096: 'd',
-		size - 1:    'z',
-	}
-
-	// Run the mmap-using parts of the test in a subprocess, to avoid
-	// an intentional page fault hanging the whole process (because it
-	// would need to be served by the same process, and there might
-	// not be a thread free to do that). Merely bumping GOMAXPROCS is
-	// not enough to prevent the hangs reliably.
-	if childMode {
-		f, err := os.Create("child")
-		if err != nil {
-			t.Fatalf("Create: %v", err)
-		}
-		defer f.Close()
-
-		data, err := syscall.Mmap(int(f.Fd()), 0, size, syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
-		if err != nil {
-			t.Fatalf("Mmap: %v", err)
-		}
-
-		for i, b := range writes {
-			data[i] = b
-		}
-
-		if err := syscallx.Msync(data, syscall.MS_SYNC); err != nil {
-			t.Fatalf("Msync: %v", err)
-		}
-
-		if err := syscall.Munmap(data); err != nil {
-			t.Fatalf("Munmap: %v", err)
-		}
-
-		if err := f.Sync(); err != nil {
-			t.Fatalf("Fsync = %v", err)
-		}
-
-		err = f.Close()
-		if err != nil {
-			t.Fatalf("Close: %v", err)
-		}
-
-		return
-	}
 
 	w := &mmap{}
-	w.data = make([]byte, size)
+	w.data = make([]byte, mmapSize)
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.ChildMap{"child": w}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
 
-	child, err := childCmd("TestMmap")
+	// Run the mmap-using parts of the test in a subprocess, to avoid
+	// an intentional page fault hanging the whole process (because it
+	// would need to be served by the same process, and there might
+	// not be a thread free to do that). Merely bumping GOMAXPROCS is
+	// not enough to prevent the hangs reliably.
+	child, err := childCmd("mmap")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1735,12 +1710,12 @@ func TestMmap(t *testing.T) {
 	}
 
 	got := w.data
-	if g, e := len(got), size; g != e {
+	if g, e := len(got), mmapSize; g != e {
 		t.Fatalf("bad write length: %d != %d", g, e)
 	}
 	for i, g := range got {
 		// default '\x00' for writes[i] is good here
-		if e := writes[i]; g != e {
+		if e := mmapWrites[i]; g != e {
 			t.Errorf("wrong byte at offset %d: %q != %q", i, g, e)
 		}
 	}
