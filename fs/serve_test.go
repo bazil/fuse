@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -1609,10 +1610,21 @@ func TestCustomErrno(t *testing.T) {
 // Test Mmap writing
 
 type inMemoryFile struct {
+	mu   sync.Mutex
 	data []byte
 }
 
+func (f *inMemoryFile) bytes() []byte {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	return f.data
+}
+
 func (f *inMemoryFile) Attr() fuse.Attr {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	return fuse.Attr{
 		Mode: 0666,
 		Size: uint64(len(f.data)),
@@ -1620,11 +1632,17 @@ func (f *inMemoryFile) Attr() fuse.Attr {
 }
 
 func (f *inMemoryFile) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	fuseutil.HandleRead(req, resp, f.data)
 	return nil
 }
 
 func (f *inMemoryFile) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	resp.Size = copy(f.data[req.Offset:], req.Data)
 	return nil
 }
@@ -1709,7 +1727,7 @@ func TestMmap(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := w.data
+	got := w.bytes()
 	if g, e := len(got), mmapSize; g != e {
 		t.Fatalf("bad write length: %d != %d", g, e)
 	}
