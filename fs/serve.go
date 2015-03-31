@@ -55,9 +55,6 @@ type FSDestroyer interface {
 	// Linux only sends this request for block device backed (fuseblk)
 	// filesystems, to allow them to flush writes to disk before the
 	// unmount completes.
-	//
-	// On normal FUSE filesystems, use Forget of the root Node to
-	// do actions at unmount time.
 	Destroy()
 }
 
@@ -192,6 +189,11 @@ type NodeCreater interface {
 }
 
 type NodeForgetter interface {
+	// Forget about this node. This node will not receive further
+	// method calls.
+	//
+	// Forget is not necessarily seen on unmount, as all nodes are
+	// implicitly forgotten as part part of the unmount.
 	Forget()
 }
 
