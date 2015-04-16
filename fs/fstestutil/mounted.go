@@ -10,6 +10,7 @@ import (
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
+	"golang.org/x/net/context"
 )
 
 // Mount contains information about the mount for the test to use.
@@ -75,7 +76,7 @@ func Mounted(srv *fs.Server, options ...fuse.MountOption) (*Mount, error) {
 	}
 	go func() {
 		defer close(done)
-		serveErr <- srv.Serve(c)
+		serveErr <- srv.Serve(context.Background(), c)
 	}()
 
 	select {
@@ -105,7 +106,7 @@ func MountedT(t testing.TB, filesys fs.FS, options ...fuse.MountOption) (*Mount,
 		FS: filesys,
 	}
 	if debug {
-		srv.Debug = func(msg interface{}) {
+		srv.Debug = func(ctx context.Context, msg interface{}) {
 			t.Logf("FUSE: %s", msg)
 		}
 	}

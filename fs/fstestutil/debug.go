@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"bazil.org/fuse"
+	"golang.org/x/net/context"
 )
 
 type flagDebug bool
@@ -18,7 +19,7 @@ func (f *flagDebug) IsBoolFlag() bool {
 	return true
 }
 
-func nop(msg interface{}) {}
+func nop(ctx context.Context, msg interface{}) {}
 
 func (f *flagDebug) Set(s string) error {
 	v, err := strconv.ParseBool(s)
@@ -38,7 +39,7 @@ func (f *flagDebug) String() string {
 	return strconv.FormatBool(bool(*f))
 }
 
-func logMsg(msg interface{}) {
+func logMsg(ctx context.Context, msg interface{}) {
 	log.Printf("FUSE: %s\n", msg)
 }
 
