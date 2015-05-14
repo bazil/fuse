@@ -2,6 +2,8 @@ package fuse
 
 import (
 	"runtime"
+
+	"golang.org/x/net/context"
 )
 
 func stack() string {
@@ -9,7 +11,7 @@ func stack() string {
 	return string(buf[:runtime.Stack(buf, false)])
 }
 
-func nop(msg interface{}) {}
+func nop(ctx context.Context, msg interface{}) {}
 
 // Debug is called to output debug messages, including protocol
 // traces. The default behavior is to do nothing.
@@ -18,4 +20,4 @@ func nop(msg interface{}) {}
 // safe to marshal to JSON.
 //
 // Implementations must not retain msg.
-var Debug func(msg interface{}) = nop
+var Debug func(ctx context.Context, msg interface{}) = nop
