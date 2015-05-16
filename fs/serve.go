@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"hash/fnv"
 	"io"
+	"log"
 	"reflect"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -649,6 +651,15 @@ func (h handlerPanickedError) Error() string {
 	return fmt.Sprintf("handler panicked: %v", h.Err)
 }
 
+var _ fuse.ErrorNumber = handlerPanickedError{}
+
+func (h handlerPanickedError) Errno() fuse.Errno {
+	if err, ok := h.Err.(fuse.ErrorNumber); ok {
+		return err.Errno()
+	}
+	return fuse.DefaultErrno
+}
+
 func (c *serveConn) serve(r fuse.Request) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -730,12 +741,14 @@ func (c *serveConn) serve(r fuse.Request) {
 
 	defer func() {
 		if rec := recover(); rec != nil {
-			err, ok := rec.(error)
-			if !ok {
-				err = handlerPanickedError{
-					Request: r,
-					Err:     rec,
-				}
+			const size = 1 << 16
+			buf := make([]byte, size)
+			n := runtime.Stack(buf, false)
+			buf = buf[:n]
+			log.Printf("fuse: panic in handler for %v: %v\n%s", r, rec, buf)
+			err := handlerPanickedError{
+				Request: r,
+				Err:     rec,
 			}
 			done(err)
 			r.RespondError(err)
