@@ -638,6 +638,17 @@ func (m *renameNewDirNodeNotFound) String() string {
 	return fmt.Sprintf("In RenameRequest (request %#x), node %d not found", m.Request.Hdr().ID, m.In.NewDir)
 }
 
+type handlerPanickedError struct {
+	Request interface{}
+	Err     interface{}
+}
+
+var _ error = handlerPanickedError{}
+
+func (h handlerPanickedError) Error() string {
+	return fmt.Sprintf("handler panicked: %v", h.Err)
+}
+
 func (c *serveConn) serve(r fuse.Request) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -716,6 +727,20 @@ func (c *serveConn) serve(r fuse.Request) {
 		delete(c.req, hdr.ID)
 		c.meta.Unlock()
 	}
+
+	defer func() {
+		if rec := recover(); rec != nil {
+			err, ok := rec.(error)
+			if !ok {
+				err = handlerPanickedError{
+					Request: r,
+					Err:     rec,
+				}
+			}
+			done(err)
+			r.RespondError(err)
+		}
+	}()
 
 	switch r := r.(type) {
 	default:

@@ -84,6 +84,48 @@ func TestRootErr(t *testing.T) {
 	}
 }
 
+type testPanic struct{}
+
+type panicSentinel struct{}
+
+var _ error = panicSentinel{}
+
+func (panicSentinel) Error() string { return "just a test" }
+
+var _ fuse.ErrorNumber = panicSentinel{}
+
+func (panicSentinel) Errno() fuse.Errno {
+	return fuse.Errno(syscall.ENAMETOOLONG)
+}
+
+func (f testPanic) Root() (fs.Node, error) {
+	return f, nil
+}
+
+func (f testPanic) Attr(a *fuse.Attr) {
+	a.Inode = 1
+	a.Mode = os.ModeDir | 0777
+}
+
+func (f testPanic) Statfs(ctx context.Context, req *fuse.StatfsRequest, resp *fuse.StatfsResponse) error {
+	panic(panicSentinel{})
+}
+
+func TestPanic(t *testing.T) {
+	t.Parallel()
+	mnt, err := fstestutil.MountedT(t, testPanic{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	var st syscall.Statfs_t
+	err = syscall.Statfs(mnt.Dir, &st)
+	if g, e := err, syscall.ENAMETOOLONG; g != e {
+		t.Fatalf("wrong error from panicking handler: %v != %v", g, e)
+	}
+}
+
 type testStatFS struct{}
 
 func (f testStatFS) Root() (fs.Node, error) {
