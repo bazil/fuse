@@ -18,19 +18,13 @@ func (f *flagDebug) IsBoolFlag() bool {
 	return true
 }
 
-func nop(msg interface{}) {}
-
 func (f *flagDebug) Set(s string) error {
 	v, err := strconv.ParseBool(s)
 	if err != nil {
 		return err
 	}
 	*f = flagDebug(v)
-	if v {
-		fuse.Debug = logMsg
-	} else {
-		fuse.Debug = nop
-	}
+	fuse.Debug = testDebugger{}
 	return nil
 }
 
@@ -38,8 +32,23 @@ func (f *flagDebug) String() string {
 	return strconv.FormatBool(bool(*f))
 }
 
-func logMsg(msg interface{}) {
-	log.Printf("FUSE: %s\n", msg)
+// testDebugger is the Debugger used for tests, controlled
+// by the debug flag.
+type testDebugger struct {}
+
+func (d testDebugger) Print(msg interface{}) {
+	if debug {
+		log.Printf("FUSE: %s\n", msg)
+	}
+}
+
+func (d testDebugger) Begin(msg interface{}) interface{} {
+	d.Print(msg)
+	return nil
+}
+
+func (d testDebugger) End(span, msg interface{}) {
+	d.Print(msg)
 }
 
 func init() {
