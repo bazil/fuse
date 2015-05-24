@@ -317,12 +317,17 @@ type Server struct {
 	//
 	// See fuse.Debug for the rules that log functions must follow.
 	Debug func(msg interface{})
+
+	// Used to ensure worker goroutines finish before Serve returns
+	wg sync.WaitGroup
 }
 
 // Serve serves the FUSE connection by making calls to the methods
 // of fs and the Nodes and Handles it makes available.  It returns only
 // when the connection has been closed or an unexpected error occurs.
 func (s *Server) Serve(c *fuse.Conn) error {
+	defer s.wg.Wait() // Wait for worker goroutines to complete before return
+
 	sc := serveConn{
 		fs:           s.FS,
 		debug:        s.Debug,
@@ -352,7 +357,11 @@ func (s *Server) Serve(c *fuse.Conn) error {
 			return err
 		}
 
-		go sc.serve(req)
+		s.wg.Add(1)
+		go func() {
+			defer s.wg.Done()
+			sc.serve(req)
+		}()
 	}
 	return nil
 }
