@@ -46,7 +46,7 @@
 // The required and optional methods for the FS, Node, and Handle interfaces
 // have the general form
 //
-//	Op(ctx context.Context, req *OpRequest, resp *OpResponse) Error
+//	Op(ctx context.Context, req *OpRequest, resp *OpResponse) error
 //
 // where Op is the name of a FUSE operation. Op reads request
 // parameters from req and writes results to resp. An operation whose
