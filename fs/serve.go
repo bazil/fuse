@@ -848,7 +848,11 @@ func (c *serveConn) serve(r fuse.Request) {
 			r.RespondError(err)
 			break
 		}
-		c.saveLookup(&s.LookupResponse, snode, r.NewName, n2)
+		if err := c.saveLookup(ctx, &s.LookupResponse, snode, r.NewName, n2); err != nil {
+			done(err)
+			r.RespondError(err)
+			break
+		}
 		done(s)
 		r.Respond(s)
 
@@ -897,7 +901,11 @@ func (c *serveConn) serve(r fuse.Request) {
 			break
 		}
 		s := &fuse.LookupResponse{}
-		c.saveLookup(s, snode, r.NewName, n2)
+		if err := c.saveLookup(ctx, s, snode, r.NewName, n2); err != nil {
+			done(err)
+			r.RespondError(err)
+			break
+		}
 		done(s)
 		r.Respond(s)
 
@@ -946,7 +954,11 @@ func (c *serveConn) serve(r fuse.Request) {
 			r.RespondError(err)
 			break
 		}
-		c.saveLookup(s, snode, r.Name, n2)
+		if err := c.saveLookup(ctx, s, snode, r.Name, n2); err != nil {
+			done(err)
+			r.RespondError(err)
+			break
+		}
 		done(s)
 		r.Respond(s)
 
@@ -964,7 +976,11 @@ func (c *serveConn) serve(r fuse.Request) {
 			r.RespondError(err)
 			break
 		}
-		c.saveLookup(&s.LookupResponse, snode, r.Name, n2)
+		if err := c.saveLookup(ctx, &s.LookupResponse, snode, r.Name, n2); err != nil {
+			done(err)
+			r.RespondError(err)
+			break
+		}
 		done(s)
 		r.Respond(s)
 
@@ -1001,7 +1017,11 @@ func (c *serveConn) serve(r fuse.Request) {
 			r.RespondError(err)
 			break
 		}
-		c.saveLookup(&s.LookupResponse, snode, r.Name, n2)
+		if err := c.saveLookup(ctx, &s.LookupResponse, snode, r.Name, n2); err != nil {
+			done(err)
+			r.RespondError(err)
+			break
+		}
 		s.Handle = c.saveHandle(h2, hdr.Node)
 		done(s)
 		r.Respond(s)
@@ -1277,7 +1297,11 @@ func (c *serveConn) serve(r fuse.Request) {
 			break
 		}
 		s := &fuse.LookupResponse{}
-		c.saveLookup(s, snode, r.Name, n2)
+		if err := c.saveLookup(ctx, s, snode, r.Name, n2); err != nil {
+			done(err)
+			r.RespondError(err)
+			break
+		}
 		done(s)
 		r.Respond(s)
 
@@ -1327,7 +1351,7 @@ func (c *serveConn) serve(r fuse.Request) {
 	}
 }
 
-func (c *serveConn) saveLookup(s *fuse.LookupResponse, snode *serveNode, elem string, n2 Node) {
+func (c *serveConn) saveLookup(ctx context.Context, s *fuse.LookupResponse, snode *serveNode, elem string, n2 Node) error {
 	s.Attr = nodeAttr(n2)
 	if s.Attr.Inode == 0 {
 		s.Attr.Inode = c.dynamicInode(snode.inode, elem)
@@ -1340,6 +1364,7 @@ func (c *serveConn) saveLookup(s *fuse.LookupResponse, snode *serveNode, elem st
 	if s.AttrValid == 0 {
 		s.AttrValid = attrValidTime
 	}
+	return nil
 }
 
 // DataHandle returns a read-only Handle that satisfies reads
