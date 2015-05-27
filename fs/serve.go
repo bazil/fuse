@@ -673,6 +673,10 @@ func (h handlerPanickedError) Errno() fuse.Errno {
 	return fuse.DefaultErrno
 }
 
+func initLookupResponse(s *fuse.LookupResponse) {
+	s.EntryValid = entryValidTime
+}
+
 func (c *serveConn) serve(r fuse.Request) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -846,6 +850,7 @@ func (c *serveConn) serve(r fuse.Request) {
 
 	case *fuse.SymlinkRequest:
 		s := &fuse.SymlinkResponse{}
+		initLookupResponse(&s.LookupResponse)
 		n, ok := node.(NodeSymlinker)
 		if !ok {
 			done(fuse.EIO) // XXX or EPERM like Mkdir?
@@ -911,6 +916,7 @@ func (c *serveConn) serve(r fuse.Request) {
 			break
 		}
 		s := &fuse.LookupResponse{}
+		initLookupResponse(s)
 		if err := c.saveLookup(ctx, s, snode, r.NewName, n2); err != nil {
 			done(err)
 			r.RespondError(err)
@@ -950,6 +956,7 @@ func (c *serveConn) serve(r fuse.Request) {
 		var n2 Node
 		var err error
 		s := &fuse.LookupResponse{}
+		initLookupResponse(s)
 		if n, ok := node.(NodeStringLookuper); ok {
 			n2, err = n.Lookup(ctx, r.Name)
 		} else if n, ok := node.(NodeRequestLookuper); ok {
@@ -974,6 +981,7 @@ func (c *serveConn) serve(r fuse.Request) {
 
 	case *fuse.MkdirRequest:
 		s := &fuse.MkdirResponse{}
+		initLookupResponse(&s.LookupResponse)
 		n, ok := node.(NodeMkdirer)
 		if !ok {
 			done(fuse.EPERM)
@@ -1021,6 +1029,7 @@ func (c *serveConn) serve(r fuse.Request) {
 			break
 		}
 		s := &fuse.CreateResponse{OpenResponse: fuse.OpenResponse{}}
+		initLookupResponse(&s.LookupResponse)
 		n2, h2, err := n.Create(ctx, r, s)
 		if err != nil {
 			done(err)
@@ -1307,6 +1316,7 @@ func (c *serveConn) serve(r fuse.Request) {
 			break
 		}
 		s := &fuse.LookupResponse{}
+		initLookupResponse(s)
 		if err := c.saveLookup(ctx, s, snode, r.Name, n2); err != nil {
 			done(err)
 			r.RespondError(err)
@@ -1370,9 +1380,6 @@ func (c *serveConn) saveLookup(ctx context.Context, s *fuse.LookupResponse, snod
 	}
 
 	s.Node, s.Generation = c.saveNode(s.Attr.Inode, n2)
-	if s.EntryValid == 0 {
-		s.EntryValid = entryValidTime
-	}
 	return nil
 }
 
