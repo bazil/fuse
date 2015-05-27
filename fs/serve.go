@@ -401,12 +401,12 @@ type serveNode struct {
 	refs  uint64
 }
 
-func (sn *serveNode) attr() (attr fuse.Attr) {
-	attr = nodeAttr(sn.node)
+func (sn *serveNode) attr(ctx context.Context, attr *fuse.Attr) error {
+	*attr = nodeAttr(sn.node)
 	if attr.Inode == 0 {
 		attr.Inode = sn.inode
 	}
-	return
+	return nil
 }
 
 type serveHandle struct {
@@ -811,7 +811,11 @@ func (c *serveConn) serve(r fuse.Request) {
 			}
 		} else {
 			s.AttrValid = attrValidTime
-			s.Attr = snode.attr()
+			if err := snode.attr(ctx, &s.Attr); err != nil {
+				done(err)
+				r.RespondError(err)
+				break
+			}
 		}
 		done(s)
 		r.Respond(s)
@@ -830,7 +834,11 @@ func (c *serveConn) serve(r fuse.Request) {
 		}
 
 		s.AttrValid = attrValidTime
-		s.Attr = snode.attr()
+		if err := snode.attr(ctx, &s.Attr); err != nil {
+			done(err)
+			r.RespondError(err)
+			break
+		}
 		done(s)
 		r.Respond(s)
 
