@@ -829,9 +829,7 @@ func (c *serveConn) serve(r fuse.Request) {
 			break
 		}
 
-		if s.AttrValid == 0 {
-			s.AttrValid = attrValidTime
-		}
+		s.AttrValid = attrValidTime
 		s.Attr = snode.attr()
 		done(s)
 		r.Respond(s)
