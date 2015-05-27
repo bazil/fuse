@@ -43,15 +43,17 @@ type symlink struct {
 	target string
 }
 
-func (f symlink) Attr(a *fuse.Attr) {
+func (f symlink) Attr(ctx context.Context, a *fuse.Attr) error {
 	a.Mode = os.ModeSymlink | 0666
+	return nil
 }
 
 // fifo can be embedded in a struct to make it look like a named pipe.
 type fifo struct{}
 
-func (f fifo) Attr(a *fuse.Attr) {
+func (f fifo) Attr(ctx context.Context, a *fuse.Attr) error {
 	a.Mode = os.ModeNamedPipe | 0666
+	return nil
 }
 
 type badRootFS struct{}
@@ -102,9 +104,10 @@ func (f testPanic) Root() (fs.Node, error) {
 	return f, nil
 }
 
-func (f testPanic) Attr(a *fuse.Attr) {
+func (f testPanic) Attr(ctx context.Context, a *fuse.Attr) error {
 	a.Inode = 1
 	a.Mode = os.ModeDir | 0777
+	return nil
 }
 
 func (f testPanic) Statfs(ctx context.Context, req *fuse.StatfsRequest, resp *fuse.StatfsResponse) error {
@@ -132,9 +135,10 @@ func (f testStatFS) Root() (fs.Node, error) {
 	return f, nil
 }
 
-func (f testStatFS) Attr(a *fuse.Attr) {
+func (f testStatFS) Attr(ctx context.Context, a *fuse.Attr) error {
 	a.Inode = 1
 	a.Mode = os.ModeDir | 0777
+	return nil
 }
 
 func (f testStatFS) Statfs(ctx context.Context, req *fuse.StatfsRequest, resp *fuse.StatfsResponse) error {
@@ -196,9 +200,10 @@ func (f root) Root() (fs.Node, error) {
 	return f, nil
 }
 
-func (root) Attr(a *fuse.Attr) {
+func (root) Attr(ctx context.Context, a *fuse.Attr) error {
 	a.Inode = 1
 	a.Mode = os.ModeDir | 0555
+	return nil
 }
 
 func TestStatRoot(t *testing.T) {
@@ -245,9 +250,10 @@ type readAll struct {
 
 const hi = "hello, world"
 
-func (readAll) Attr(a *fuse.Attr) {
+func (readAll) Attr(ctx context.Context, a *fuse.Attr) error {
 	a.Mode = 0666
 	a.Size = uint64(len(hi))
+	return nil
 }
 
 func (readAll) ReadAll(ctx context.Context) ([]byte, error) {
@@ -281,9 +287,10 @@ type readWithHandleRead struct {
 	fstestutil.File
 }
 
-func (readWithHandleRead) Attr(a *fuse.Attr) {
+func (readWithHandleRead) Attr(ctx context.Context, a *fuse.Attr) error {
 	a.Mode = 0666
 	a.Size = uint64(len(hi))
+	return nil
 }
 
 func (readWithHandleRead) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
@@ -817,9 +824,10 @@ type dataHandleTest struct {
 	fstestutil.File
 }
 
-func (dataHandleTest) Attr(a *fuse.Attr) {
+func (dataHandleTest) Attr(ctx context.Context, a *fuse.Attr) error {
 	a.Mode = 0666
 	a.Size = uint64(len(hi))
+	return nil
 }
 
 func (dataHandleTest) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
@@ -854,9 +862,10 @@ type interrupt struct {
 	hanging chan struct{}
 }
 
-func (interrupt) Attr(a *fuse.Attr) {
+func (interrupt) Attr(ctx context.Context, a *fuse.Attr) error {
 	a.Mode = 0666
 	a.Size = 1
+	return nil
 }
 
 func (it *interrupt) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
@@ -1661,12 +1670,13 @@ func (f *inMemoryFile) bytes() []byte {
 	return f.data
 }
 
-func (f *inMemoryFile) Attr(a *fuse.Attr) {
+func (f *inMemoryFile) Attr(ctx context.Context, a *fuse.Attr) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
 	a.Mode = 0666
 	a.Size = uint64(len(f.data))
+	return nil
 }
 
 func (f *inMemoryFile) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
@@ -1863,9 +1873,12 @@ type attrUnlinked struct {
 
 var _ fs.Node = attrUnlinked{}
 
-func (f attrUnlinked) Attr(a *fuse.Attr) {
-	f.File.Attr(a)
+func (f attrUnlinked) Attr(ctx context.Context, a *fuse.Attr) error {
+	if err := f.File.Attr(ctx, a); err != nil {
+		return err
+	}
 	a.Nlink = 0
+	return nil
 }
 
 func TestAttrUnlinked(t *testing.T) {
@@ -1881,5 +1894,26 @@ func TestAttrUnlinked(t *testing.T) {
 		if stat.Nlink != 0 {
 			t.Errorf("wrong link count: %v", stat.Nlink)
 		}
+	}
+}
+
+// Test behavior when Attr method fails
+
+type attrBad struct {
+}
+
+var _ fs.Node = attrBad{}
+
+func (attrBad) Attr(ctx context.Context, attr *fuse.Attr) error {
+	return fuse.Errno(syscall.ENAMETOOLONG)
+}
+
+func TestAttrBad(t *testing.T) {
+	t.Parallel()
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.ChildMap{"child": attrBad{}}})
+
+	_, err = os.Stat(mnt.Dir + "/child")
+	if nerr, ok := err.(*os.PathError); !ok || nerr.Err != syscall.ENAMETOOLONG {
+		t.Fatalf("wrong error: %v", err)
 	}
 }

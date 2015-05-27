@@ -155,8 +155,9 @@ func TestMountOptionAllowRootThenAllowOther(t *testing.T) {
 
 type unwritableFile struct{}
 
-func (f unwritableFile) Attr(a *fuse.Attr) {
+func (f unwritableFile) Attr(ctx context.Context, a *fuse.Attr) error {
 	a.Mode = 0000
+	return nil
 }
 
 func TestMountOptionDefaultPermissions(t *testing.T) {

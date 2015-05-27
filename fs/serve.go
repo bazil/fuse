@@ -86,7 +86,8 @@ type FSInodeGenerator interface {
 // Other FUSE requests can be handled by implementing methods from the
 // Node* interfaces, for example NodeOpener.
 type Node interface {
-	Attr(*fuse.Attr)
+	// Attr fills attr with the standard metadata for the node.
+	Attr(ctx context.Context, attr *fuse.Attr) error
 }
 
 type NodeGetattrer interface {
@@ -247,7 +248,9 @@ func nodeAttr(ctx context.Context, n Node, attr *fuse.Attr) error {
 	attr.Mtime = startTime
 	attr.Ctime = startTime
 	attr.Crtime = startTime
-	n.Attr(attr)
+	if err := n.Attr(ctx, attr); err != nil {
+		return err
+	}
 	return nil
 }
 
