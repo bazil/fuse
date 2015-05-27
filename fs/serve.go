@@ -240,14 +240,14 @@ type NodeRemovexattrer interface {
 
 var startTime = time.Now()
 
-func nodeAttr(n Node) (attr fuse.Attr) {
+func nodeAttr(ctx context.Context, n Node, attr *fuse.Attr) error {
 	attr.Nlink = 1
 	attr.Atime = startTime
 	attr.Mtime = startTime
 	attr.Ctime = startTime
 	attr.Crtime = startTime
-	n.Attr(&attr)
-	return
+	n.Attr(attr)
+	return nil
 }
 
 // A Handle is the interface required of an opened file or directory.
@@ -402,11 +402,11 @@ type serveNode struct {
 }
 
 func (sn *serveNode) attr(ctx context.Context, attr *fuse.Attr) error {
-	*attr = nodeAttr(sn.node)
+	err := nodeAttr(ctx, sn.node, attr)
 	if attr.Inode == 0 {
 		attr.Inode = sn.inode
 	}
-	return nil
+	return err
 }
 
 type serveHandle struct {
@@ -1360,7 +1360,9 @@ func (c *serveConn) serve(r fuse.Request) {
 }
 
 func (c *serveConn) saveLookup(ctx context.Context, s *fuse.LookupResponse, snode *serveNode, elem string, n2 Node) error {
-	s.Attr = nodeAttr(n2)
+	if err := nodeAttr(ctx, n2, &s.Attr); err != nil {
+		return err
+	}
 	if s.Attr.Inode == 0 {
 		s.Attr.Inode = c.dynamicInode(snode.inode, elem)
 	}
