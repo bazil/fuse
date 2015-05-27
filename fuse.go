@@ -68,7 +68,7 @@
 // can implement ErrorNumber to control the errno returned. Without
 // ErrorNumber, a generic errno (EIO) is returned.
 //
-// Errors messages will be visible in the debug log as part of the
+// Error messages will be visible in the debug log as part of the
 // response.
 //
 // Interrupted Operations
