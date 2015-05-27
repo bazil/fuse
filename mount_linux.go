@@ -58,11 +58,11 @@ func mount(dir string, conf *MountConfig, ready chan<- struct{}, errp *error) (f
 	var wg sync.WaitGroup
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, fmt.Errorf("setting up fusermount stderr: %v")
+		return nil, fmt.Errorf("setting up fusermount stderr: %v", err)
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return nil, fmt.Errorf("setting up fusermount stderr: %v")
+		return nil, fmt.Errorf("setting up fusermount stderr: %v", err)
 	}
 
 	if err := cmd.Start(); err != nil {
