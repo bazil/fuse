@@ -241,6 +241,7 @@ type NodeRemovexattrer interface {
 var startTime = time.Now()
 
 func nodeAttr(ctx context.Context, n Node, attr *fuse.Attr) error {
+	attr.Valid = attrValidTime
 	attr.Nlink = 1
 	attr.Atime = startTime
 	attr.Mtime = startTime
@@ -810,7 +811,6 @@ func (c *serveConn) serve(r fuse.Request) {
 				break
 			}
 		} else {
-			s.Attr.Valid = attrValidTime
 			if err := snode.attr(ctx, &s.Attr); err != nil {
 				done(err)
 				r.RespondError(err)
@@ -833,7 +833,6 @@ func (c *serveConn) serve(r fuse.Request) {
 			break
 		}
 
-		s.Attr.Valid = attrValidTime
 		if err := snode.attr(ctx, &s.Attr); err != nil {
 			done(err)
 			r.RespondError(err)
@@ -1370,9 +1369,6 @@ func (c *serveConn) saveLookup(ctx context.Context, s *fuse.LookupResponse, snod
 	s.Node, s.Generation = c.saveNode(s.Attr.Inode, n2)
 	if s.EntryValid == 0 {
 		s.EntryValid = entryValidTime
-	}
-	if s.Attr.Valid == 0 {
-		s.Attr.Valid = attrValidTime
 	}
 	return nil
 }
