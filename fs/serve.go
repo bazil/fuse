@@ -810,7 +810,7 @@ func (c *serveConn) serve(r fuse.Request) {
 				break
 			}
 		} else {
-			s.AttrValid = attrValidTime
+			s.Attr.Valid = attrValidTime
 			if err := snode.attr(ctx, &s.Attr); err != nil {
 				done(err)
 				r.RespondError(err)
@@ -833,7 +833,7 @@ func (c *serveConn) serve(r fuse.Request) {
 			break
 		}
 
-		s.AttrValid = attrValidTime
+		s.Attr.Valid = attrValidTime
 		if err := snode.attr(ctx, &s.Attr); err != nil {
 			done(err)
 			r.RespondError(err)
@@ -1371,8 +1371,8 @@ func (c *serveConn) saveLookup(ctx context.Context, s *fuse.LookupResponse, snod
 	if s.EntryValid == 0 {
 		s.EntryValid = entryValidTime
 	}
-	if s.AttrValid == 0 {
-		s.AttrValid = attrValidTime
+	if s.Attr.Valid == 0 {
+		s.Attr.Valid = attrValidTime
 	}
 	return nil
 }
