@@ -46,7 +46,7 @@ const (
 	protoVersionMinMajor = 7
 	protoVersionMinMinor = 8
 	protoVersionMaxMajor = 7
-	protoVersionMaxMinor = 8
+	protoVersionMaxMinor = 9
 )
 
 const (
@@ -71,6 +71,22 @@ type fileLock struct {
 	End   uint64
 	Type  uint32
 	Pid   uint32
+}
+
+// GetattrFlags are bit flags that can be seen in GetattrRequest.
+type GetattrFlags uint32
+
+const (
+	// Indicates the handle is valid.
+	GetattrFh GetattrFlags = 1 << 0
+)
+
+var getattrFlagsNames = []flagName{
+	{uint32(GetattrFh), "GetattrFh"},
+}
+
+func (fl GetattrFlags) String() string {
+	return flagString(uint32(fl), getattrFlagsNames)
 }
 
 // The SetattrValid are bit flags describing which fields in the SetattrRequest
@@ -380,8 +396,23 @@ type entryOut struct {
 	Attr           attr
 }
 
+func entryOutSize(p Protocol) uintptr {
+	switch {
+	case p.LT(Protocol{7, 9}):
+		return unsafe.Offsetof(entryOut{}.Attr) + unsafe.Offsetof(entryOut{}.Attr.Blksize)
+	default:
+		return unsafe.Sizeof(entryOut{})
+	}
+}
+
 type forgetIn struct {
 	Nlookup uint64
+}
+
+type getattrIn struct {
+	GetattrFlags uint32
+	dummy        uint32
+	Fh           uint64
 }
 
 type attrOut struct {
@@ -389,6 +420,15 @@ type attrOut struct {
 	AttrValidNsec uint32
 	Dummy         uint32
 	Attr          attr
+}
+
+func attrOutSize(p Protocol) uintptr {
+	switch {
+	case p.LT(Protocol{7, 9}):
+		return unsafe.Offsetof(attrOut{}.Attr) + unsafe.Offsetof(attrOut{}.Attr.Blksize)
+	default:
+		return unsafe.Sizeof(attrOut{})
+	}
 }
 
 // OS X
@@ -477,10 +517,38 @@ type flushIn struct {
 }
 
 type readIn struct {
-	Fh      uint64
-	Offset  uint64
-	Size    uint32
-	Padding uint32
+	Fh        uint64
+	Offset    uint64
+	Size      uint32
+	ReadFlags uint32
+	LockOwner uint64
+	Flags     uint32
+	padding   uint32
+}
+
+func readInSize(p Protocol) uintptr {
+	switch {
+	case p.LT(Protocol{7, 9}):
+		return unsafe.Offsetof(readIn{}.ReadFlags) + 4
+	default:
+		return unsafe.Sizeof(readIn{})
+	}
+}
+
+// The ReadFlags are passed in ReadRequest.
+type ReadFlags uint32
+
+const (
+	// LockOwner field is valid.
+	ReadLockOwner ReadFlags = 1 << 1
+)
+
+var readFlagNames = []flagName{
+	{uint32(ReadLockOwner), "ReadLockOwner"},
+}
+
+func (fl ReadFlags) String() string {
+	return flagString(uint32(fl), readFlagNames)
 }
 
 type writeIn struct {
@@ -488,6 +556,18 @@ type writeIn struct {
 	Offset     uint64
 	Size       uint32
 	WriteFlags uint32
+	LockOwner  uint64
+	Flags      uint32
+	padding    uint32
+}
+
+func writeInSize(p Protocol) uintptr {
+	switch {
+	case p.LT(Protocol{7, 9}):
+		return unsafe.Offsetof(writeIn{}.LockOwner)
+	default:
+		return unsafe.Sizeof(writeIn{})
+	}
 }
 
 type writeOut struct {
@@ -498,11 +578,20 @@ type writeOut struct {
 // The WriteFlags are passed in WriteRequest.
 type WriteFlags uint32
 
+const (
+	WriteCache WriteFlags = 1 << 0
+	// LockOwner field is valid.
+	WriteLockOwner WriteFlags = 1 << 1
+)
+
+var writeFlagNames = []flagName{
+	{uint32(WriteCache), "WriteCache"},
+	{uint32(WriteLockOwner), "WriteLockOwner"},
+}
+
 func (fl WriteFlags) String() string {
 	return flagString(uint32(fl), writeFlagNames)
 }
-
-var writeFlagNames = []flagName{}
 
 const compatStatfsSize = 48
 
@@ -540,9 +629,20 @@ type getxattrOut struct {
 }
 
 type lkIn struct {
-	Fh    uint64
-	Owner uint64
-	Lk    fileLock
+	Fh      uint64
+	Owner   uint64
+	Lk      fileLock
+	LkFlags uint32
+	padding uint32
+}
+
+func lkInSize(p Protocol) uintptr {
+	switch {
+	case p.LT(Protocol{7, 9}):
+		return unsafe.Offsetof(lkIn{}.LkFlags)
+	default:
+		return unsafe.Sizeof(lkIn{})
+	}
 }
 
 type lkOut struct {

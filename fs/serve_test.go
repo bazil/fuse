@@ -210,6 +210,8 @@ func (f root) Root() (fs.Node, error) {
 func (root) Attr(ctx context.Context, a *fuse.Attr) error {
 	a.Inode = 1
 	a.Mode = os.ModeDir | 0555
+	// This has to be a power of two, but try to pick something that's an unlikely default.
+	a.BlockSize = 65536
 	return nil
 }
 
@@ -245,6 +247,13 @@ func TestStatRoot(t *testing.T) {
 		}
 		if stat.Gid != 0 {
 			t.Errorf("root has wrong gid: %d", stat.Gid)
+		}
+		if mnt.Conn.Protocol().HasAttrBlockSize() {
+			// convert stat.Blksize too because it's int64 on Linux but
+			// int32 on Darwin.
+			if g, e := int64(stat.Blksize), int64(65536); g != e {
+				t.Errorf("root has wrong blocksize: %d != %d", g, e)
+			}
 		}
 	}
 }
@@ -314,6 +323,98 @@ func TestReadAllWithHandleRead(t *testing.T) {
 	defer mnt.Close()
 
 	testReadAll(t, mnt.Dir+"/child")
+}
+
+type readFlags struct {
+	fstestutil.File
+	fileFlags record.Recorder
+}
+
+func (r *readFlags) Attr(ctx context.Context, a *fuse.Attr) error {
+	a.Mode = 0666
+	a.Size = uint64(len(hi))
+	return nil
+}
+
+func (r *readFlags) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
+	r.fileFlags.Record(req.FileFlags)
+	fuseutil.HandleRead(req, resp, []byte(hi))
+	return nil
+}
+
+func TestReadFileFlags(t *testing.T) {
+	t.Parallel()
+	r := &readFlags{}
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.ChildMap{"child": r}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	if !mnt.Conn.Protocol().HasReadWriteFlags() {
+		t.Skip("Old FUSE protocol")
+	}
+
+	f, err := os.OpenFile(mnt.Dir+"/child", os.O_RDWR|os.O_APPEND, 0666)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if _, err := f.Read(make([]byte, 4096)); err != nil {
+		t.Fatal(err)
+	}
+	_ = f.Close()
+
+	want := fuse.OpenReadWrite | fuse.OpenAppend
+	if g, e := r.fileFlags.Recorded().(fuse.OpenFlags), want; g != e {
+		t.Errorf("read saw file flags %+v, want %+v", g, e)
+	}
+}
+
+type writeFlags struct {
+	fstestutil.File
+	fileFlags record.Recorder
+}
+
+func (r *writeFlags) Attr(ctx context.Context, a *fuse.Attr) error {
+	a.Mode = 0666
+	a.Size = uint64(len(hi))
+	return nil
+}
+
+func (r *writeFlags) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
+	r.fileFlags.Record(req.FileFlags)
+	resp.Size = len(req.Data)
+	return nil
+}
+
+func TestWriteFileFlags(t *testing.T) {
+	t.Parallel()
+	r := &writeFlags{}
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.ChildMap{"child": r}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	if !mnt.Conn.Protocol().HasReadWriteFlags() {
+		t.Skip("Old FUSE protocol")
+	}
+
+	f, err := os.OpenFile(mnt.Dir+"/child", os.O_RDWR|os.O_APPEND, 0666)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if _, err := f.Write(make([]byte, 4096)); err != nil {
+		t.Fatal(err)
+	}
+	_ = f.Close()
+
+	want := fuse.OpenReadWrite | fuse.OpenAppend
+	if g, e := r.fileFlags.Recorded().(fuse.OpenFlags), want; g != e {
+		t.Errorf("write saw file flags %+v, want %+v", g, e)
+	}
 }
 
 // Test Release.

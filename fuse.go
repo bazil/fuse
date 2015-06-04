@@ -504,6 +504,10 @@ func (c *Conn) fd() int {
 	return int(c.dev.Fd())
 }
 
+func (c *Conn) Protocol() Protocol {
+	return c.proto
+}
+
 // ReadRequest returns the next FUSE request from the kernel.
 //
 // Caller must call either Request.Respond or Request.RespondError in
@@ -584,8 +588,22 @@ loop:
 		}
 
 	case opGetattr:
-		req = &GetattrRequest{
-			Header: m.Header(),
+		switch {
+		case c.proto.LT(Protocol{7, 9}):
+			req = &GetattrRequest{
+				Header: m.Header(),
+			}
+
+		default:
+			in := (*getattrIn)(m.data())
+			if m.len() < unsafe.Sizeof(*in) {
+				goto corrupt
+			}
+			req = &GetattrRequest{
+				Header: m.Header(),
+				Flags:  GetattrFlags(in.GetattrFlags),
+				Handle: HandleID(in.Fh),
+			}
 		}
 
 	case opSetattr:
@@ -736,20 +754,26 @@ loop:
 
 	case opRead, opReaddir:
 		in := (*readIn)(m.data())
-		if m.len() < unsafe.Sizeof(*in) {
+		if m.len() < readInSize(c.proto) {
 			goto corrupt
 		}
-		req = &ReadRequest{
+		r := &ReadRequest{
 			Header: m.Header(),
 			Dir:    m.hdr.Opcode == opReaddir,
 			Handle: HandleID(in.Fh),
 			Offset: int64(in.Offset),
 			Size:   int(in.Size),
 		}
+		if c.proto.GE(Protocol{7, 9}) {
+			r.Flags = ReadFlags(in.ReadFlags)
+			r.LockOwner = in.LockOwner
+			r.FileFlags = openFlags(in.Flags)
+		}
+		req = r
 
 	case opWrite:
 		in := (*writeIn)(m.data())
-		if m.len() < unsafe.Sizeof(*in) {
+		if m.len() < writeInSize(c.proto) {
 			goto corrupt
 		}
 		r := &WriteRequest{
@@ -758,7 +782,11 @@ loop:
 			Offset: int64(in.Offset),
 			Flags:  WriteFlags(in.WriteFlags),
 		}
-		buf := m.bytes()[unsafe.Sizeof(*in):]
+		if c.proto.GE(Protocol{7, 9}) {
+			r.LockOwner = in.LockOwner
+			r.FileFlags = openFlags(in.Flags)
+		}
+		buf := m.bytes()[writeInSize(c.proto):]
 		if uint32(len(buf)) < in.Size {
 			goto corrupt
 		}
@@ -1129,19 +1157,20 @@ func (r *AccessRequest) Respond() {
 type Attr struct {
 	Valid time.Duration // how long Attr can be cached
 
-	Inode  uint64      // inode number
-	Size   uint64      // size in bytes
-	Blocks uint64      // size in blocks
-	Atime  time.Time   // time of last access
-	Mtime  time.Time   // time of last modification
-	Ctime  time.Time   // time of last inode change
-	Crtime time.Time   // time of creation (OS X only)
-	Mode   os.FileMode // file mode
-	Nlink  uint32      // number of links
-	Uid    uint32      // owner uid
-	Gid    uint32      // group gid
-	Rdev   uint32      // device numbers
-	Flags  uint32      // chflags(2) flags (OS X only)
+	Inode     uint64      // inode number
+	Size      uint64      // size in bytes
+	Blocks    uint64      // size in 512-byte units
+	Atime     time.Time   // time of last access
+	Mtime     time.Time   // time of last modification
+	Ctime     time.Time   // time of last inode change
+	Crtime    time.Time   // time of creation (OS X only)
+	Mode      os.FileMode // file mode
+	Nlink     uint32      // number of links
+	Uid       uint32      // owner uid
+	Gid       uint32      // group gid
+	Rdev      uint32      // device numbers
+	Flags     uint32      // chflags(2) flags (OS X only)
+	BlockSize uint32      // preferred blocksize for filesystem I/O
 }
 
 func unix(t time.Time) (sec uint64, nsec uint32) {
@@ -1151,7 +1180,7 @@ func unix(t time.Time) (sec uint64, nsec uint32) {
 	return
 }
 
-func (a *Attr) attr(out *attr) {
+func (a *Attr) attr(out *attr, proto Protocol) {
 	out.Ino = a.Inode
 	out.Size = a.Size
 	out.Blocks = a.Blocks
@@ -1189,6 +1218,9 @@ func (a *Attr) attr(out *attr) {
 	out.Gid = a.Gid
 	out.Rdev = a.Rdev
 	out.SetFlags(a.Flags)
+	if proto.GE(Protocol{7, 9}) {
+		out.Blksize = a.BlockSize
+	}
 
 	return
 }
@@ -1196,21 +1228,24 @@ func (a *Attr) attr(out *attr) {
 // A GetattrRequest asks for the metadata for the file denoted by r.Node.
 type GetattrRequest struct {
 	Header `json:"-"`
+	Flags  GetattrFlags
+	Handle HandleID
 }
 
 var _ = Request(&GetattrRequest{})
 
 func (r *GetattrRequest) String() string {
-	return fmt.Sprintf("Getattr [%s]", &r.Header)
+	return fmt.Sprintf("Getattr [%s] %#x fl=%v", &r.Header, r.Handle, r.Flags)
 }
 
 // Respond replies to the request with the given response.
 func (r *GetattrRequest) Respond(resp *GetattrResponse) {
-	buf := newBuffer(unsafe.Sizeof(attrOut{}))
-	out := (*attrOut)(buf.alloc(unsafe.Sizeof(attrOut{})))
+	size := attrOutSize(r.Header.Conn.proto)
+	buf := newBuffer(size)
+	out := (*attrOut)(buf.alloc(size))
 	out.AttrValid = uint64(resp.Attr.Valid / time.Second)
 	out.AttrValidNsec = uint32(resp.Attr.Valid % time.Second / time.Nanosecond)
-	resp.Attr.attr(&out.Attr)
+	resp.Attr.attr(&out.Attr, r.Header.Conn.proto)
 	r.respond(buf)
 }
 
@@ -1390,15 +1425,16 @@ func (r *LookupRequest) String() string {
 
 // Respond replies to the request with the given response.
 func (r *LookupRequest) Respond(resp *LookupResponse) {
-	buf := newBuffer(unsafe.Sizeof(entryOut{}))
-	out := (*entryOut)(buf.alloc(unsafe.Sizeof(entryOut{})))
+	size := entryOutSize(r.Header.Conn.proto)
+	buf := newBuffer(size)
+	out := (*entryOut)(buf.alloc(size))
 	out.Nodeid = uint64(resp.Node)
 	out.Generation = resp.Generation
 	out.EntryValid = uint64(resp.EntryValid / time.Second)
 	out.EntryValidNsec = uint32(resp.EntryValid % time.Second / time.Nanosecond)
 	out.AttrValid = uint64(resp.Attr.Valid / time.Second)
 	out.AttrValidNsec = uint32(resp.Attr.Valid % time.Second / time.Nanosecond)
-	resp.Attr.attr(&out.Attr)
+	resp.Attr.attr(&out.Attr, r.Header.Conn.proto)
 	r.respond(buf)
 }
 
@@ -1462,16 +1498,17 @@ func (r *CreateRequest) String() string {
 
 // Respond replies to the request with the given response.
 func (r *CreateRequest) Respond(resp *CreateResponse) {
-	buf := newBuffer(unsafe.Sizeof(entryOut{}) + unsafe.Sizeof(openOut{}))
+	eSize := entryOutSize(r.Header.Conn.proto)
+	buf := newBuffer(eSize + unsafe.Sizeof(openOut{}))
 
-	e := (*entryOut)(buf.alloc(unsafe.Sizeof(entryOut{})))
+	e := (*entryOut)(buf.alloc(eSize))
 	e.Nodeid = uint64(resp.Node)
 	e.Generation = resp.Generation
 	e.EntryValid = uint64(resp.EntryValid / time.Second)
 	e.EntryValidNsec = uint32(resp.EntryValid % time.Second / time.Nanosecond)
 	e.AttrValid = uint64(resp.Attr.Valid / time.Second)
 	e.AttrValidNsec = uint32(resp.Attr.Valid % time.Second / time.Nanosecond)
-	resp.Attr.attr(&e.Attr)
+	resp.Attr.attr(&e.Attr, r.Header.Conn.proto)
 
 	o := (*openOut)(buf.alloc(unsafe.Sizeof(openOut{})))
 	o.Fh = uint64(resp.Handle)
@@ -1506,15 +1543,16 @@ func (r *MkdirRequest) String() string {
 
 // Respond replies to the request with the given response.
 func (r *MkdirRequest) Respond(resp *MkdirResponse) {
-	buf := newBuffer(unsafe.Sizeof(entryOut{}))
-	out := (*entryOut)(buf.alloc(unsafe.Sizeof(entryOut{})))
+	size := entryOutSize(r.Header.Conn.proto)
+	buf := newBuffer(size)
+	out := (*entryOut)(buf.alloc(size))
 	out.Nodeid = uint64(resp.Node)
 	out.Generation = resp.Generation
 	out.EntryValid = uint64(resp.EntryValid / time.Second)
 	out.EntryValidNsec = uint32(resp.EntryValid % time.Second / time.Nanosecond)
 	out.AttrValid = uint64(resp.Attr.Valid / time.Second)
 	out.AttrValidNsec = uint32(resp.Attr.Valid % time.Second / time.Nanosecond)
-	resp.Attr.attr(&out.Attr)
+	resp.Attr.attr(&out.Attr, r.Header.Conn.proto)
 	r.respond(buf)
 }
 
@@ -1529,17 +1567,20 @@ func (r *MkdirResponse) String() string {
 
 // A ReadRequest asks to read from an open file.
 type ReadRequest struct {
-	Header `json:"-"`
-	Dir    bool // is this Readdir?
-	Handle HandleID
-	Offset int64
-	Size   int
+	Header    `json:"-"`
+	Dir       bool // is this Readdir?
+	Handle    HandleID
+	Offset    int64
+	Size      int
+	Flags     ReadFlags
+	LockOwner uint64
+	FileFlags OpenFlags
 }
 
 var _ = Request(&ReadRequest{})
 
 func (r *ReadRequest) String() string {
-	return fmt.Sprintf("Read [%s] %#x %d @%#x dir=%v", &r.Header, r.Handle, r.Size, r.Offset, r.Dir)
+	return fmt.Sprintf("Read [%s] %#x %d @%#x dir=%v fl=%v lock=%d ffl=%v", &r.Header, r.Handle, r.Size, r.Offset, r.Dir, r.Flags, r.LockOwner, r.FileFlags)
 }
 
 // Respond replies to the request with the given response.
@@ -1713,16 +1754,18 @@ func AppendDirent(data []byte, dir Dirent) []byte {
 // A WriteRequest asks to write to an open file.
 type WriteRequest struct {
 	Header
-	Handle HandleID
-	Offset int64
-	Data   []byte
-	Flags  WriteFlags
+	Handle    HandleID
+	Offset    int64
+	Data      []byte
+	Flags     WriteFlags
+	LockOwner uint64
+	FileFlags OpenFlags
 }
 
 var _ = Request(&WriteRequest{})
 
 func (r *WriteRequest) String() string {
-	return fmt.Sprintf("Write [%s] %#x %d @%d fl=%v", &r.Header, r.Handle, len(r.Data), r.Offset, r.Flags)
+	return fmt.Sprintf("Write [%s] %#x %d @%d fl=%v lock=%d ffl=%v", &r.Header, r.Handle, len(r.Data), r.Offset, r.Flags, r.LockOwner, r.FileFlags)
 }
 
 type jsonWriteRequest struct {
@@ -1834,11 +1877,12 @@ func (r *SetattrRequest) String() string {
 // Respond replies to the request with the given response,
 // giving the updated attributes.
 func (r *SetattrRequest) Respond(resp *SetattrResponse) {
-	buf := newBuffer(unsafe.Sizeof(attrOut{}))
-	out := (*attrOut)(buf.alloc(unsafe.Sizeof(attrOut{})))
+	size := attrOutSize(r.Header.Conn.proto)
+	buf := newBuffer(size)
+	out := (*attrOut)(buf.alloc(size))
 	out.AttrValid = uint64(resp.Attr.Valid / time.Second)
 	out.AttrValidNsec = uint32(resp.Attr.Valid % time.Second / time.Nanosecond)
-	resp.Attr.attr(&out.Attr)
+	resp.Attr.attr(&out.Attr, r.Header.Conn.proto)
 	r.respond(buf)
 }
 
@@ -1907,15 +1951,16 @@ func (r *SymlinkRequest) String() string {
 
 // Respond replies to the request, indicating that the symlink was created.
 func (r *SymlinkRequest) Respond(resp *SymlinkResponse) {
-	buf := newBuffer(unsafe.Sizeof(entryOut{}))
-	out := (*entryOut)(buf.alloc(unsafe.Sizeof(entryOut{})))
+	size := entryOutSize(r.Header.Conn.proto)
+	buf := newBuffer(size)
+	out := (*entryOut)(buf.alloc(size))
 	out.Nodeid = uint64(resp.Node)
 	out.Generation = resp.Generation
 	out.EntryValid = uint64(resp.EntryValid / time.Second)
 	out.EntryValidNsec = uint32(resp.EntryValid % time.Second / time.Nanosecond)
 	out.AttrValid = uint64(resp.Attr.Valid / time.Second)
 	out.AttrValidNsec = uint32(resp.Attr.Valid % time.Second / time.Nanosecond)
-	resp.Attr.attr(&out.Attr)
+	resp.Attr.attr(&out.Attr, r.Header.Conn.proto)
 	r.respond(buf)
 }
 
@@ -1955,15 +2000,16 @@ func (r *LinkRequest) String() string {
 }
 
 func (r *LinkRequest) Respond(resp *LookupResponse) {
-	buf := newBuffer(unsafe.Sizeof(entryOut{}))
-	out := (*entryOut)(buf.alloc(unsafe.Sizeof(entryOut{})))
+	size := entryOutSize(r.Header.Conn.proto)
+	buf := newBuffer(size)
+	out := (*entryOut)(buf.alloc(size))
 	out.Nodeid = uint64(resp.Node)
 	out.Generation = resp.Generation
 	out.EntryValid = uint64(resp.EntryValid / time.Second)
 	out.EntryValidNsec = uint32(resp.EntryValid % time.Second / time.Nanosecond)
 	out.AttrValid = uint64(resp.Attr.Valid / time.Second)
 	out.AttrValidNsec = uint32(resp.Attr.Valid % time.Second / time.Nanosecond)
-	resp.Attr.attr(&out.Attr)
+	resp.Attr.attr(&out.Attr, r.Header.Conn.proto)
 	r.respond(buf)
 }
 
@@ -1999,15 +2045,16 @@ func (r *MknodRequest) String() string {
 }
 
 func (r *MknodRequest) Respond(resp *LookupResponse) {
-	buf := newBuffer(unsafe.Sizeof(entryOut{}))
-	out := (*entryOut)(buf.alloc(unsafe.Sizeof(entryOut{})))
+	size := entryOutSize(r.Header.Conn.proto)
+	buf := newBuffer(size)
+	out := (*entryOut)(buf.alloc(size))
 	out.Nodeid = uint64(resp.Node)
 	out.Generation = resp.Generation
 	out.EntryValid = uint64(resp.EntryValid / time.Second)
 	out.EntryValidNsec = uint32(resp.EntryValid % time.Second / time.Nanosecond)
 	out.AttrValid = uint64(resp.Attr.Valid / time.Second)
 	out.AttrValidNsec = uint32(resp.Attr.Valid % time.Second / time.Nanosecond)
-	resp.Attr.attr(&out.Attr)
+	resp.Attr.attr(&out.Attr, r.Header.Conn.proto)
 	r.respond(buf)
 }
 
