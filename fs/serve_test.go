@@ -1351,6 +1351,40 @@ func TestOpen(t *testing.T) {
 	}
 }
 
+type openNonSeekable struct {
+	fstestutil.File
+}
+
+func (f *openNonSeekable) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
+	resp.Flags |= fuse.OpenNonSeekable
+	return f, nil
+}
+
+func TestOpenNonSeekable(t *testing.T) {
+	t.Parallel()
+	f := &openNonSeekable{}
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.ChildMap{"child": f}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	if !mnt.Conn.Protocol().HasOpenNonSeekable() {
+		t.Skip("Old FUSE protocol")
+	}
+
+	fil, err := os.Open(mnt.Dir + "/child")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fil.Close()
+
+	_, err = fil.Seek(0, os.SEEK_SET)
+	if nerr, ok := err.(*os.PathError); !ok || nerr.Err != syscall.ESPIPE {
+		t.Fatalf("wrong error: %v", err)
+	}
+}
+
 // Test Fsync on a dir
 
 type fsyncDir struct {

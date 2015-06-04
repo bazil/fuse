@@ -47,3 +47,13 @@ func (a Protocol) HasReadWriteFlags() bool {
 func (a Protocol) HasGetattrFlags() bool {
 	return a.is79()
 }
+
+func (a Protocol) is710() bool {
+	return a.GE(Protocol{7, 10})
+}
+
+// HasOpenNonSeekable returns whether OpenResponse field Flags flag
+// OpenNonSeekable is supported.
+func (a Protocol) HasOpenNonSeekable() bool {
+	return a.is710()
+}
