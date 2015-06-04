@@ -41,9 +41,6 @@ import (
 	"unsafe"
 )
 
-// Version is the FUSE version implemented by the package.
-const Version = "7.8"
-
 const (
 	kernelVersion      = 7
 	kernelMinorVersion = 8
