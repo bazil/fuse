@@ -1056,6 +1056,84 @@ func (c *Conn) respond(msg []byte) {
 	}
 }
 
+type notCachedError struct{}
+
+func (notCachedError) Error() string {
+	return "node not cached"
+}
+
+var _ ErrorNumber = notCachedError{}
+
+func (notCachedError) Errno() Errno {
+	// Behave just like if the original syscall.ENOENT had been passed
+	// straight through.
+	return ENOENT
+}
+
+var (
+	ErrNotCached = notCachedError{}
+)
+
+// sendInvalidate sends an invalidate notification to kernel.
+//
+// A returned ENOENT is translated to a friendlier error.
+func (c *Conn) sendInvalidate(msg []byte) error {
+	switch err := c.writeToKernel(msg); err {
+	case syscall.ENOENT:
+		return ErrNotCached
+	default:
+		return err
+	}
+}
+
+// InvalidateNode invalidates the kernel cache of the attributes and a
+// range of the data of a node.
+//
+// Giving offset 0 and size -1 means all data. To invalidate just the
+// attributes, give offset 0 and size 0.
+//
+// Returns ErrNotCached if the kernel is not currently caching the
+// node.
+func (c *Conn) InvalidateNode(nodeID NodeID, off int64, size int64) error {
+	buf := newBuffer(unsafe.Sizeof(notifyInvalInodeOut{}))
+	h := (*outHeader)(unsafe.Pointer(&buf[0]))
+	// h.Unique is 0
+	h.Error = notifyCodeInvalInode
+	out := (*notifyInvalInodeOut)(buf.alloc(unsafe.Sizeof(notifyInvalInodeOut{})))
+	out.Ino = uint64(nodeID)
+	out.Off = off
+	out.Len = size
+	return c.sendInvalidate(buf)
+}
+
+// InvalidateEntry invalidates the kernel cache of the directory entry
+// identified by parent directory node ID and entry basename.
+//
+// Kernel may or may not cache directory listings. To invalidate
+// those, use InvalidateNode to invalidate all of the data for a
+// directory. (As of 2015-06, Linux FUSE does not cache directory
+// listings.)
+//
+// Returns ErrNotCached if the kernel is not currently caching the
+// node.
+func (c *Conn) InvalidateEntry(parent NodeID, name string) error {
+	const maxUint32 = 1 << 32
+	if len(name) > maxUint32 {
+		// very unlikely, but we don't want to silently truncate
+		return syscall.ENAMETOOLONG
+	}
+	buf := newBuffer(unsafe.Sizeof(notifyInvalEntryOut{}) + uintptr(len(name)) + 1)
+	h := (*outHeader)(unsafe.Pointer(&buf[0]))
+	// h.Unique is 0
+	h.Error = notifyCodeInvalEntry
+	out := (*notifyInvalEntryOut)(buf.alloc(unsafe.Sizeof(notifyInvalEntryOut{})))
+	out.Parent = uint64(parent)
+	out.Namelen = uint32(len(name))
+	buf = append(buf, name...)
+	buf = append(buf, '\x00')
+	return c.sendInvalidate(buf)
+}
+
 // An InitRequest is the first request sent on a FUSE file system.
 type InitRequest struct {
 	Header `json:"-"`

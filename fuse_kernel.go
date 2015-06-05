@@ -746,3 +746,21 @@ type dirent struct {
 }
 
 const direntSize = 8 + 8 + 4 + 4
+
+const (
+	notifyCodePoll       int32 = 1
+	notifyCodeInvalInode int32 = 2
+	notifyCodeInvalEntry int32 = 3
+)
+
+type notifyInvalInodeOut struct {
+	Ino uint64
+	Off int64
+	Len int64
+}
+
+type notifyInvalEntryOut struct {
+	Parent  uint64
+	Namelen uint32
+	padding uint32
+}
