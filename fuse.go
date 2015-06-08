@@ -941,6 +941,15 @@ func (b bugShortKernelWrite) String() string {
 	return fmt.Sprintf("short kernel write: written=%d/%d error=%q stack=\n%s", b.Written, b.Length, b.Error, b.Stack)
 }
 
+type bugKernelWriteError struct {
+	Error string
+	Stack string
+}
+
+func (b bugKernelWriteError) String() string {
+	return fmt.Sprintf("kernel write error: error=%q stack=\n%s", b.Error, b.Stack)
+}
+
 // safe to call even with nil error
 func errorString(err error) string {
 	if err == nil {
@@ -949,13 +958,20 @@ func errorString(err error) string {
 	return err.Error()
 }
 
-func (c *Conn) respond(out *outHeader, n uintptr) {
+func (c *Conn) writeToKernel(out *outHeader, n uintptr, data []byte) error {
+	out.Len = uint32(n)
+	// tightly bound slice cap so append below always makes a copy
+	msg := (*[1 << 30]byte)(unsafe.Pointer(out))[:n:n]
+	if len(data) > 0 {
+		// TODO: use writev
+		out.Len += uint32(len(data))
+		msg = append(msg, data...)
+	}
+
 	c.wio.Lock()
 	defer c.wio.Unlock()
-	out.Len = uint32(n)
-	msg := (*[1 << 30]byte)(unsafe.Pointer(out))[:n]
 	nn, err := syscall.Write(c.fd(), msg)
-	if nn != len(msg) || err != nil {
+	if err == nil && nn != len(msg) {
 		Debug(bugShortKernelWrite{
 			Written: int64(nn),
 			Length:  int64(len(msg)),
@@ -963,17 +979,25 @@ func (c *Conn) respond(out *outHeader, n uintptr) {
 			Stack:   stack(),
 		})
 	}
+	return err
+}
+
+func (c *Conn) respond(out *outHeader, n uintptr) {
+	if err := c.writeToKernel(out, n, nil); err != nil {
+		Debug(bugKernelWriteError{
+			Error: errorString(err),
+			Stack: stack(),
+		})
+	}
 }
 
 func (c *Conn) respondData(out *outHeader, n uintptr, data []byte) {
-	c.wio.Lock()
-	defer c.wio.Unlock()
-	// TODO: use writev
-	out.Len = uint32(n + uintptr(len(data)))
-	msg := make([]byte, out.Len)
-	copy(msg, (*[1 << 30]byte)(unsafe.Pointer(out))[:n])
-	copy(msg[n:], data)
-	syscall.Write(c.fd(), msg)
+	if err := c.writeToKernel(out, n, data); err != nil {
+		Debug(bugKernelWriteError{
+			Error: errorString(err),
+			Stack: stack(),
+		})
+	}
 }
 
 // An InitRequest is the first request sent on a FUSE file system.
