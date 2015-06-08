@@ -155,7 +155,7 @@ type NodeStringLookuper interface {
 	// Lookup looks up a specific entry in the receiver,
 	// which must be a directory.  Lookup should return a Node
 	// corresponding to the entry.  If the name does not exist in
-	// the directory, Lookup should return nil, err.
+	// the directory, Lookup should return ENOENT.
 	//
 	// Lookup need not to handle the names "." and "..".
 	Lookup(ctx context.Context, name string) (Node, error)
