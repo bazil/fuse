@@ -4,6 +4,7 @@ package fs // import "bazil.org/fuse/fs"
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -370,6 +371,13 @@ func (s *Server) Serve(fs FS) error {
 	if err != nil {
 		return fmt.Errorf("cannot obtain root node: %v", err)
 	}
+	if nodeRef, ok := root.(nodeRef); ok {
+		// Recognize the root node if it's ever returned from Lookup,
+		// passed to Invalidate, etc.
+		ref := nodeRef.nodeRef()
+		ref.id = 1
+		ref.generation = s.nodeGen
+	}
 	s.node = append(s.node, nil, &serveNode{inode: 1, node: root, refs: 1})
 	s.handle = append(s.handle, nil)
 
@@ -639,6 +647,30 @@ func (r response) String() string {
 		}
 	default:
 		return fmt.Sprintf("-> %s", r.Request)
+	}
+}
+
+type notification struct {
+	Op   string
+	Node fuse.NodeID
+	Out  interface{} `json:",omitempty"`
+	Err  error       `json:",omitempty"`
+}
+
+func (n notification) String() string {
+	switch {
+	case n.Out != nil:
+		// make sure (seemingly) empty values are readable
+		switch n.Out.(type) {
+		case string:
+			return fmt.Sprintf("=> %s %d %q Err:%v", n.Op, n.Node, n.Out, n.Err)
+		case []byte:
+			return fmt.Sprintf("=> %s %d [% x] Err:%v", n.Op, n.Node, n.Out, n.Err)
+		default:
+			return fmt.Sprintf("=> %s %d %s Err:%v", n.Op, n.Node, n.Out, n.Err)
+		}
+	default:
+		return fmt.Sprintf("=> %s %d Err:%v", n.Op, n.Node, n.Err)
 	}
 }
 
@@ -1383,6 +1415,124 @@ func (c *Server) saveLookup(ctx context.Context, s *fuse.LookupResponse, snode *
 
 	s.Node, s.Generation = c.saveNode(s.Attr.Inode, n2)
 	return nil
+}
+
+type invalidateNodeDetail struct {
+	Off  int64
+	Size int64
+}
+
+func (i invalidateNodeDetail) String() string {
+	return fmt.Sprintf("Off:%d Size:%d", i.Off, i.Size)
+}
+
+func (s *Server) invalidateNode(node Node, off int64, size int64) error {
+	nodeRef, ok := node.(nodeRef)
+	if !ok {
+		return errors.New("for invalidation, node must embed NodeRef")
+	}
+	ref := nodeRef.nodeRef()
+
+	s.meta.Lock()
+	ref.wg.Add(1)
+	id := ref.id
+	s.meta.Unlock()
+	defer ref.wg.Done()
+
+	if id == 0 {
+		// This is what the kernel would have said, if we had been
+		// able to send this message; it's not cached.
+		return fuse.ErrNotCached
+	}
+	// Delay logging until after we can record the error too. We
+	// consider a /dev/fuse write to be instantaneous enough to not
+	// need separate before and after messages.
+	err := s.conn.InvalidateNode(id, off, size)
+	s.debug(notification{
+		Op:   "InvalidateNode",
+		Node: id,
+		Out: invalidateNodeDetail{
+			Off:  off,
+			Size: size,
+		},
+		Err: err,
+	})
+	return err
+}
+
+// InvalidateNodeAttr invalidates the kernel cache of the attributes
+// of node.
+//
+// Returns fuse.ErrNotCached if the kernel is not currently caching
+// the node.
+func (s *Server) InvalidateNodeAttr(node Node) error {
+	return s.invalidateNode(node, 0, 0)
+}
+
+// InvalidateNodeData invalidates the kernel cache of the attributes
+// and data of node.
+//
+// Returns fuse.ErrNotCached if the kernel is not currently caching
+// the node.
+func (s *Server) InvalidateNodeData(node Node) error {
+	return s.invalidateNode(node, 0, -1)
+}
+
+// InvalidateNodeDataRange invalidates the kernel cache of the
+// attributes and a range of the data of node.
+//
+// Returns fuse.ErrNotCached if the kernel is not currently caching
+// the node.
+func (s *Server) InvalidateNodeDataRange(node Node, off int64, size int64) error {
+	return s.invalidateNode(node, off, size)
+}
+
+type invalidateEntryDetail struct {
+	Name string
+}
+
+func (i invalidateEntryDetail) String() string {
+	return fmt.Sprintf("%q", i.Name)
+}
+
+// InvalidateEntry invalidates the kernel cache of the directory entry
+// identified by parent node and entry basename.
+//
+// Kernel may or may not cache directory listings. To invalidate
+// those, use InvalidateNode to invalidate all of the data for a
+// directory. (As of 2015-06, Linux FUSE does not cache directory
+// listings.)
+//
+// Returns ErrNotCached if the kernel is not currently caching the
+// node.
+func (s *Server) InvalidateEntry(parent Node, name string) error {
+	nodeRef, ok := parent.(nodeRef)
+	if !ok {
+		return errors.New("for invalidation, node must embed NodeRef")
+	}
+	ref := nodeRef.nodeRef()
+
+	s.meta.Lock()
+	ref.wg.Add(1)
+	id := ref.id
+	s.meta.Unlock()
+	defer ref.wg.Done()
+
+	if id == 0 {
+		// This is what the kernel would have said, if we had been
+		// able to send this message; it's not cached.
+		return fuse.ErrNotCached
+	}
+	err := s.conn.InvalidateEntry(id, name)
+	s.debug(notification{
+		Op:   "InvalidateEntry",
+		Node: id,
+		Out: invalidateEntryDetail{
+			Name: name,
+		},
+		Err: err,
+	})
+	return err
 }
 
 // DataHandle returns a read-only Handle that satisfies reads

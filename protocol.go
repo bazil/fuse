@@ -67,3 +67,9 @@ func (a Protocol) is712() bool {
 func (a Protocol) HasUmask() bool {
 	return a.is712()
 }
+
+// HasInvalidate returns whether InvalidateNode/InvalidateEntry are
+// supported.
+func (a Protocol) HasInvalidate() bool {
+	return a.is712()
+}

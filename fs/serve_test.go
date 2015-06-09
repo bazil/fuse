@@ -2069,3 +2069,292 @@ func TestAttrBad(t *testing.T) {
 		t.Fatalf("wrong error: %v", err)
 	}
 }
+
+// Test kernel cache invalidation
+
+type invalidateAttr struct {
+	fs.NodeRef
+	t    testing.TB
+	attr record.Counter
+}
+
+var _ fs.Node = (*invalidateAttr)(nil)
+
+func (i *invalidateAttr) Attr(ctx context.Context, a *fuse.Attr) error {
+	i.attr.Inc()
+	i.t.Logf("Attr called, #%d", i.attr.Count())
+	a.Mode = 0600
+	return nil
+}
+
+func TestInvalidateNodeAttr(t *testing.T) {
+	// This test may see false positive failures when run under
+	// extreme memory pressure.
+	t.Parallel()
+	a := &invalidateAttr{
+		t: t,
+	}
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.ChildMap{"child": a}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	if !mnt.Conn.Protocol().HasInvalidate() {
+		t.Skip("Old FUSE protocol")
+	}
+
+	for i := 0; i < 10; i++ {
+		if _, err := os.Stat(mnt.Dir + "/child"); err != nil {
+			t.Fatalf("stat error: %v", err)
+		}
+	}
+	if g, e := a.attr.Count(), uint32(1); g != e {
+		t.Errorf("wrong Attr call count: %d != %d", g, e)
+	}
+
+	t.Logf("invalidating...")
+	if err := mnt.Server.InvalidateNodeAttr(a); err != nil {
+		t.Fatalf("invalidate error: %v", err)
+	}
+
+	for i := 0; i < 10; i++ {
+		if _, err := os.Stat(mnt.Dir + "/child"); err != nil {
+			t.Fatalf("stat error: %v", err)
+		}
+	}
+	if g, e := a.attr.Count(), uint32(2); g != e {
+		t.Errorf("wrong Attr call count: %d != %d", g, e)
+	}
+}
+
+type invalidateData struct {
+	fs.NodeRef
+	t    testing.TB
+	attr record.Counter
+	read record.Counter
+}
+
+const invalidateDataContent = "hello, world\n"
+
+var _ fs.Node = (*invalidateData)(nil)
+
+func (i *invalidateData) Attr(ctx context.Context, a *fuse.Attr) error {
+	i.attr.Inc()
+	i.t.Logf("Attr called, #%d", i.attr.Count())
+	a.Mode = 0600
+	a.Size = uint64(len(invalidateDataContent))
+	return nil
+}
+
+var _ fs.HandleReader = (*invalidateData)(nil)
+
+func (i *invalidateData) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
+	i.read.Inc()
+	i.t.Logf("Read called, #%d", i.read.Count())
+	fuseutil.HandleRead(req, resp, []byte(invalidateDataContent))
+	return nil
+}
+
+func TestInvalidateNodeData(t *testing.T) {
+	// This test may see false positive failures when run under
+	// extreme memory pressure.
+	t.Parallel()
+	a := &invalidateData{
+		t: t,
+	}
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.ChildMap{"child": a}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	if !mnt.Conn.Protocol().HasInvalidate() {
+		t.Skip("Old FUSE protocol")
+	}
+
+	f, err := os.Open(mnt.Dir + "/child")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	buf := make([]byte, 4)
+	for i := 0; i < 10; i++ {
+		if _, err := f.ReadAt(buf, 0); err != nil {
+			t.Fatalf("readat error: %v", err)
+		}
+	}
+	if g, e := a.attr.Count(), uint32(1); g != e {
+		t.Errorf("wrong Attr call count: %d != %d", g, e)
+	}
+	if g, e := a.read.Count(), uint32(1); g != e {
+		t.Errorf("wrong Read call count: %d != %d", g, e)
+	}
+
+	t.Logf("invalidating...")
+	if err := mnt.Server.InvalidateNodeData(a); err != nil {
+		t.Fatalf("invalidate error: %v", err)
+	}
+
+	for i := 0; i < 10; i++ {
+		if _, err := f.ReadAt(buf, 0); err != nil {
+			t.Fatalf("readat error: %v", err)
+		}
+	}
+	if g, e := a.attr.Count(), uint32(1); g != e {
+		t.Errorf("wrong Attr call count: %d != %d", g, e)
+	}
+	if g, e := a.read.Count(), uint32(2); g != e {
+		t.Errorf("wrong Read call count: %d != %d", g, e)
+	}
+}
+
+type invalidateDataPartial struct {
+	fs.NodeRef
+	t    testing.TB
+	attr record.Counter
+	read record.Counter
+}
+
+var invalidateDataPartialContent = strings.Repeat("hello, world\n", 1000)
+
+var _ fs.Node = (*invalidateDataPartial)(nil)
+
+func (i *invalidateDataPartial) Attr(ctx context.Context, a *fuse.Attr) error {
+	i.attr.Inc()
+	i.t.Logf("Attr called, #%d", i.attr.Count())
+	a.Mode = 0600
+	a.Size = uint64(len(invalidateDataPartialContent))
+	return nil
+}
+
+var _ fs.HandleReader = (*invalidateDataPartial)(nil)
+
+func (i *invalidateDataPartial) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
+	i.read.Inc()
+	i.t.Logf("Read called, #%d", i.read.Count())
+	fuseutil.HandleRead(req, resp, []byte(invalidateDataPartialContent))
+	return nil
+}
+
+func TestInvalidateNodeDataRange(t *testing.T) {
+	// This test may see false positive failures when run under
+	// extreme memory pressure.
+	t.Parallel()
+	a := &invalidateDataPartial{
+		t: t,
+	}
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.ChildMap{"child": a}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	if !mnt.Conn.Protocol().HasInvalidate() {
+		t.Skip("Old FUSE protocol")
+	}
+
+	f, err := os.Open(mnt.Dir + "/child")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	buf := make([]byte, 4)
+	for i := 0; i < 10; i++ {
+		if _, err := f.ReadAt(buf, 0); err != nil {
+			t.Fatalf("readat error: %v", err)
+		}
+	}
+	if g, e := a.attr.Count(), uint32(1); g != e {
+		t.Errorf("wrong Attr call count: %d != %d", g, e)
+	}
+	if g, e := a.read.Count(), uint32(1); g != e {
+		t.Errorf("wrong Read call count: %d != %d", g, e)
+	}
+
+	t.Logf("invalidating...")
+	if err := mnt.Server.InvalidateNodeDataRange(a, 4096, 4096); err != nil {
+		t.Fatalf("invalidate error: %v", err)
+	}
+
+	for i := 0; i < 10; i++ {
+		if _, err := f.ReadAt(buf, 0); err != nil {
+			t.Fatalf("readat error: %v", err)
+		}
+	}
+	if g, e := a.attr.Count(), uint32(1); g != e {
+		t.Errorf("wrong Attr call count: %d != %d", g, e)
+	}
+	// The page invalidated is not the page we're reading, so it
+	// should stay in cache.
+	if g, e := a.read.Count(), uint32(1); g != e {
+		t.Errorf("wrong Read call count: %d != %d", g, e)
+	}
+}
+
+type invalidateEntryRoot struct {
+	fs.NodeRef
+	t      testing.TB
+	lookup record.Counter
+}
+
+var _ fs.Node = (*invalidateEntryRoot)(nil)
+
+func (i *invalidateEntryRoot) Attr(ctx context.Context, a *fuse.Attr) error {
+	a.Mode = 0600 | os.ModeDir
+	return nil
+}
+
+var _ fs.NodeStringLookuper = (*invalidateEntryRoot)(nil)
+
+func (i *invalidateEntryRoot) Lookup(ctx context.Context, name string) (fs.Node, error) {
+	if name != "child" {
+		return nil, fuse.ENOENT
+	}
+	i.lookup.Inc()
+	i.t.Logf("Lookup called, #%d", i.lookup.Count())
+	return fstestutil.File{}, nil
+}
+
+func TestInvalidateEntry(t *testing.T) {
+	// This test may see false positive failures when run under
+	// extreme memory pressure.
+	t.Parallel()
+	a := &invalidateEntryRoot{
+		t: t,
+	}
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{a})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	if !mnt.Conn.Protocol().HasInvalidate() {
+		t.Skip("Old FUSE protocol")
+	}
+
+	for i := 0; i < 10; i++ {
+		if _, err := os.Stat(mnt.Dir + "/child"); err != nil {
+			t.Fatalf("stat error: %v", err)
+		}
+	}
+	if g, e := a.lookup.Count(), uint32(1); g != e {
+		t.Errorf("wrong Lookup call count: %d != %d", g, e)
+	}
+
+	t.Logf("invalidating...")
+	if err := mnt.Server.InvalidateEntry(a, "child"); err != nil {
+		t.Fatalf("invalidate error: %v", err)
+	}
+
+	for i := 0; i < 10; i++ {
+		if _, err := os.Stat(mnt.Dir + "/child"); err != nil {
+			t.Fatalf("stat error: %v", err)
+		}
+	}
+	if g, e := a.lookup.Count(), uint32(2); g != e {
+		t.Errorf("wrong Lookup call count: %d != %d", g, e)
+	}
+}
