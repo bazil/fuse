@@ -1884,6 +1884,10 @@ func (f attrUnlinked) Attr(ctx context.Context, a *fuse.Attr) error {
 func TestAttrUnlinked(t *testing.T) {
 	t.Parallel()
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.ChildMap{"child": attrUnlinked{}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
 
 	fi, err := os.Stat(mnt.Dir + "/child")
 	if err != nil {
@@ -1911,6 +1915,10 @@ func (attrBad) Attr(ctx context.Context, attr *fuse.Attr) error {
 func TestAttrBad(t *testing.T) {
 	t.Parallel()
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.ChildMap{"child": attrBad{}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
 
 	_, err = os.Stat(mnt.Dir + "/child")
 	if nerr, ok := err.(*os.PathError); !ok || nerr.Err != syscall.ENAMETOOLONG {
