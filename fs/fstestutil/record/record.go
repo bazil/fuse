@@ -35,7 +35,7 @@ type Counter struct {
 }
 
 func (r *Counter) Inc() {
-	atomic.StoreUint32(&r.count, 1)
+	atomic.AddUint32(&r.count, 1)
 }
 
 func (r *Counter) Count() uint32 {
