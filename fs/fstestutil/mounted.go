@@ -83,7 +83,7 @@ func Mounted(srv *fs.Server, options ...fuse.MountOption) (*Mount, error) {
 		if mnt.Conn.MountError != nil {
 			return nil, err
 		}
-		return mnt, err
+		return mnt, nil
 	case err = <-mnt.Error:
 		// Serve quit early
 		if err != nil {
