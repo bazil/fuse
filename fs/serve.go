@@ -305,15 +305,51 @@ type HandleReleaser interface {
 	Release(ctx context.Context, req *fuse.ReleaseRequest) error
 }
 
-type Server struct {
-	FS FS
-
+type Config struct {
 	// Function to send debug log messages to. If nil, use fuse.Debug.
 	// Note that changing this or fuse.Debug may not affect existing
 	// calls to Serve.
 	//
 	// See fuse.Debug for the rules that log functions must follow.
 	Debug func(msg interface{})
+}
+
+// New returns a new FUSE server ready to serve this kernel FUSE
+// connection.
+//
+// Config may be nil.
+func New(conn *fuse.Conn, config *Config) *Server {
+	s := &Server{
+		conn:         conn,
+		req:          map[fuse.RequestID]*serveRequest{},
+		dynamicInode: GenerateDynamicInode,
+	}
+	if config != nil {
+		s.debug = config.Debug
+	}
+	if s.debug == nil {
+		s.debug = fuse.Debug
+	}
+	return s
+}
+
+type Server struct {
+	// set in New
+	conn  *fuse.Conn
+	debug func(msg interface{})
+
+	// set once at Serve time
+	fs           FS
+	dynamicInode func(parent uint64, name string) uint64
+
+	// state, protected by meta
+	meta       sync.Mutex
+	req        map[fuse.RequestID]*serveRequest
+	node       []*serveNode
+	handle     []*serveHandle
+	freeNode   []fuse.NodeID
+	freeHandle []fuse.HandleID
+	nodeGen    uint64
 
 	// Used to ensure worker goroutines finish before Serve returns
 	wg sync.WaitGroup
@@ -322,31 +358,23 @@ type Server struct {
 // Serve serves the FUSE connection by making calls to the methods
 // of fs and the Nodes and Handles it makes available.  It returns only
 // when the connection has been closed or an unexpected error occurs.
-func (s *Server) Serve(c *fuse.Conn) error {
+func (s *Server) Serve(fs FS) error {
 	defer s.wg.Wait() // Wait for worker goroutines to complete before return
 
-	sc := serveConn{
-		fs:           s.FS,
-		debug:        s.Debug,
-		req:          map[fuse.RequestID]*serveRequest{},
-		dynamicInode: GenerateDynamicInode,
-	}
-	if sc.debug == nil {
-		sc.debug = fuse.Debug
-	}
-	if dyn, ok := sc.fs.(FSInodeGenerator); ok {
-		sc.dynamicInode = dyn.GenerateInode
+	s.fs = fs
+	if dyn, ok := fs.(FSInodeGenerator); ok {
+		s.dynamicInode = dyn.GenerateInode
 	}
 
-	root, err := sc.fs.Root()
+	root, err := fs.Root()
 	if err != nil {
 		return fmt.Errorf("cannot obtain root node: %v", err)
 	}
-	sc.node = append(sc.node, nil, &serveNode{inode: 1, node: root, refs: 1})
-	sc.handle = append(sc.handle, nil)
+	s.node = append(s.node, nil, &serveNode{inode: 1, node: root, refs: 1})
+	s.handle = append(s.handle, nil)
 
 	for {
-		req, err := c.ReadRequest()
+		req, err := s.conn.ReadRequest()
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -357,7 +385,7 @@ func (s *Server) Serve(c *fuse.Conn) error {
 		s.wg.Add(1)
 		go func() {
 			defer s.wg.Done()
-			sc.serve(req)
+			s.serve(req)
 		}()
 	}
 	return nil
@@ -366,26 +394,11 @@ func (s *Server) Serve(c *fuse.Conn) error {
 // Serve serves a FUSE connection with the default settings. See
 // Server.Serve.
 func Serve(c *fuse.Conn, fs FS) error {
-	server := Server{
-		FS: fs,
-	}
-	return server.Serve(c)
+	server := New(c, nil)
+	return server.Serve(fs)
 }
 
 type nothing struct{}
-
-type serveConn struct {
-	meta         sync.Mutex
-	fs           FS
-	req          map[fuse.RequestID]*serveRequest
-	node         []*serveNode
-	handle       []*serveHandle
-	freeNode     []fuse.NodeID
-	freeHandle   []fuse.HandleID
-	nodeGen      uint64
-	debug        func(msg interface{})
-	dynamicInode func(parent uint64, name string) uint64
-}
 
 type serveRequest struct {
 	Request fuse.Request
@@ -423,7 +436,7 @@ type NodeRef struct {
 	generation uint64
 }
 
-// nodeRef is only ever accessed while holding serveConn.meta
+// nodeRef is only ever accessed while holding Server.meta
 func (n *NodeRef) nodeRef() *NodeRef {
 	return n
 }
@@ -432,7 +445,7 @@ type nodeRef interface {
 	nodeRef() *NodeRef
 }
 
-func (c *serveConn) saveNode(inode uint64, node Node) (id fuse.NodeID, gen uint64) {
+func (c *Server) saveNode(inode uint64, node Node) (id fuse.NodeID, gen uint64) {
 	c.meta.Lock()
 	defer c.meta.Unlock()
 
@@ -442,7 +455,7 @@ func (c *serveConn) saveNode(inode uint64, node Node) (id fuse.NodeID, gen uint6
 
 		if ref.id != 0 {
 			// dropNode guarantees that NodeRef is zeroed at the same
-			// time as the NodeID is removed from serveConn.node, as
+			// time as the NodeID is removed from Server.node, as
 			// guarded by c.meta; this means sn cannot be nil here
 			sn := c.node[ref.id]
 			sn.refs++
@@ -468,7 +481,7 @@ func (c *serveConn) saveNode(inode uint64, node Node) (id fuse.NodeID, gen uint6
 	return
 }
 
-func (c *serveConn) saveHandle(handle Handle, nodeID fuse.NodeID) (id fuse.HandleID) {
+func (c *Server) saveHandle(handle Handle, nodeID fuse.NodeID) (id fuse.HandleID) {
 	c.meta.Lock()
 	shandle := &serveHandle{handle: handle, nodeID: nodeID}
 	if n := len(c.freeHandle); n > 0 {
@@ -493,7 +506,7 @@ func (n *nodeRefcountDropBug) String() string {
 	return fmt.Sprintf("bug: trying to drop %d of %d references to %v", n.N, n.Refs, n.Node)
 }
 
-func (c *serveConn) dropNode(id fuse.NodeID, n uint64) (forget bool) {
+func (c *Server) dropNode(id fuse.NodeID, n uint64) (forget bool) {
 	c.meta.Lock()
 	defer c.meta.Unlock()
 	snode := c.node[id]
@@ -527,7 +540,7 @@ func (c *serveConn) dropNode(id fuse.NodeID, n uint64) (forget bool) {
 	return false
 }
 
-func (c *serveConn) dropHandle(id fuse.HandleID) {
+func (c *Server) dropHandle(id fuse.HandleID) {
 	c.meta.Lock()
 	c.handle[id] = nil
 	c.freeHandle = append(c.freeHandle, id)
@@ -544,7 +557,7 @@ func (m missingHandle) String() string {
 }
 
 // Returns nil for invalid handles.
-func (c *serveConn) getHandle(id fuse.HandleID) (shandle *serveHandle) {
+func (c *Server) getHandle(id fuse.HandleID) (shandle *serveHandle) {
 	c.meta.Lock()
 	defer c.meta.Unlock()
 	if id < fuse.HandleID(len(c.handle)) {
@@ -670,7 +683,7 @@ func initLookupResponse(s *fuse.LookupResponse) {
 	s.EntryValid = entryValidTime
 }
 
-func (c *serveConn) serve(r fuse.Request) {
+func (c *Server) serve(r fuse.Request) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -1348,7 +1361,7 @@ func (c *serveConn) serve(r fuse.Request) {
 	}
 }
 
-func (c *serveConn) saveLookup(ctx context.Context, s *fuse.LookupResponse, snode *serveNode, elem string, n2 Node) error {
+func (c *Server) saveLookup(ctx context.Context, s *fuse.LookupResponse, snode *serveNode, elem string, n2 Node) error {
 	if err := nodeAttr(ctx, n2, &s.Attr); err != nil {
 		return err
 	}
