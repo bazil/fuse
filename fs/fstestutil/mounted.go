@@ -80,7 +80,7 @@ func Mounted(srv *fs.Server, options ...fuse.MountOption) (*Mount, error) {
 
 	select {
 	case <-mnt.Conn.Ready:
-		if mnt.Conn.MountError != nil {
+		if err := mnt.Conn.MountError; err != nil {
 			return nil, err
 		}
 		return mnt, nil
