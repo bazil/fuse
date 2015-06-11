@@ -14,7 +14,7 @@ import (
 
 var errNoAvail = errors.New("no available fuse devices")
 
-var errNotLoaded = errors.New("osxfusefs is not loaded")
+var errNotLoaded = errors.New("osxfuse is not loaded")
 
 func loadOSXFUSE() error {
 	cmd := exec.Command("/Library/Filesystems/osxfuse.fs/Contents/Resources/load_osxfuse")
