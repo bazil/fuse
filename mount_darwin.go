@@ -91,7 +91,7 @@ func isBoringMountOSXFUSEError(err error) bool {
 }
 
 func callMount(dir string, conf *mountConfig, f *os.File, ready chan<- struct{}, errp *error) error {
-	bin := "/Library/Filesystems/osxfusefs.fs/Support/mount_osxfusefs"
+	bin := "/Library/Filesystems/osxfuse.fs/Contents/Resources/mount_osxfuse"
 
 	for k, v := range conf.options {
 		if strings.Contains(k, ",") || strings.Contains(v, ",") {
