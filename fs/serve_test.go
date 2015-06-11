@@ -1445,6 +1445,10 @@ func (f *openNonSeekable) Open(ctx context.Context, req *fuse.OpenRequest, resp 
 }
 
 func TestOpenNonSeekable(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skip("OSXFUSE shares one read and one write handle for all clients, does not support open modes")
+	}
+
 	t.Parallel()
 	f := &openNonSeekable{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
