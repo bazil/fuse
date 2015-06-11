@@ -117,7 +117,7 @@ func callMount(dir string, conf *mountConfig, f *os.File, ready chan<- struct{},
 	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, "MOUNT_FUSEFS_CALL_BY_LIB=")
 	// TODO this is used for fs typenames etc, let app influence it
-	cmd.Env = append(cmd.Env, "MOUNT_FUSEFS_DAEMON_PATH="+bin)
+	cmd.Env = append(cmd.Env, "MOUNT_OSXFUSE_DAEMON_PATH="+bin)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
