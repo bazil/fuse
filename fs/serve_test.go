@@ -110,7 +110,7 @@ func (f testPanic) Attr(ctx context.Context, a *fuse.Attr) error {
 	return nil
 }
 
-func (f testPanic) Statfs(ctx context.Context, req *fuse.StatfsRequest, resp *fuse.StatfsResponse) error {
+func (f testPanic) Mkdir(ctx context.Context, req *fuse.MkdirRequest) (fs.Node, error) {
 	panic(panicSentinel{})
 }
 
@@ -122,10 +122,9 @@ func TestPanic(t *testing.T) {
 	}
 	defer mnt.Close()
 
-	var st syscall.Statfs_t
-	err = syscall.Statfs(mnt.Dir, &st)
-	if g, e := err, syscall.ENAMETOOLONG; g != e {
-		t.Fatalf("wrong error from panicking handler: %v != %v", g, e)
+	err = os.Mkdir(mnt.Dir+"/trigger-a-panic", 0700)
+	if nerr, ok := err.(*os.PathError); !ok || nerr.Err != syscall.ENAMETOOLONG {
+		t.Fatalf("wrong error from panicking handler: %T: %v", err, err)
 	}
 }
 
