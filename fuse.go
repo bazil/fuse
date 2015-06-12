@@ -668,33 +668,39 @@ loop:
 		}
 
 	case opMknod:
-		in := (*mknodIn)(m.data())
-		if m.len() < unsafe.Sizeof(*in) {
+		size := mknodInSize(c.proto)
+		if m.len() < size {
 			goto corrupt
 		}
-		name := m.bytes()[unsafe.Sizeof(*in):]
+		in := (*mknodIn)(m.data())
+		name := m.bytes()[size:]
 		if len(name) < 2 || name[len(name)-1] != '\x00' {
 			goto corrupt
 		}
 		name = name[:len(name)-1]
-		req = &MknodRequest{
+		r := &MknodRequest{
 			Header: m.Header(),
 			Mode:   fileMode(in.Mode),
 			Rdev:   in.Rdev,
 			Name:   string(name),
 		}
+		if c.proto.GE(Protocol{7, 12}) {
+			r.Umask = fileMode(in.Umask) & os.ModePerm
+		}
+		req = r
 
 	case opMkdir:
-		in := (*mkdirIn)(m.data())
-		if m.len() < unsafe.Sizeof(*in) {
+		size := mkdirInSize(c.proto)
+		if m.len() < size {
 			goto corrupt
 		}
-		name := m.bytes()[unsafe.Sizeof(*in):]
+		in := (*mkdirIn)(m.data())
+		name := m.bytes()[size:]
 		i := bytes.IndexByte(name, '\x00')
 		if i < 0 {
 			goto corrupt
 		}
-		req = &MkdirRequest{
+		r := &MkdirRequest{
 			Header: m.Header(),
 			Name:   string(name[:i]),
 			// observed on Linux: mkdirIn.Mode & syscall.S_IFMT == 0,
@@ -702,6 +708,10 @@ loop:
 			// code branch; enforce type to directory
 			Mode: fileMode((in.Mode &^ syscall.S_IFMT) | syscall.S_IFDIR),
 		}
+		if c.proto.GE(Protocol{7, 12}) {
+			r.Umask = fileMode(in.Umask) & os.ModePerm
+		}
+		req = r
 
 	case opUnlink, opRmdir:
 		buf := m.bytes()
@@ -929,21 +939,26 @@ loop:
 		}
 
 	case opCreate:
-		in := (*createIn)(m.data())
-		if m.len() < unsafe.Sizeof(*in) {
+		size := createInSize(c.proto)
+		if m.len() < size {
 			goto corrupt
 		}
-		name := m.bytes()[unsafe.Sizeof(*in):]
+		in := (*createIn)(m.data())
+		name := m.bytes()[size:]
 		i := bytes.IndexByte(name, '\x00')
 		if i < 0 {
 			goto corrupt
 		}
-		req = &CreateRequest{
+		r := &CreateRequest{
 			Header: m.Header(),
 			Flags:  openFlags(in.Flags),
 			Mode:   fileMode(in.Mode),
 			Name:   string(name[:i]),
 		}
+		if c.proto.GE(Protocol{7, 12}) {
+			r.Umask = fileMode(in.Umask) & os.ModePerm
+		}
+		req = r
 
 	case opInterrupt:
 		in := (*interruptIn)(m.data())
@@ -1488,12 +1503,13 @@ type CreateRequest struct {
 	Name   string
 	Flags  OpenFlags
 	Mode   os.FileMode
+	Umask  os.FileMode
 }
 
 var _ = Request(&CreateRequest{})
 
 func (r *CreateRequest) String() string {
-	return fmt.Sprintf("Create [%s] %q fl=%v mode=%v", &r.Header, r.Name, r.Flags, r.Mode)
+	return fmt.Sprintf("Create [%s] %q fl=%v mode=%v umask=%v", &r.Header, r.Name, r.Flags, r.Mode, r.Umask)
 }
 
 // Respond replies to the request with the given response.
@@ -1533,12 +1549,13 @@ type MkdirRequest struct {
 	Header `json:"-"`
 	Name   string
 	Mode   os.FileMode
+	Umask  os.FileMode
 }
 
 var _ = Request(&MkdirRequest{})
 
 func (r *MkdirRequest) String() string {
-	return fmt.Sprintf("Mkdir [%s] %q mode=%v", &r.Header, r.Name, r.Mode)
+	return fmt.Sprintf("Mkdir [%s] %q mode=%v umask=%v", &r.Header, r.Name, r.Mode, r.Umask)
 }
 
 // Respond replies to the request with the given response.
@@ -2036,12 +2053,13 @@ type MknodRequest struct {
 	Name   string
 	Mode   os.FileMode
 	Rdev   uint32
+	Umask  os.FileMode
 }
 
 var _ = Request(&MknodRequest{})
 
 func (r *MknodRequest) String() string {
-	return fmt.Sprintf("Mknod [%s] Name %q mode %v rdev %d", &r.Header, r.Name, r.Mode, r.Rdev)
+	return fmt.Sprintf("Mknod [%s] Name %q mode=%v umask=%v rdev=%d", &r.Header, r.Name, r.Mode, r.Umask, r.Rdev)
 }
 
 func (r *MknodRequest) Respond(resp *LookupResponse) {

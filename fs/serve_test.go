@@ -598,6 +598,9 @@ func TestMkdir(t *testing.T) {
 		t.Fatalf("mkdir: %v", err)
 	}
 	want := fuse.MkdirRequest{Name: "foo", Mode: os.ModeDir | 0751}
+	if mnt.Conn.Protocol().HasUmask() {
+		want.Umask = 0022
+	}
 	if g, e := f.RecordedMkdir(), want; g != e {
 		t.Errorf("mkdir saw %+v, want %+v", g, e)
 	}

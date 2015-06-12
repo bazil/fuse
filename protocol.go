@@ -57,3 +57,13 @@ func (a Protocol) is710() bool {
 func (a Protocol) HasOpenNonSeekable() bool {
 	return a.is710()
 }
+
+func (a Protocol) is712() bool {
+	return a.GE(Protocol{7, 12})
+}
+
+// HasUmask returns whether CreateRequest/MkdirRequest/MknodRequest
+// field Umask is valid.
+func (a Protocol) HasUmask() bool {
+	return a.is712()
+}

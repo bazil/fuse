@@ -46,7 +46,7 @@ const (
 	protoVersionMinMajor = 7
 	protoVersionMinMinor = 8
 	protoVersionMaxMajor = 7
-	protoVersionMaxMinor = 11
+	protoVersionMaxMinor = 12
 )
 
 const (
@@ -441,15 +441,35 @@ type getxtimesOut struct {
 }
 
 type mknodIn struct {
-	Mode uint32
-	Rdev uint32
+	Mode    uint32
+	Rdev    uint32
+	Umask   uint32
+	padding uint32
 	// "filename\x00" follows.
 }
 
+func mknodInSize(p Protocol) uintptr {
+	switch {
+	case p.LT(Protocol{7, 12}):
+		return unsafe.Offsetof(mknodIn{}.Umask)
+	default:
+		return unsafe.Sizeof(mknodIn{})
+	}
+}
+
 type mkdirIn struct {
-	Mode    uint32
-	Padding uint32
+	Mode  uint32
+	Umask uint32
 	// filename follows
+}
+
+func mkdirInSize(p Protocol) uintptr {
+	switch {
+	case p.LT(Protocol{7, 12}):
+		return unsafe.Offsetof(mkdirIn{}.Umask) + 4
+	default:
+		return unsafe.Sizeof(mkdirIn{})
+	}
 }
 
 type renameIn struct {
@@ -499,8 +519,19 @@ type openOut struct {
 }
 
 type createIn struct {
-	Flags uint32
-	Mode  uint32
+	Flags   uint32
+	Mode    uint32
+	Umask   uint32
+	padding uint32
+}
+
+func createInSize(p Protocol) uintptr {
+	switch {
+	case p.LT(Protocol{7, 12}):
+		return unsafe.Offsetof(createIn{}.Umask)
+	default:
+		return unsafe.Sizeof(createIn{})
+	}
 }
 
 type releaseIn struct {
