@@ -154,6 +154,15 @@ func TestStatfs(t *testing.T) {
 	}
 	defer mnt.Close()
 
+	// Perform an operation that forces the OS X mount to be ready, so
+	// we know the Statfs handler will really be called. OS X insists
+	// on volumes answering Statfs calls very early (before FUSE
+	// handshake), so OSXFUSE gives made-up answers for a few brief moments
+	// during the mount process.
+	if _, err := os.Stat(mnt.Dir + "/does-not-exist"); !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+
 	{
 		var st syscall.Statfs_t
 		err = syscall.Statfs(mnt.Dir, &st)
