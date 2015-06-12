@@ -197,7 +197,6 @@ func TestStatfs(t *testing.T) {
 			t.Errorf("got Files = %d; want %d", g, e)
 		}
 	}
-
 }
 
 // Test Stat of root.
@@ -1199,7 +1198,6 @@ func (f *open) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenR
 	f.Opens.Open(ctx, req, resp)
 	// pick a really distinct error, to identify it later
 	return nil, fuse.Errno(syscall.ENAMETOOLONG)
-
 }
 
 func TestOpen(t *testing.T) {
