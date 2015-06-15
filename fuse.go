@@ -125,7 +125,6 @@ type Conn struct {
 	// File handle for kernel communication. Only safe to access if
 	// rio or wio is held.
 	dev *os.File
-	buf []byte
 	wio sync.Mutex
 	rio sync.RWMutex
 }
