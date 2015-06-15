@@ -127,6 +127,9 @@ type Conn struct {
 	dev *os.File
 	wio sync.Mutex
 	rio sync.RWMutex
+
+	// Protocol version negotiated with InitRequest/InitResponse.
+	proto Protocol
 }
 
 // Mount mounts a new FUSE connection on the named directory
@@ -199,8 +202,15 @@ func initMount(c *Conn) error {
 		}
 	}
 
+	proto := Protocol{protoVersionMaxMajor, protoVersionMaxMinor}
+	if r.Kernel.LT(proto) {
+		// Kernel doesn't support the latest version we have.
+		proto = r.Kernel
+	}
+	c.proto = proto
+
 	s := &InitResponse{
-		Library:  min,
+		Library:  proto,
 		MaxWrite: 128 * 1024,
 		Flags:    InitBigWrites,
 	}

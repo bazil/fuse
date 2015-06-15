@@ -45,6 +45,8 @@ import (
 const (
 	protoVersionMinMajor = 7
 	protoVersionMinMinor = 8
+	protoVersionMaxMajor = 7
+	protoVersionMaxMinor = 8
 )
 
 const (
