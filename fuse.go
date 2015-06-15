@@ -1035,8 +1035,8 @@ func (r *InitResponse) String() string {
 func (r *InitRequest) Respond(resp *InitResponse) {
 	out := &initOut{
 		outHeader:    outHeader{Unique: uint64(r.ID)},
-		Major:        kernelVersion,
-		Minor:        kernelMinorVersion,
+		Major:        protoVersionMinMajor,
+		Minor:        protoVersionMinMinor,
 		MaxReadahead: resp.MaxReadahead,
 		Flags:        uint32(resp.Flags),
 		MaxWrite:     resp.MaxWrite,

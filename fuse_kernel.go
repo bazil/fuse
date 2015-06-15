@@ -41,10 +41,14 @@ import (
 	"unsafe"
 )
 
+// The FUSE version implemented by the package.
 const (
-	kernelVersion      = 7
-	kernelMinorVersion = 8
-	rootID             = 1
+	protoVersionMinMajor = 7
+	protoVersionMinMinor = 8
+)
+
+const (
+	rootID = 1
 )
 
 type kstatfs struct {
