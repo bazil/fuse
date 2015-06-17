@@ -22,13 +22,6 @@ type benchFS struct {
 }
 
 var _ = fs.FS(benchFS{})
-var _ = fs.FSIniter(benchFS{})
-
-func (benchFS) Init(ctx context.Context, req *fuse.InitRequest, resp *fuse.InitResponse) error {
-	resp.MaxReadahead = 64 * 1024 * 1024
-	resp.Flags |= fuse.InitAsyncRead
-	return nil
-}
 
 func (f benchFS) Root() (fs.Node, error) {
 	return benchDir{conf: f.conf}, nil
@@ -110,6 +103,8 @@ func benchmark(b *testing.B, fn func(b *testing.B, mnt string), conf *benchConfi
 			conf: conf,
 		},
 	}
+	// TODO reintroduce MaxReadahead = 64 * 1024 * 1024
+	// TODO reintroduce fuse.InitAsyncRead
 	mnt, err := fstestutil.Mounted(srv)
 	if err != nil {
 		b.Fatal(err)

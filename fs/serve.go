@@ -32,17 +32,10 @@ const (
 // An FS is the interface required of a file system.
 //
 // Other FUSE requests can be handled by implementing methods from the
-// FS* interfaces, for example FSIniter.
+// FS* interfaces, for example FSStatfser.
 type FS interface {
 	// Root is called to obtain the Node for the file system root.
 	Root() (Node, error)
-}
-
-type FSIniter interface {
-	// Init is called to initialize the FUSE connection.
-	// It can inspect the request and adjust the response as desired.
-	// Init must return promptly.
-	Init(ctx context.Context, req *fuse.InitRequest, resp *fuse.InitResponse) error
 }
 
 type FSStatfser interface {
@@ -785,13 +778,6 @@ func (c *serveConn) serve(r fuse.Request) {
 		s := &fuse.InitResponse{
 			MaxWrite: 128 * 1024,
 			Flags:    fuse.InitBigWrites,
-		}
-		if fs, ok := c.fs.(FSIniter); ok {
-			if err := fs.Init(ctx, r, s); err != nil {
-				done(err)
-				r.RespondError(err)
-				break
-			}
 		}
 		done(s)
 		r.Respond(s)
