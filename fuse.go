@@ -200,6 +200,7 @@ func initMount(c *Conn) error {
 	}
 
 	s := &InitResponse{
+		Library:  min,
 		MaxWrite: 128 * 1024,
 		Flags:    InitBigWrites,
 	}
@@ -1035,6 +1036,7 @@ func (r *InitRequest) String() string {
 
 // An InitResponse is the response to an InitRequest.
 type InitResponse struct {
+	Library Protocol
 	// Maximum readahead in bytes that the kernel can use. Ignored if
 	// greater than InitRequest.MaxReadahead.
 	MaxReadahead uint32
@@ -1052,8 +1054,8 @@ func (r *InitResponse) String() string {
 func (r *InitRequest) Respond(resp *InitResponse) {
 	out := &initOut{
 		outHeader:    outHeader{Unique: uint64(r.ID)},
-		Major:        protoVersionMinMajor,
-		Minor:        protoVersionMinMinor,
+		Major:        resp.Library.Major,
+		Minor:        resp.Library.Minor,
 		MaxReadahead: resp.MaxReadahead,
 		Flags:        uint32(resp.Flags),
 		MaxWrite:     resp.MaxWrite,
