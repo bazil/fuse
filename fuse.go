@@ -158,7 +158,34 @@ func Mount(dir string, options ...MountOption) (*Conn, error) {
 		return nil, err
 	}
 	c.dev = f
+
+	if err := initMount(c); err != nil {
+		c.Close()
+		return nil, err
+	}
+
 	return c, nil
+}
+
+func initMount(c *Conn) error {
+	req, err := c.ReadRequest()
+	if err != nil {
+		if err == io.EOF {
+			return fmt.Errorf("missing init, got EOF")
+		}
+		return err
+	}
+	r, ok := req.(*InitRequest)
+	if !ok {
+		return fmt.Errorf("missing init, got: %T", req)
+	}
+
+	s := &InitResponse{
+		MaxWrite: 128 * 1024,
+		Flags:    InitBigWrites,
+	}
+	r.Respond(s)
+	return nil
 }
 
 // A Request represents a single FUSE request received from the kernel.

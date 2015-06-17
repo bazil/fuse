@@ -773,15 +773,6 @@ func (c *serveConn) serve(r fuse.Request) {
 		done(fuse.ENOSYS)
 		r.RespondError(fuse.ENOSYS)
 
-	// FS operations.
-	case *fuse.InitRequest:
-		s := &fuse.InitResponse{
-			MaxWrite: 128 * 1024,
-			Flags:    fuse.InitBigWrites,
-		}
-		done(s)
-		r.Respond(s)
-
 	case *fuse.StatfsRequest:
 		s := &fuse.StatfsResponse{}
 		if fs, ok := c.fs.(FSStatfser); ok {
