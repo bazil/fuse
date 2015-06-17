@@ -167,6 +167,15 @@ func Mount(dir string, options ...MountOption) (*Conn, error) {
 	return c, nil
 }
 
+type OldVersionError struct {
+	Kernel     Protocol
+	LibraryMin Protocol
+}
+
+func (e *OldVersionError) Error() string {
+	return fmt.Sprintf("kernel FUSE version is too old: %v < %v", e.Kernel, e.LibraryMin)
+}
+
 func initMount(c *Conn) error {
 	req, err := c.ReadRequest()
 	if err != nil {
@@ -178,6 +187,16 @@ func initMount(c *Conn) error {
 	r, ok := req.(*InitRequest)
 	if !ok {
 		return fmt.Errorf("missing init, got: %T", req)
+	}
+
+	min := Protocol{protoVersionMinMajor, protoVersionMinMinor}
+	if r.Kernel.LT(min) {
+		req.RespondError(Errno(syscall.EPROTO))
+		c.Close()
+		return &OldVersionError{
+			Kernel:     r.Kernel,
+			LibraryMin: min,
+		}
 	}
 
 	s := &InitResponse{
@@ -849,8 +868,7 @@ loop:
 		}
 		req = &InitRequest{
 			Header:       m.Header(),
-			Major:        in.Major,
-			Minor:        in.Minor,
+			Kernel:       Protocol{in.Major, in.Minor},
 			MaxReadahead: in.MaxReadahead,
 			Flags:        InitFlags(in.Flags),
 		}
@@ -1003,8 +1021,7 @@ func (c *Conn) respondData(out *outHeader, n uintptr, data []byte) {
 // An InitRequest is the first request sent on a FUSE file system.
 type InitRequest struct {
 	Header `json:"-"`
-	Major  uint32
-	Minor  uint32
+	Kernel Protocol
 	// Maximum readahead in bytes that the kernel plans to use.
 	MaxReadahead uint32
 	Flags        InitFlags
@@ -1013,7 +1030,7 @@ type InitRequest struct {
 var _ = Request(&InitRequest{})
 
 func (r *InitRequest) String() string {
-	return fmt.Sprintf("Init [%s] %d.%d ra=%d fl=%v", &r.Header, r.Major, r.Minor, r.MaxReadahead, r.Flags)
+	return fmt.Sprintf("Init [%s] %v ra=%d fl=%v", &r.Header, r.Kernel, r.MaxReadahead, r.Flags)
 }
 
 // An InitResponse is the response to an InitRequest.
