@@ -547,7 +547,7 @@ type missingHandle struct {
 }
 
 func (m missingHandle) String() string {
-	return fmt.Sprint("missing handle", m.Handle, m.MaxHandle)
+	return fmt.Sprint("missing handle: ", m.Handle, m.MaxHandle)
 }
 
 // Returns nil for invalid handles.
