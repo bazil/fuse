@@ -1478,19 +1478,20 @@ func (r *CreateRequest) String() string {
 
 // Respond replies to the request with the given response.
 func (r *CreateRequest) Respond(resp *CreateResponse) {
-	buf, h := newBuffer(r.ID, unsafe.Sizeof(createOut{}))
+	buf, h := newBuffer(r.ID, unsafe.Sizeof(entryOut{})+unsafe.Sizeof(openOut{}))
 
-	out := (*createOut)(buf.alloc(unsafe.Sizeof(createOut{})))
-	out.Nodeid = uint64(resp.Node)
-	out.Generation = resp.Generation
-	out.EntryValid = uint64(resp.EntryValid / time.Second)
-	out.EntryValidNsec = uint32(resp.EntryValid % time.Second / time.Nanosecond)
-	out.AttrValid = uint64(resp.Attr.Valid / time.Second)
-	out.AttrValidNsec = uint32(resp.Attr.Valid % time.Second / time.Nanosecond)
-	out.Attr = resp.Attr.attr()
+	e := (*entryOut)(buf.alloc(unsafe.Sizeof(entryOut{})))
+	e.Nodeid = uint64(resp.Node)
+	e.Generation = resp.Generation
+	e.EntryValid = uint64(resp.EntryValid / time.Second)
+	e.EntryValidNsec = uint32(resp.EntryValid % time.Second / time.Nanosecond)
+	e.AttrValid = uint64(resp.Attr.Valid / time.Second)
+	e.AttrValidNsec = uint32(resp.Attr.Valid % time.Second / time.Nanosecond)
+	e.Attr = resp.Attr.attr()
 
-	out.Fh = uint64(resp.Handle)
-	out.OpenFlags = uint32(resp.Flags)
+	o := (*openOut)(buf.alloc(unsafe.Sizeof(openOut{})))
+	o.Fh = uint64(resp.Handle)
+	o.OpenFlags = uint32(resp.Flags)
 
 	r.respond(h, uintptr(len(buf)))
 }

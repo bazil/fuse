@@ -462,20 +462,6 @@ type createIn struct {
 	Mode  uint32
 }
 
-type createOut struct {
-	Nodeid         uint64 // Inode ID
-	Generation     uint64 // Inode generation
-	EntryValid     uint64 // Cache timeout for the name
-	AttrValid      uint64 // Cache timeout for the attributes
-	EntryValidNsec uint32
-	AttrValidNsec  uint32
-	Attr           attr
-
-	Fh        uint64
-	OpenFlags uint32
-	Padding   uint32
-}
-
 type releaseIn struct {
 	Fh           uint64
 	Flags        uint32
