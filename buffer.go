@@ -28,9 +28,9 @@ func (w *buffer) reset() {
 	*w = (*w)[:0]
 }
 
-func newBuffer(id RequestID, extra uintptr) (buffer, *outHeader) {
+func newBuffer(id RequestID, extra uintptr) buffer {
 	buf := make(buffer, 0, unsafe.Sizeof(outHeader{})+extra)
 	h := (*outHeader)(buf.alloc(unsafe.Sizeof(outHeader{})))
 	h.Unique = uint64(id)
-	return buf, h
+	return buf
 }
