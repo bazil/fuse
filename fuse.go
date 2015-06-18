@@ -1091,19 +1091,18 @@ func (r *StatfsRequest) String() string {
 
 // Respond replies to the request with the given response.
 func (r *StatfsRequest) Respond(resp *StatfsResponse) {
-	out := &statfsOut{
-		outHeader: outHeader{Unique: uint64(r.ID)},
-		St: kstatfs{
-			Blocks:  resp.Blocks,
-			Bfree:   resp.Bfree,
-			Bavail:  resp.Bavail,
-			Files:   resp.Files,
-			Bsize:   resp.Bsize,
-			Namelen: resp.Namelen,
-			Frsize:  resp.Frsize,
-		},
+	buf, h := newBuffer(r.ID, unsafe.Sizeof(statfsOut{}))
+	out := (*statfsOut)(buf.alloc(unsafe.Sizeof(statfsOut{})))
+	out.St = kstatfs{
+		Blocks:  resp.Blocks,
+		Bfree:   resp.Bfree,
+		Bavail:  resp.Bavail,
+		Files:   resp.Files,
+		Bsize:   resp.Bsize,
+		Namelen: resp.Namelen,
+		Frsize:  resp.Frsize,
 	}
-	r.respond(&out.outHeader, unsafe.Sizeof(*out))
+	r.respond(h, uintptr(len(buf)))
 }
 
 // A StatfsResponse is the response to a StatfsRequest.

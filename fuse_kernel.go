@@ -528,7 +528,6 @@ var writeFlagNames = []flagName{}
 const compatStatfsSize = 48
 
 type statfsOut struct {
-	outHeader
 	St kstatfs
 }
 
