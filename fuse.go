@@ -1062,20 +1062,20 @@ func (r *InitResponse) String() string {
 
 // Respond replies to the request with the given response.
 func (r *InitRequest) Respond(resp *InitResponse) {
-	out := &initOut{
-		outHeader:    outHeader{Unique: uint64(r.ID)},
-		Major:        resp.Library.Major,
-		Minor:        resp.Library.Minor,
-		MaxReadahead: resp.MaxReadahead,
-		Flags:        uint32(resp.Flags),
-		MaxWrite:     resp.MaxWrite,
-	}
+	buf, h := newBuffer(r.ID, unsafe.Sizeof(initOut{}))
+	out := (*initOut)(buf.alloc(unsafe.Sizeof(initOut{})))
+	out.Major = resp.Library.Major
+	out.Minor = resp.Library.Minor
+	out.MaxReadahead = resp.MaxReadahead
+	out.Flags = uint32(resp.Flags)
+	out.MaxWrite = resp.MaxWrite
+
 	// MaxWrite larger than our receive buffer would just lead to
 	// errors on large writes.
 	if out.MaxWrite > maxWrite {
 		out.MaxWrite = maxWrite
 	}
-	r.respond(&out.outHeader, unsafe.Sizeof(*out))
+	r.respond(h, uintptr(len(buf)))
 }
 
 // A StatfsRequest requests information about the mounted file system.

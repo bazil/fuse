@@ -587,7 +587,6 @@ type initIn struct {
 const initInSize = int(unsafe.Sizeof(initIn{}))
 
 type initOut struct {
-	outHeader
 	Major        uint32
 	Minor        uint32
 	MaxReadahead uint32
