@@ -982,15 +982,9 @@ func errorString(err error) string {
 	return err.Error()
 }
 
-func (c *Conn) writeToKernel(out *outHeader, n uintptr, data []byte) error {
+func (c *Conn) writeToKernel(out *outHeader, n uintptr) error {
 	out.Len = uint32(n)
-	// tightly bound slice cap so append below always makes a copy
 	msg := (*[1 << 30]byte)(unsafe.Pointer(out))[:n:n]
-	if len(data) > 0 {
-		// TODO: use writev
-		out.Len += uint32(len(data))
-		msg = append(msg, data...)
-	}
 
 	c.wio.Lock()
 	defer c.wio.Unlock()
@@ -1007,7 +1001,7 @@ func (c *Conn) writeToKernel(out *outHeader, n uintptr, data []byte) error {
 }
 
 func (c *Conn) respond(out *outHeader, n uintptr) {
-	if err := c.writeToKernel(out, n, nil); err != nil {
+	if err := c.writeToKernel(out, n); err != nil {
 		Debug(bugKernelWriteError{
 			Error: errorString(err),
 			Stack: stack(),
