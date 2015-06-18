@@ -1151,7 +1151,7 @@ func unix(t time.Time) (sec uint64, nsec uint32) {
 	return
 }
 
-func (a *Attr) attr() (out attr) {
+func (a *Attr) attr(out *attr) {
 	out.Ino = a.Inode
 	out.Size = a.Size
 	out.Blocks = a.Blocks
@@ -1210,7 +1210,7 @@ func (r *GetattrRequest) Respond(resp *GetattrResponse) {
 	out := (*attrOut)(buf.alloc(unsafe.Sizeof(attrOut{})))
 	out.AttrValid = uint64(resp.Attr.Valid / time.Second)
 	out.AttrValidNsec = uint32(resp.Attr.Valid % time.Second / time.Nanosecond)
-	out.Attr = resp.Attr.attr()
+	resp.Attr.attr(&out.Attr)
 	r.respond(buf)
 }
 
@@ -1398,7 +1398,7 @@ func (r *LookupRequest) Respond(resp *LookupResponse) {
 	out.EntryValidNsec = uint32(resp.EntryValid % time.Second / time.Nanosecond)
 	out.AttrValid = uint64(resp.Attr.Valid / time.Second)
 	out.AttrValidNsec = uint32(resp.Attr.Valid % time.Second / time.Nanosecond)
-	out.Attr = resp.Attr.attr()
+	resp.Attr.attr(&out.Attr)
 	r.respond(buf)
 }
 
@@ -1471,7 +1471,7 @@ func (r *CreateRequest) Respond(resp *CreateResponse) {
 	e.EntryValidNsec = uint32(resp.EntryValid % time.Second / time.Nanosecond)
 	e.AttrValid = uint64(resp.Attr.Valid / time.Second)
 	e.AttrValidNsec = uint32(resp.Attr.Valid % time.Second / time.Nanosecond)
-	e.Attr = resp.Attr.attr()
+	resp.Attr.attr(&e.Attr)
 
 	o := (*openOut)(buf.alloc(unsafe.Sizeof(openOut{})))
 	o.Fh = uint64(resp.Handle)
@@ -1514,7 +1514,7 @@ func (r *MkdirRequest) Respond(resp *MkdirResponse) {
 	out.EntryValidNsec = uint32(resp.EntryValid % time.Second / time.Nanosecond)
 	out.AttrValid = uint64(resp.Attr.Valid / time.Second)
 	out.AttrValidNsec = uint32(resp.Attr.Valid % time.Second / time.Nanosecond)
-	out.Attr = resp.Attr.attr()
+	resp.Attr.attr(&out.Attr)
 	r.respond(buf)
 }
 
@@ -1838,7 +1838,7 @@ func (r *SetattrRequest) Respond(resp *SetattrResponse) {
 	out := (*attrOut)(buf.alloc(unsafe.Sizeof(attrOut{})))
 	out.AttrValid = uint64(resp.Attr.Valid / time.Second)
 	out.AttrValidNsec = uint32(resp.Attr.Valid % time.Second / time.Nanosecond)
-	out.Attr = resp.Attr.attr()
+	resp.Attr.attr(&out.Attr)
 	r.respond(buf)
 }
 
@@ -1915,7 +1915,7 @@ func (r *SymlinkRequest) Respond(resp *SymlinkResponse) {
 	out.EntryValidNsec = uint32(resp.EntryValid % time.Second / time.Nanosecond)
 	out.AttrValid = uint64(resp.Attr.Valid / time.Second)
 	out.AttrValidNsec = uint32(resp.Attr.Valid % time.Second / time.Nanosecond)
-	out.Attr = resp.Attr.attr()
+	resp.Attr.attr(&out.Attr)
 	r.respond(buf)
 }
 
@@ -1963,7 +1963,7 @@ func (r *LinkRequest) Respond(resp *LookupResponse) {
 	out.EntryValidNsec = uint32(resp.EntryValid % time.Second / time.Nanosecond)
 	out.AttrValid = uint64(resp.Attr.Valid / time.Second)
 	out.AttrValidNsec = uint32(resp.Attr.Valid % time.Second / time.Nanosecond)
-	out.Attr = resp.Attr.attr()
+	resp.Attr.attr(&out.Attr)
 	r.respond(buf)
 }
 
@@ -2007,7 +2007,7 @@ func (r *MknodRequest) Respond(resp *LookupResponse) {
 	out.EntryValidNsec = uint32(resp.EntryValid % time.Second / time.Nanosecond)
 	out.AttrValid = uint64(resp.Attr.Valid / time.Second)
 	out.AttrValidNsec = uint32(resp.Attr.Valid % time.Second / time.Nanosecond)
-	out.Attr = resp.Attr.attr()
+	resp.Attr.attr(&out.Attr)
 	r.respond(buf)
 }
 
