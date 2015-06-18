@@ -395,7 +395,6 @@ type attrOut struct {
 
 // OS X
 type getxtimesOut struct {
-	outHeader
 	Bkuptime     uint64
 	Crtime       uint64
 	BkuptimeNsec uint32
