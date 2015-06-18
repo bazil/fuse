@@ -359,8 +359,9 @@ func (h *Header) RespondError(err error) {
 	}
 	// FUSE uses negative errors!
 	// TODO: File bug report against OSXFUSE: positive error causes kernel panic.
-	out := &outHeader{Error: -int32(errno), Unique: uint64(h.ID)}
-	h.respond(out, unsafe.Sizeof(*out))
+	buf, hOut := newBuffer(h.ID, 0)
+	hOut.Error = -int32(errno)
+	h.respond(hOut, uintptr(len(buf)))
 }
 
 // Maximum file write size we are prepared to receive from the kernel.
@@ -1117,8 +1118,8 @@ func (r *AccessRequest) String() string {
 // Respond replies to the request indicating that access is allowed.
 // To deny access, use RespondError.
 func (r *AccessRequest) Respond() {
-	out := &outHeader{Unique: uint64(r.ID)}
-	r.respond(out, unsafe.Sizeof(*out))
+	buf, h := newBuffer(r.ID, 0)
+	r.respond(h, uintptr(len(buf)))
 }
 
 // An Attr is the metadata for a single file or directory.
@@ -1323,8 +1324,8 @@ func (r *RemovexattrRequest) String() string {
 
 // Respond replies to the request, indicating that the attribute was removed.
 func (r *RemovexattrRequest) Respond() {
-	out := &outHeader{Unique: uint64(r.ID)}
-	r.respond(out, unsafe.Sizeof(*out))
+	buf, h := newBuffer(r.ID, 0)
+	r.respond(h, uintptr(len(buf)))
 }
 
 // A SetxattrRequest asks to set an extended attribute associated with a file.
@@ -1368,8 +1369,8 @@ func (r *SetxattrRequest) String() string {
 
 // Respond replies to the request, indicating that the extended attribute was set.
 func (r *SetxattrRequest) Respond() {
-	out := &outHeader{Unique: uint64(r.ID)}
-	r.respond(out, unsafe.Sizeof(*out))
+	buf, h := newBuffer(r.ID, 0)
+	r.respond(h, uintptr(len(buf)))
 }
 
 // A LookupRequest asks to look up the given name in the directory named by r.Node.
@@ -1583,8 +1584,8 @@ func (r *ReleaseRequest) String() string {
 
 // Respond replies to the request, indicating that the handle has been released.
 func (r *ReleaseRequest) Respond() {
-	out := &outHeader{Unique: uint64(r.ID)}
-	r.respond(out, unsafe.Sizeof(*out))
+	buf, h := newBuffer(r.ID, 0)
+	r.respond(h, uintptr(len(buf)))
 }
 
 // A DestroyRequest is sent by the kernel when unmounting the file system.
@@ -1602,8 +1603,8 @@ func (r *DestroyRequest) String() string {
 
 // Respond replies to the request.
 func (r *DestroyRequest) Respond() {
-	out := &outHeader{Unique: uint64(r.ID)}
-	r.respond(out, unsafe.Sizeof(*out))
+	buf, h := newBuffer(r.ID, 0)
+	r.respond(h, uintptr(len(buf)))
 }
 
 // A ForgetRequest is sent by the kernel when forgetting about r.Node
@@ -1865,8 +1866,8 @@ func (r *FlushRequest) String() string {
 
 // Respond replies to the request, indicating that the flush succeeded.
 func (r *FlushRequest) Respond() {
-	out := &outHeader{Unique: uint64(r.ID)}
-	r.respond(out, unsafe.Sizeof(*out))
+	buf, h := newBuffer(r.ID, 0)
+	r.respond(h, uintptr(len(buf)))
 }
 
 // A RemoveRequest asks to remove a file or directory from the
@@ -1885,8 +1886,8 @@ func (r *RemoveRequest) String() string {
 
 // Respond replies to the request, indicating that the file was removed.
 func (r *RemoveRequest) Respond() {
-	out := &outHeader{Unique: uint64(r.ID)}
-	r.respond(out, unsafe.Sizeof(*out))
+	buf, h := newBuffer(r.ID, 0)
+	r.respond(h, uintptr(len(buf)))
 }
 
 // A SymlinkRequest is a request to create a symlink making NewName point to Target.
@@ -1977,8 +1978,8 @@ func (r *RenameRequest) String() string {
 }
 
 func (r *RenameRequest) Respond() {
-	out := &outHeader{Unique: uint64(r.ID)}
-	r.respond(out, unsafe.Sizeof(*out))
+	buf, h := newBuffer(r.ID, 0)
+	r.respond(h, uintptr(len(buf)))
 }
 
 type MknodRequest struct {
@@ -2022,8 +2023,8 @@ func (r *FsyncRequest) String() string {
 }
 
 func (r *FsyncRequest) Respond() {
-	out := &outHeader{Unique: uint64(r.ID)}
-	r.respond(out, unsafe.Sizeof(*out))
+	buf, h := newBuffer(r.ID, 0)
+	r.respond(h, uintptr(len(buf)))
 }
 
 // An InterruptRequest is a request to interrupt another pending request. The
