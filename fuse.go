@@ -276,11 +276,6 @@ func (h *Header) respond(out *outHeader, n uintptr) {
 	putMessage(h.msg)
 }
 
-func (h *Header) respondData(out *outHeader, n uintptr, data []byte) {
-	h.Conn.respondData(out, n, data)
-	putMessage(h.msg)
-}
-
 // An ErrorNumber is an error with a specific error number.
 //
 // Operations may return an error value that implements ErrorNumber to
@@ -1013,15 +1008,6 @@ func (c *Conn) writeToKernel(out *outHeader, n uintptr, data []byte) error {
 
 func (c *Conn) respond(out *outHeader, n uintptr) {
 	if err := c.writeToKernel(out, n, nil); err != nil {
-		Debug(bugKernelWriteError{
-			Error: errorString(err),
-			Stack: stack(),
-		})
-	}
-}
-
-func (c *Conn) respondData(out *outHeader, n uintptr, data []byte) {
-	if err := c.writeToKernel(out, n, data); err != nil {
 		Debug(bugKernelWriteError{
 			Error: errorString(err),
 			Stack: stack(),
