@@ -386,7 +386,6 @@ type forgetIn struct {
 }
 
 type attrOut struct {
-	outHeader
 	AttrValid     uint64 // Cache timeout for the attributes
 	AttrValidNsec uint32
 	Dummy         uint32

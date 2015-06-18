@@ -1222,13 +1222,12 @@ func (r *GetattrRequest) String() string {
 
 // Respond replies to the request with the given response.
 func (r *GetattrRequest) Respond(resp *GetattrResponse) {
-	out := &attrOut{
-		outHeader:     outHeader{Unique: uint64(r.ID)},
-		AttrValid:     uint64(resp.Attr.Valid / time.Second),
-		AttrValidNsec: uint32(resp.Attr.Valid % time.Second / time.Nanosecond),
-		Attr:          resp.Attr.attr(),
-	}
-	r.respond(&out.outHeader, unsafe.Sizeof(*out))
+	buf, h := newBuffer(r.ID, unsafe.Sizeof(attrOut{}))
+	out := (*attrOut)(buf.alloc(unsafe.Sizeof(attrOut{})))
+	out.AttrValid = uint64(resp.Attr.Valid / time.Second)
+	out.AttrValidNsec = uint32(resp.Attr.Valid % time.Second / time.Nanosecond)
+	out.Attr = resp.Attr.attr()
+	r.respond(h, uintptr(len(buf)))
 }
 
 // A GetattrResponse is the response to a GetattrRequest.
@@ -1851,13 +1850,12 @@ func (r *SetattrRequest) String() string {
 // Respond replies to the request with the given response,
 // giving the updated attributes.
 func (r *SetattrRequest) Respond(resp *SetattrResponse) {
-	out := &attrOut{
-		outHeader:     outHeader{Unique: uint64(r.ID)},
-		AttrValid:     uint64(resp.Attr.Valid / time.Second),
-		AttrValidNsec: uint32(resp.Attr.Valid % time.Second / time.Nanosecond),
-		Attr:          resp.Attr.attr(),
-	}
-	r.respond(&out.outHeader, unsafe.Sizeof(*out))
+	buf, h := newBuffer(r.ID, unsafe.Sizeof(attrOut{}))
+	out := (*attrOut)(buf.alloc(unsafe.Sizeof(attrOut{})))
+	out.AttrValid = uint64(resp.Attr.Valid / time.Second)
+	out.AttrValidNsec = uint32(resp.Attr.Valid % time.Second / time.Nanosecond)
+	out.Attr = resp.Attr.attr()
+	r.respond(h, uintptr(len(buf)))
 }
 
 // A SetattrResponse is the response to a SetattrRequest.
