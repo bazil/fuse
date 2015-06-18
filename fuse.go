@@ -2044,38 +2044,3 @@ func (r *InterruptRequest) Respond() {
 func (r *InterruptRequest) String() string {
 	return fmt.Sprintf("Interrupt [%s] ID %v", &r.Header, r.IntrID)
 }
-
-/*{
-
-// A XXXRequest xxx.
-type XXXRequest struct {
-	Header `json:"-"`
-	xxx
-}
-
-var _ = Request(&XXXRequest{})
-
-func (r *XXXRequest) String() string {
-	return fmt.Sprintf("XXX [%s] xxx", &r.Header)
-}
-
-// Respond replies to the request with the given response.
-func (r *XXXRequest) Respond(resp *XXXResponse) {
-	out := &xxxOut{
-		outHeader: outHeader{Unique: uint64(r.ID)},
-		xxx,
-	}
-	r.respond(&out.outHeader, unsafe.Sizeof(*out))
-}
-
-// A XXXResponse is the response to a XXXRequest.
-type XXXResponse struct {
-	xxx
-}
-
-func (r *XXXResponse) String() string {
-	return fmt.Sprintf("XXX %+v", *r)
-}
-
- }
-*/
