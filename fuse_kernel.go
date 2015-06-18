@@ -467,8 +467,6 @@ type createIn struct {
 }
 
 type createOut struct {
-	outHeader
-
 	Nodeid         uint64 // Inode ID
 	Generation     uint64 // Inode generation
 	EntryValid     uint64 // Cache timeout for the name

@@ -1481,21 +1481,21 @@ func (r *CreateRequest) String() string {
 
 // Respond replies to the request with the given response.
 func (r *CreateRequest) Respond(resp *CreateResponse) {
-	out := &createOut{
-		outHeader: outHeader{Unique: uint64(r.ID)},
+	buf, h := newBuffer(r.ID, unsafe.Sizeof(createOut{}))
 
-		Nodeid:         uint64(resp.Node),
-		Generation:     resp.Generation,
-		EntryValid:     uint64(resp.EntryValid / time.Second),
-		EntryValidNsec: uint32(resp.EntryValid % time.Second / time.Nanosecond),
-		AttrValid:      uint64(resp.Attr.Valid / time.Second),
-		AttrValidNsec:  uint32(resp.Attr.Valid % time.Second / time.Nanosecond),
-		Attr:           resp.Attr.attr(),
+	out := (*createOut)(buf.alloc(unsafe.Sizeof(createOut{})))
+	out.Nodeid = uint64(resp.Node)
+	out.Generation = resp.Generation
+	out.EntryValid = uint64(resp.EntryValid / time.Second)
+	out.EntryValidNsec = uint32(resp.EntryValid % time.Second / time.Nanosecond)
+	out.AttrValid = uint64(resp.Attr.Valid / time.Second)
+	out.AttrValidNsec = uint32(resp.Attr.Valid % time.Second / time.Nanosecond)
+	out.Attr = resp.Attr.attr()
 
-		Fh:        uint64(resp.Handle),
-		OpenFlags: uint32(resp.Flags),
-	}
-	r.respond(&out.outHeader, unsafe.Sizeof(*out))
+	out.Fh = uint64(resp.Handle)
+	out.OpenFlags = uint32(resp.Flags)
+
+	r.respond(h, uintptr(len(buf)))
 }
 
 // A CreateResponse is the response to a CreateRequest.
