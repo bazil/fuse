@@ -1952,8 +1952,9 @@ func (r *ReadlinkRequest) String() string {
 }
 
 func (r *ReadlinkRequest) Respond(target string) {
-	out := &outHeader{Unique: uint64(r.ID)}
-	r.respondData(out, unsafe.Sizeof(*out), []byte(target))
+	buf, h := newBuffer(r.ID, uintptr(len(target)))
+	buf = append(buf, target...)
+	r.respond(h, uintptr(len(buf)))
 }
 
 // A LinkRequest is a request to create a hard link.
