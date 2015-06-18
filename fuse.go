@@ -1406,17 +1406,16 @@ func (r *LookupRequest) String() string {
 
 // Respond replies to the request with the given response.
 func (r *LookupRequest) Respond(resp *LookupResponse) {
-	out := &entryOut{
-		outHeader:      outHeader{Unique: uint64(r.ID)},
-		Nodeid:         uint64(resp.Node),
-		Generation:     resp.Generation,
-		EntryValid:     uint64(resp.EntryValid / time.Second),
-		EntryValidNsec: uint32(resp.EntryValid % time.Second / time.Nanosecond),
-		AttrValid:      uint64(resp.Attr.Valid / time.Second),
-		AttrValidNsec:  uint32(resp.Attr.Valid % time.Second / time.Nanosecond),
-		Attr:           resp.Attr.attr(),
-	}
-	r.respond(&out.outHeader, unsafe.Sizeof(*out))
+	buf, h := newBuffer(r.ID, unsafe.Sizeof(entryOut{}))
+	out := (*entryOut)(buf.alloc(unsafe.Sizeof(entryOut{})))
+	out.Nodeid = uint64(resp.Node)
+	out.Generation = resp.Generation
+	out.EntryValid = uint64(resp.EntryValid / time.Second)
+	out.EntryValidNsec = uint32(resp.EntryValid % time.Second / time.Nanosecond)
+	out.AttrValid = uint64(resp.Attr.Valid / time.Second)
+	out.AttrValidNsec = uint32(resp.Attr.Valid % time.Second / time.Nanosecond)
+	out.Attr = resp.Attr.attr()
+	r.respond(h, uintptr(len(buf)))
 }
 
 // A LookupResponse is the response to a LookupRequest.
@@ -1522,17 +1521,16 @@ func (r *MkdirRequest) String() string {
 
 // Respond replies to the request with the given response.
 func (r *MkdirRequest) Respond(resp *MkdirResponse) {
-	out := &entryOut{
-		outHeader:      outHeader{Unique: uint64(r.ID)},
-		Nodeid:         uint64(resp.Node),
-		Generation:     resp.Generation,
-		EntryValid:     uint64(resp.EntryValid / time.Second),
-		EntryValidNsec: uint32(resp.EntryValid % time.Second / time.Nanosecond),
-		AttrValid:      uint64(resp.Attr.Valid / time.Second),
-		AttrValidNsec:  uint32(resp.Attr.Valid % time.Second / time.Nanosecond),
-		Attr:           resp.Attr.attr(),
-	}
-	r.respond(&out.outHeader, unsafe.Sizeof(*out))
+	buf, h := newBuffer(r.ID, unsafe.Sizeof(entryOut{}))
+	out := (*entryOut)(buf.alloc(unsafe.Sizeof(entryOut{})))
+	out.Nodeid = uint64(resp.Node)
+	out.Generation = resp.Generation
+	out.EntryValid = uint64(resp.EntryValid / time.Second)
+	out.EntryValidNsec = uint32(resp.EntryValid % time.Second / time.Nanosecond)
+	out.AttrValid = uint64(resp.Attr.Valid / time.Second)
+	out.AttrValidNsec = uint32(resp.Attr.Valid % time.Second / time.Nanosecond)
+	out.Attr = resp.Attr.attr()
+	r.respond(h, uintptr(len(buf)))
 }
 
 // A MkdirResponse is the response to a MkdirRequest.
@@ -1923,17 +1921,16 @@ func (r *SymlinkRequest) String() string {
 
 // Respond replies to the request, indicating that the symlink was created.
 func (r *SymlinkRequest) Respond(resp *SymlinkResponse) {
-	out := &entryOut{
-		outHeader:      outHeader{Unique: uint64(r.ID)},
-		Nodeid:         uint64(resp.Node),
-		Generation:     resp.Generation,
-		EntryValid:     uint64(resp.EntryValid / time.Second),
-		EntryValidNsec: uint32(resp.EntryValid % time.Second / time.Nanosecond),
-		AttrValid:      uint64(resp.Attr.Valid / time.Second),
-		AttrValidNsec:  uint32(resp.Attr.Valid % time.Second / time.Nanosecond),
-		Attr:           resp.Attr.attr(),
-	}
-	r.respond(&out.outHeader, unsafe.Sizeof(*out))
+	buf, h := newBuffer(r.ID, unsafe.Sizeof(entryOut{}))
+	out := (*entryOut)(buf.alloc(unsafe.Sizeof(entryOut{})))
+	out.Nodeid = uint64(resp.Node)
+	out.Generation = resp.Generation
+	out.EntryValid = uint64(resp.EntryValid / time.Second)
+	out.EntryValidNsec = uint32(resp.EntryValid % time.Second / time.Nanosecond)
+	out.AttrValid = uint64(resp.Attr.Valid / time.Second)
+	out.AttrValidNsec = uint32(resp.Attr.Valid % time.Second / time.Nanosecond)
+	out.Attr = resp.Attr.attr()
+	r.respond(h, uintptr(len(buf)))
 }
 
 // A SymlinkResponse is the response to a SymlinkRequest.
@@ -1971,17 +1968,16 @@ func (r *LinkRequest) String() string {
 }
 
 func (r *LinkRequest) Respond(resp *LookupResponse) {
-	out := &entryOut{
-		outHeader:      outHeader{Unique: uint64(r.ID)},
-		Nodeid:         uint64(resp.Node),
-		Generation:     resp.Generation,
-		EntryValid:     uint64(resp.EntryValid / time.Second),
-		EntryValidNsec: uint32(resp.EntryValid % time.Second / time.Nanosecond),
-		AttrValid:      uint64(resp.Attr.Valid / time.Second),
-		AttrValidNsec:  uint32(resp.Attr.Valid % time.Second / time.Nanosecond),
-		Attr:           resp.Attr.attr(),
-	}
-	r.respond(&out.outHeader, unsafe.Sizeof(*out))
+	buf, h := newBuffer(r.ID, unsafe.Sizeof(entryOut{}))
+	out := (*entryOut)(buf.alloc(unsafe.Sizeof(entryOut{})))
+	out.Nodeid = uint64(resp.Node)
+	out.Generation = resp.Generation
+	out.EntryValid = uint64(resp.EntryValid / time.Second)
+	out.EntryValidNsec = uint32(resp.EntryValid % time.Second / time.Nanosecond)
+	out.AttrValid = uint64(resp.Attr.Valid / time.Second)
+	out.AttrValidNsec = uint32(resp.Attr.Valid % time.Second / time.Nanosecond)
+	out.Attr = resp.Attr.attr()
+	r.respond(h, uintptr(len(buf)))
 }
 
 // A RenameRequest is a request to rename a file.
@@ -2016,17 +2012,16 @@ func (r *MknodRequest) String() string {
 }
 
 func (r *MknodRequest) Respond(resp *LookupResponse) {
-	out := &entryOut{
-		outHeader:      outHeader{Unique: uint64(r.ID)},
-		Nodeid:         uint64(resp.Node),
-		Generation:     resp.Generation,
-		EntryValid:     uint64(resp.EntryValid / time.Second),
-		EntryValidNsec: uint32(resp.EntryValid % time.Second / time.Nanosecond),
-		AttrValid:      uint64(resp.Attr.Valid / time.Second),
-		AttrValidNsec:  uint32(resp.Attr.Valid % time.Second / time.Nanosecond),
-		Attr:           resp.Attr.attr(),
-	}
-	r.respond(&out.outHeader, unsafe.Sizeof(*out))
+	buf, h := newBuffer(r.ID, unsafe.Sizeof(entryOut{}))
+	out := (*entryOut)(buf.alloc(unsafe.Sizeof(entryOut{})))
+	out.Nodeid = uint64(resp.Node)
+	out.Generation = resp.Generation
+	out.EntryValid = uint64(resp.EntryValid / time.Second)
+	out.EntryValidNsec = uint32(resp.EntryValid % time.Second / time.Nanosecond)
+	out.AttrValid = uint64(resp.Attr.Valid / time.Second)
+	out.AttrValidNsec = uint32(resp.Attr.Valid % time.Second / time.Nanosecond)
+	out.Attr = resp.Attr.attr()
+	r.respond(h, uintptr(len(buf)))
 }
 
 type FsyncRequest struct {
