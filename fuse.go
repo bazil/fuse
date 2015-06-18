@@ -125,7 +125,7 @@ type Conn struct {
 	// File handle for kernel communication. Only safe to access if
 	// rio or wio is held.
 	dev *os.File
-	wio sync.Mutex
+	wio sync.RWMutex
 	rio sync.RWMutex
 
 	// Protocol version negotiated with InitRequest/InitResponse.
@@ -1033,8 +1033,8 @@ func (c *Conn) writeToKernel(msg []byte) error {
 	out := (*outHeader)(unsafe.Pointer(&msg[0]))
 	out.Len = uint32(len(msg))
 
-	c.wio.Lock()
-	defer c.wio.Unlock()
+	c.wio.RLock()
+	defer c.wio.RUnlock()
 	nn, err := syscall.Write(c.fd(), msg)
 	if err == nil && nn != len(msg) {
 		Debug(bugShortKernelWrite{
