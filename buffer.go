@@ -28,9 +28,8 @@ func (w *buffer) reset() {
 	*w = (*w)[:0]
 }
 
-func newBuffer(id RequestID, extra uintptr) buffer {
-	buf := make(buffer, 0, unsafe.Sizeof(outHeader{})+extra)
-	h := (*outHeader)(buf.alloc(unsafe.Sizeof(outHeader{})))
-	h.Unique = uint64(id)
+func newBuffer(extra uintptr) buffer {
+	const hdrSize = unsafe.Sizeof(outHeader{})
+	buf := make(buffer, hdrSize, hdrSize+extra)
 	return buf
 }
