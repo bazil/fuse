@@ -1762,11 +1762,10 @@ func (r *WriteRequest) MarshalJSON() ([]byte, error) {
 
 // Respond replies to the request with the given response.
 func (r *WriteRequest) Respond(resp *WriteResponse) {
-	out := &writeOut{
-		outHeader: outHeader{Unique: uint64(r.ID)},
-		Size:      uint32(resp.Size),
-	}
-	r.respond(&out.outHeader, unsafe.Sizeof(*out))
+	buf, h := newBuffer(r.ID, unsafe.Sizeof(writeOut{}))
+	out := (*writeOut)(buf.alloc(unsafe.Sizeof(writeOut{})))
+	out.Size = uint32(resp.Size)
+	r.respond(h, uintptr(len(buf)))
 }
 
 // A WriteResponse replies to a write indicating how many bytes were written.

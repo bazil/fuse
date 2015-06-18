@@ -511,7 +511,6 @@ type writeIn struct {
 }
 
 type writeOut struct {
-	outHeader
 	Size    uint32
 	Padding uint32
 }
