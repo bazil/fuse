@@ -1447,12 +1447,11 @@ func (r *OpenRequest) String() string {
 
 // Respond replies to the request with the given response.
 func (r *OpenRequest) Respond(resp *OpenResponse) {
-	out := &openOut{
-		outHeader: outHeader{Unique: uint64(r.ID)},
-		Fh:        uint64(resp.Handle),
-		OpenFlags: uint32(resp.Flags),
-	}
-	r.respond(&out.outHeader, unsafe.Sizeof(*out))
+	buf, h := newBuffer(r.ID, unsafe.Sizeof(openOut{}))
+	out := (*openOut)(buf.alloc(unsafe.Sizeof(openOut{})))
+	out.Fh = uint64(resp.Handle)
+	out.OpenFlags = uint32(resp.Flags)
+	r.respond(h, uintptr(len(buf)))
 }
 
 // A OpenResponse is the response to a OpenRequest.

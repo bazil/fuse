@@ -455,7 +455,6 @@ type openIn struct {
 }
 
 type openOut struct {
-	outHeader
 	Fh        uint64
 	OpenFlags uint32
 	Padding   uint32
