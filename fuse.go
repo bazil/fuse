@@ -1266,14 +1266,14 @@ func (r *GetxattrRequest) String() string {
 // Respond replies to the request with the given response.
 func (r *GetxattrRequest) Respond(resp *GetxattrResponse) {
 	if r.Size == 0 {
-		out := &getxattrOut{
-			outHeader: outHeader{Unique: uint64(r.ID)},
-			Size:      uint32(len(resp.Xattr)),
-		}
-		r.respond(&out.outHeader, unsafe.Sizeof(*out))
+		buf, h := newBuffer(r.ID, unsafe.Sizeof(getxattrOut{}))
+		out := (*getxattrOut)(buf.alloc(unsafe.Sizeof(getxattrOut{})))
+		out.Size = uint32(len(resp.Xattr))
+		r.respond(h, uintptr(len(buf)))
 	} else {
-		out := &outHeader{Unique: uint64(r.ID)}
-		r.respondData(out, unsafe.Sizeof(*out), resp.Xattr)
+		buf, h := newBuffer(r.ID, uintptr(len(resp.Xattr)))
+		buf = append(buf, resp.Xattr...)
+		r.respond(h, uintptr(len(buf)))
 	}
 }
 
@@ -1302,14 +1302,14 @@ func (r *ListxattrRequest) String() string {
 // Respond replies to the request with the given response.
 func (r *ListxattrRequest) Respond(resp *ListxattrResponse) {
 	if r.Size == 0 {
-		out := &getxattrOut{
-			outHeader: outHeader{Unique: uint64(r.ID)},
-			Size:      uint32(len(resp.Xattr)),
-		}
-		r.respond(&out.outHeader, unsafe.Sizeof(*out))
+		buf, h := newBuffer(r.ID, unsafe.Sizeof(getxattrOut{}))
+		out := (*getxattrOut)(buf.alloc(unsafe.Sizeof(getxattrOut{})))
+		out.Size = uint32(len(resp.Xattr))
+		r.respond(h, uintptr(len(buf)))
 	} else {
-		out := &outHeader{Unique: uint64(r.ID)}
-		r.respondData(out, unsafe.Sizeof(*out), resp.Xattr)
+		buf, h := newBuffer(r.ID, uintptr(len(resp.Xattr)))
+		buf = append(buf, resp.Xattr...)
+		r.respond(h, uintptr(len(buf)))
 	}
 }
 

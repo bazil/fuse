@@ -556,7 +556,6 @@ func (getxattrInCommon) position() uint32 {
 }
 
 type getxattrOut struct {
-	outHeader
 	Size    uint32
 	Padding uint32
 }
