@@ -1560,8 +1560,9 @@ func (r *ReadRequest) String() string {
 
 // Respond replies to the request with the given response.
 func (r *ReadRequest) Respond(resp *ReadResponse) {
-	out := &outHeader{Unique: uint64(r.ID)}
-	r.respondData(out, unsafe.Sizeof(*out), resp.Data)
+	buf, h := newBuffer(r.ID, uintptr(len(resp.Data)))
+	buf = append(buf, resp.Data...)
+	r.respond(h, uintptr(len(buf)))
 }
 
 // A ReadResponse is the response to a ReadRequest.
