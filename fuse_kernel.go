@@ -568,7 +568,6 @@ type lkIn struct {
 }
 
 type lkOut struct {
-	outHeader
 	Lk fileLock
 }
 
