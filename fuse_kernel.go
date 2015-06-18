@@ -607,7 +607,6 @@ type bmapIn struct {
 }
 
 type bmapOut struct {
-	outHeader
 	Block uint64
 }
 
