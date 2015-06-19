@@ -434,6 +434,16 @@ type serveHandle struct {
 type NodeRef struct {
 	id         fuse.NodeID
 	generation uint64
+
+	// Delay freeing the NodeID until waitgroup is done. This allows
+	// using the NodeID for short periods of time without holding the
+	// Server.meta lock.
+	//
+	// Rules:
+	//
+	//     - hold Server.meta while calling wg.Add, then unlock
+	//     - do NOT try to reacquire Server.meta
+	wg sync.WaitGroup
 }
 
 // nodeRef is only ever accessed while holding Server.meta
@@ -532,7 +542,9 @@ func (c *Server) dropNode(id fuse.NodeID, n uint64) (forget bool) {
 		c.node[id] = nil
 		if nodeRef, ok := snode.node.(nodeRef); ok {
 			ref := nodeRef.nodeRef()
-			*ref = NodeRef{}
+			ref.wg.Wait()
+			ref.id = 0
+			ref.generation = 0
 		}
 		c.freeNode = append(c.freeNode, id)
 		return true
