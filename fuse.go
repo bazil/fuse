@@ -162,7 +162,7 @@ func Mount(dir string, options ...MountOption) (*Conn, error) {
 	}
 	c.dev = f
 
-	if err := initMount(c); err != nil {
+	if err := initMount(c, &conf); err != nil {
 		c.Close()
 		return nil, err
 	}
@@ -179,7 +179,7 @@ func (e *OldVersionError) Error() string {
 	return fmt.Sprintf("kernel FUSE version is too old: %v < %v", e.Kernel, e.LibraryMin)
 }
 
-func initMount(c *Conn) error {
+func initMount(c *Conn, conf *MountConfig) error {
 	req, err := c.ReadRequest()
 	if err != nil {
 		if err == io.EOF {
@@ -210,9 +210,10 @@ func initMount(c *Conn) error {
 	c.proto = proto
 
 	s := &InitResponse{
-		Library:  proto,
-		MaxWrite: 128 * 1024,
-		Flags:    InitBigWrites,
+		Library:      proto,
+		MaxReadahead: conf.maxReadahead,
+		MaxWrite:     128 * 1024,
+		Flags:        InitBigWrites,
 	}
 	r.Respond(s)
 	return nil

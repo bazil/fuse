@@ -12,7 +12,8 @@ func dummyOption(conf *MountConfig) error {
 // MountConfig holds the configuration for a mount operation.
 // Use it by passing MountOption values to Mount.
 type MountConfig struct {
-	options map[string]string
+	options      map[string]string
+	maxReadahead uint32
 }
 
 func escapeComma(s string) string {
@@ -127,6 +128,20 @@ func DefaultPermissions() MountOption {
 func ReadOnly() MountOption {
 	return func(conf *MountConfig) error {
 		conf.options["ro"] = ""
+		return nil
+	}
+}
+
+// MaxReadahead sets the number of bytes that can be prefetched for
+// sequential reads. The kernel can enforce a maximum value lower than
+// this.
+//
+// This setting makes the kernel perform speculative reads that do not
+// originate from any client process. This usually tremendously
+// improves read performance.
+func MaxReadahead(n uint32) MountOption {
+	return func(conf *MountConfig) error {
+		conf.maxReadahead = n
 		return nil
 	}
 }
