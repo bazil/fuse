@@ -14,6 +14,7 @@ func dummyOption(conf *MountConfig) error {
 type MountConfig struct {
 	options      map[string]string
 	maxReadahead uint32
+	initFlags    InitFlags
 }
 
 func escapeComma(s string) string {
@@ -142,6 +143,16 @@ func ReadOnly() MountOption {
 func MaxReadahead(n uint32) MountOption {
 	return func(conf *MountConfig) error {
 		conf.maxReadahead = n
+		return nil
+	}
+}
+
+// AsyncRead enabled multiple outstanding read requests for the same
+// handle. Without this, there is at most one request in flight at a
+// time.
+func AsyncRead() MountOption {
+	return func(conf *MountConfig) error {
+		conf.initFlags |= InitAsyncRead
 		return nil
 	}
 }

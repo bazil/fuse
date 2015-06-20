@@ -101,9 +101,9 @@ func benchmark(b *testing.B, fn func(b *testing.B, mnt string), conf *benchConfi
 	filesys := benchFS{
 		conf: conf,
 	}
-	// TODO reintroduce fuse.InitAsyncRead
 	mnt, err := fstestutil.Mounted(filesys, nil,
 		fuse.MaxReadahead(64*1024*1024),
+		fuse.AsyncRead(),
 	)
 	if err != nil {
 		b.Fatal(err)
