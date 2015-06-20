@@ -149,7 +149,7 @@ func MaxReadahead(n uint32) MountOption {
 	}
 }
 
-// AsyncRead enabled multiple outstanding read requests for the same
+// AsyncRead enables multiple outstanding read requests for the same
 // handle. Without this, there is at most one request in flight at a
 // time.
 func AsyncRead() MountOption {
