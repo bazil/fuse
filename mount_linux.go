@@ -32,7 +32,7 @@ func lineLogger(wg *sync.WaitGroup, prefix string, r io.ReadCloser) {
 	}
 }
 
-func mount(dir string, conf *MountConfig, ready chan<- struct{}, errp *error) (fusefd *os.File, err error) {
+func mount(dir string, conf *mountConfig, ready chan<- struct{}, errp *error) (fusefd *os.File, err error) {
 	// linux mount is never delayed
 	close(ready)
 

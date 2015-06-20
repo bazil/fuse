@@ -143,7 +143,7 @@ type Conn struct {
 // possible errors. Incoming requests on Conn must be served to make
 // progress.
 func Mount(dir string, options ...MountOption) (*Conn, error) {
-	conf := MountConfig{
+	conf := mountConfig{
 		options: make(map[string]string),
 	}
 	for _, option := range options {
@@ -179,7 +179,7 @@ func (e *OldVersionError) Error() string {
 	return fmt.Sprintf("kernel FUSE version is too old: %v < %v", e.Kernel, e.LibraryMin)
 }
 
-func initMount(c *Conn, conf *MountConfig) error {
+func initMount(c *Conn, conf *mountConfig) error {
 	req, err := c.ReadRequest()
 	if err != nil {
 		if err == io.EOF {

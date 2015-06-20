@@ -19,7 +19,7 @@ func TestMountOptionCommaError(t *testing.T) {
 	// some string content
 	var evil = "FuseTest,Marker"
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}},
-		func(conf *fuse.MountConfig) error {
+		func(conf *fuse.mountConfig) error {
 			fuse.ForTestSetMountOption(conf, "fusetest", evil)
 			return nil
 		},
