@@ -1118,8 +1118,8 @@ func (c *Conn) InvalidateNode(nodeID NodeID, off int64, size int64) error {
 // Returns ErrNotCached if the kernel is not currently caching the
 // node.
 func (c *Conn) InvalidateEntry(parent NodeID, name string) error {
-	const maxUint32 = 1 << 32
-	if len(name) > maxUint32 {
+	const maxUint32 = ^uint32(0)
+	if uint64(len(name)) > uint64(maxUint32) {
 		// very unlikely, but we don't want to silently truncate
 		return syscall.ENAMETOOLONG
 	}
