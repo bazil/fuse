@@ -654,7 +654,7 @@ type notification struct {
 	Op   string
 	Node fuse.NodeID
 	Out  interface{} `json:",omitempty"`
-	Err  error       `json:",omitempty"`
+	Err  string      `json:",omitempty"`
 }
 
 func (n notification) String() string {
@@ -1426,6 +1426,13 @@ func (i invalidateNodeDetail) String() string {
 	return fmt.Sprintf("Off:%d Size:%d", i.Off, i.Size)
 }
 
+func errstr(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
+
 func (s *Server) invalidateNode(node Node, off int64, size int64) error {
 	nodeRef, ok := node.(nodeRef)
 	if !ok {
@@ -1455,7 +1462,7 @@ func (s *Server) invalidateNode(node Node, off int64, size int64) error {
 			Off:  off,
 			Size: size,
 		},
-		Err: err,
+		Err: errstr(err),
 	})
 	return err
 }
@@ -1530,7 +1537,7 @@ func (s *Server) InvalidateEntry(parent Node, name string) error {
 		Out: invalidateEntryDetail{
 			Name: name,
 		},
-		Err: err,
+		Err: errstr(err),
 	})
 	return err
 }
