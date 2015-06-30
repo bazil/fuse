@@ -167,7 +167,7 @@ func TestMountOptionDefaultPermissions(t *testing.T) {
 	t.Parallel()
 	mnt, err := fstestutil.MountedT(t,
 		fstestutil.SimpleFS{
-			fstestutil.ChildMap{"child": unwritableFile{}},
+			&fstestutil.ChildMap{"child": unwritableFile{}},
 		},
 		fuse.DefaultPermissions(),
 	)
