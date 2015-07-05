@@ -254,7 +254,7 @@ func nodeAttr(ctx context.Context, n Node, attr *fuse.Attr) error {
 //
 // Other FUSE requests can be handled by implementing methods from the
 // Handle* interfaces. The most common to implement are HandleReader,
-// HandleReadDirer, and HandleWriter.
+// HandleReadDirAller, and HandleWriter.
 //
 // TODO implement methods: Getlk, Setlk, Setlkw
 type Handle interface {
