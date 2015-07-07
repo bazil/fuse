@@ -1,0 +1,42 @@
+# Testing FUSE on travis: not for the faint of heart.
+#
+# Travis containers don't exactly support fuse, as seen at
+#   https://github.com/travis-ci/travis-ci/issues/1100
+#   "We are looking at adding FUSE support in our new setup, but no ETA."
+#     -- joshk, Apr 7 2015
+#
+# Note that the travis default environment variables enumerated at
+#   http://docs.travis-ci.com/user/environment-variables/#Default-Environment-Variables
+# include "HAS_JOSH_K_SEAL_OF_APPROVAL=true" so it must be canon.
+#
+# So how do we do it? By running inside ANOTHER container, User-Mode Linux.
+#   http://user-mode-linux.sourceforge.net/
+#
+# The travis container runs bin/umltest.sh, which generates a custom script
+# for running inside the UML container and launches UML to run it and halt.
+# The UML container utilizes the host filesystem, which allows it to persist
+# the exit status upward to the travis container.
+language: go
+# Travis has a "standard infrastructure" and a "container-based infrastructure".
+# We only work on the standard one, probably because the filesystem on the VMs is
+# something called simfs but on the containers is AUFS.
+#   http://docs.travis-ci.com/user/workers/standard-infrastructure/
+#   http://docs.travis-ci.com/user/workers/container-based-infrastructure/
+# This line explicitly routes to the standard infrastructure.
+sudo: required
+
+install:
+  # This line makes it possible for forks of github.com/bazil/fuse to run
+  # the tests on travis. Otherwise due to go's name resolution rules, nothing works.
+  # See https://github.com/golang/go/wiki/PackageManagementTools for a bunch of
+  # other attempts to deal with it.
+  - bin/fix-imports.sh bazil.org/fuse "github.com/$TRAVIS_REPO_SLUG" "$TRAVIS_BUILD_DIR"
+  - go get -t -v ./...
+  # Installing FUSE in the travis container. It won't work directly, but
+  # we will exploit the files from the UML container.
+  - sudo apt-get install -qq libfuse-dev pkg-config fuse user-mode-linux slirp
+  # Magic numbers! http://lanana.org/docs/device-list/devices-2.6+.txt
+  - sudo mknod /dev/fuse c 10 229
+  - sudo chmod 666 /dev/fuse
+
+script: bin/umltest.sh
