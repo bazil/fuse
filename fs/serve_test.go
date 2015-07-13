@@ -2358,3 +2358,46 @@ func TestInvalidateEntry(t *testing.T) {
 		t.Errorf("wrong Lookup call count: %d != %d", g, e)
 	}
 }
+
+type contextFile struct {
+	fstestutil.File
+}
+
+var contextFileSentinel int
+
+func (contextFile) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
+	v := ctx.Value(&contextFileSentinel)
+	if v == nil {
+		return nil, fuse.ESTALE
+	}
+	data, ok := v.(string)
+	if !ok {
+		return nil, fuse.EIO
+	}
+	resp.Flags |= fuse.OpenDirectIO
+	return fs.DataHandle([]byte(data)), nil
+}
+
+func TestContext(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	const input = "kilroy was here"
+	ctx = context.WithValue(ctx, &contextFileSentinel, input)
+	mnt, err := fstestutil.MountedT(t,
+		fstestutil.SimpleFS{&fstestutil.ChildMap{"child": contextFile{}}},
+		&fs.Config{
+			GetContext: func() context.Context { return ctx },
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	data, err := ioutil.ReadFile(mnt.Dir + "/child")
+	if err != nil {
+		t.Fatalf("cannot read context file: %v", err)
+	}
+	if g, e := string(data), input; g != e {
+		t.Errorf("read wrong data: %q != %q", g, e)
+	}
+}

@@ -321,6 +321,12 @@ type Config struct {
 	//
 	// See fuse.Debug for the rules that log functions must follow.
 	Debug func(msg interface{})
+
+	// Function to create new contexts. If nil, use
+	// context.Background.
+	//
+	// Note that changing this may not affect existing calls to Serve.
+	GetContext func() context.Context
 }
 
 // New returns a new FUSE server ready to serve this kernel FUSE
@@ -336,17 +342,22 @@ func New(conn *fuse.Conn, config *Config) *Server {
 	}
 	if config != nil {
 		s.debug = config.Debug
+		s.context = config.GetContext
 	}
 	if s.debug == nil {
 		s.debug = fuse.Debug
+	}
+	if s.context == nil {
+		s.context = context.Background
 	}
 	return s
 }
 
 type Server struct {
 	// set in New
-	conn  *fuse.Conn
-	debug func(msg interface{})
+	conn    *fuse.Conn
+	debug   func(msg interface{})
+	context func() context.Context
 
 	// set once at Serve time
 	fs           FS
@@ -711,7 +722,7 @@ func initLookupResponse(s *fuse.LookupResponse) {
 }
 
 func (c *Server) serve(r fuse.Request) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(c.context())
 	defer cancel()
 
 	req := &serveRequest{Request: r, cancel: cancel}
