@@ -102,9 +102,11 @@ func Mounted(filesys fs.FS, conf *fs.Config, options ...fuse.MountOption) (*Moun
 //
 // The debug log is not enabled by default. Use `-fuse.debug` or call
 // DebugByDefault to enable.
-func MountedT(t testing.TB, filesys fs.FS, options ...fuse.MountOption) (*Mount, error) {
-	conf := &fs.Config{}
-	if debug {
+func MountedT(t testing.TB, filesys fs.FS, conf *fs.Config, options ...fuse.MountOption) (*Mount, error) {
+	if conf == nil {
+		conf = &fs.Config{}
+	}
+	if debug && conf.Debug == nil {
 		conf.Debug = func(msg interface{}) {
 			t.Logf("FUSE: %s", msg)
 		}
