@@ -21,6 +21,8 @@ func getxattr(path string, attr string, dest *byte, size int, position uint32, o
 		return
 	}
 	r0, _, e1 := syscall.Syscall6(syscall.SYS_GETXATTR, uintptr(unsafe.Pointer(_p0)), uintptr(unsafe.Pointer(_p1)), uintptr(unsafe.Pointer(dest)), uintptr(size), uintptr(position), uintptr(options))
+	use(unsafe.Pointer(_p0))
+	use(unsafe.Pointer(_p1))
 	sz = int(r0)
 	if e1 != 0 {
 		err = e1
@@ -43,6 +45,7 @@ func listxattr(path string, dest []byte, options int) (sz int, err error) {
 		_p1 = unsafe.Pointer(&_zero)
 	}
 	r0, _, e1 := syscall.Syscall6(syscall.SYS_LISTXATTR, uintptr(unsafe.Pointer(_p0)), uintptr(_p1), uintptr(len(dest)), uintptr(options), 0, 0)
+	use(unsafe.Pointer(_p0))
 	sz = int(r0)
 	if e1 != 0 {
 		err = e1
@@ -70,6 +73,8 @@ func setxattr(path string, attr string, data []byte, position uint32, flags int)
 		_p2 = unsafe.Pointer(&_zero)
 	}
 	_, _, e1 := syscall.Syscall6(syscall.SYS_SETXATTR, uintptr(unsafe.Pointer(_p0)), uintptr(unsafe.Pointer(_p1)), uintptr(_p2), uintptr(len(data)), uintptr(position), uintptr(flags))
+	use(unsafe.Pointer(_p0))
+	use(unsafe.Pointer(_p1))
 	if e1 != 0 {
 		err = e1
 	}
@@ -90,6 +95,8 @@ func removexattr(path string, attr string, options int) (err error) {
 		return
 	}
 	_, _, e1 := syscall.Syscall(syscall.SYS_REMOVEXATTR, uintptr(unsafe.Pointer(_p0)), uintptr(unsafe.Pointer(_p1)), uintptr(options))
+	use(unsafe.Pointer(_p0))
+	use(unsafe.Pointer(_p1))
 	if e1 != 0 {
 		err = e1
 	}

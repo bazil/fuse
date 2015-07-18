@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-mksys="$(go env GOROOT)/src/pkg/syscall/mksyscall.pl"
+mksys="$(go env GOROOT)/src/syscall/mksyscall.pl"
 
 fix() {
     sed 's,^package syscall$,&x\nimport "syscall",' \
@@ -12,7 +12,8 @@ fix() {
 	| gofmt -r='SYS_LISTXATTR -> syscall.SYS_LISTXATTR' \
 	| gofmt -r='SYS_SETXATTR -> syscall.SYS_SETXATTR' \
 	| gofmt -r='SYS_REMOVEXATTR -> syscall.SYS_REMOVEXATTR' \
-	| gofmt -r='SYS_MSYNC -> syscall.SYS_MSYNC'
+	| gofmt -r='SYS_MSYNC -> syscall.SYS_MSYNC' \
+	| gofmt -r='SYS_MOUNT -> syscall.SYS_MOUNT'
 }
 
 cd "$(dirname "$0")"
@@ -32,3 +33,11 @@ $mksys msync.go \
 $mksys -l32 msync.go \
     | fix \
     >msync_386.go
+
+$mksys mount_openbsd.go \
+    | fix \
+    > mount_openbsd_amd64.go
+
+$mksys -l32 mount_openbsd.go \
+    | fix \
+    > mount_openbsd_386.go
