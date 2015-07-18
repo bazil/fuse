@@ -1,3 +1,5 @@
+// +build openbsd freebsd
+
 package fuse
 
 func localVolume(conf *mountConfig) error {
