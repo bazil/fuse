@@ -1224,6 +1224,58 @@ func TestReadDirAll(t *testing.T) {
 	}
 }
 
+type readDirAllBad struct {
+	fstestutil.Dir
+}
+
+func (d *readDirAllBad) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
+	r := []fuse.Dirent{
+		{Name: "one", Inode: 11, Type: fuse.DT_Dir},
+		{Name: "three", Inode: 13},
+		{Name: "two", Inode: 12, Type: fuse.DT_File},
+	}
+	// pick a really distinct error, to identify it later
+	return r, fuse.Errno(syscall.ENAMETOOLONG)
+}
+
+func TestReadDirAllBad(t *testing.T) {
+	t.Parallel()
+	f := &readDirAllBad{}
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	fil, err := os.Open(mnt.Dir)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer fil.Close()
+
+	var names []string
+	for {
+		n, err := fil.Readdirnames(1)
+		if err != nil {
+			if nerr, ok := err.(*os.SyscallError); !ok || nerr.Err != syscall.ENAMETOOLONG {
+				t.Fatalf("wrong error: %v", err)
+			}
+			break
+		}
+		names = append(names, n...)
+	}
+
+	t.Logf("Got readdir: %q", names)
+
+	// TODO could serve partial results from ReadDirAll but the
+	// shandle.readData mechanism makes that awkward.
+	if len(names) != 0 {
+		t.Errorf(`expected 0 entries, got: %q`, names)
+		return
+	}
+}
+
 // Test readdir without any ReadDir methods implemented.
 
 type readDirNotImplemented struct {
