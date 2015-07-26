@@ -717,6 +717,22 @@ func (h handlerPanickedError) Errno() fuse.Errno {
 	return fuse.DefaultErrno
 }
 
+type handleNotReaderError struct {
+	handle Handle
+}
+
+var _ error = handleNotReaderError{}
+
+func (e handleNotReaderError) Error() string {
+	return fmt.Sprintf("handle has no Read: %T", e.handle)
+}
+
+var _ fuse.ErrorNumber = handleNotReaderError{}
+
+func (e handleNotReaderError) Errno() fuse.Errno {
+	return fuse.ENOTSUP
+}
+
 func initLookupResponse(s *fuse.LookupResponse) {
 	s.EntryValid = entryValidTime
 }
@@ -1215,9 +1231,9 @@ func (c *Server) serve(r fuse.Request) {
 			}
 			h, ok := handle.(HandleReader)
 			if !ok {
-				fmt.Printf("NO READ FOR %T\n", handle)
-				done(fuse.EIO)
-				r.RespondError(fuse.EIO)
+				err := handleNotReaderError{handle: handle}
+				done(err)
+				r.RespondError(err)
 				break
 			}
 			if err := h.Read(ctx, r, s); err != nil {
