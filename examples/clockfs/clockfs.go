@@ -24,16 +24,7 @@ func usage() {
 	flag.PrintDefaults()
 }
 
-func main() {
-	flag.Usage = usage
-	flag.Parse()
-
-	if flag.NArg() != 1 {
-		usage()
-		os.Exit(2)
-	}
-	mountpoint := flag.Arg(0)
-
+func run(mountpoint string) error {
 	c, err := fuse.Mount(
 		mountpoint,
 		fuse.FSName("clock"),
@@ -42,7 +33,7 @@ func main() {
 		fuse.VolumeName("Clock filesystem"),
 	)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	defer c.Close()
 
@@ -61,12 +52,28 @@ func main() {
 	// This goroutine never exits. That's fine for this example.
 	go filesys.clockFile.update()
 	if err := srv.Serve(filesys); err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	// Check if the mount process has an error to report.
 	<-c.Ready
 	if err := c.MountError; err != nil {
+		return err
+	}
+	return nil
+}
+
+func main() {
+	flag.Usage = usage
+	flag.Parse()
+
+	if flag.NArg() != 1 {
+		usage()
+		os.Exit(2)
+	}
+	mountpoint := flag.Arg(0)
+
+	if err := run(mountpoint); err != nil {
 		log.Fatal(err)
 	}
 }
