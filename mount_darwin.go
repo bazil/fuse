@@ -1,13 +1,14 @@
 package fuse
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 )
 
@@ -52,6 +53,43 @@ func openOSXFUSEDev() (*os.File, error) {
 	}
 }
 
+func handleMountOSXFUSE(errCh chan<- error) func(line string) (ignore bool) {
+	return func(line string) (ignore bool) {
+		const (
+			noMountpointPrefix = `mount_osxfusefs: `
+			noMountpointSuffix = `: No such file or directory`
+		)
+		if strings.HasPrefix(line, noMountpointPrefix) && strings.HasSuffix(line, noMountpointSuffix) {
+			// re-extract it from the error message in case some layer
+			// changed the path
+			mountpoint := line[len(noMountpointPrefix) : len(line)-len(noMountpointSuffix)]
+			err := &MountpointDoesNotExistError{
+				Path: mountpoint,
+			}
+			select {
+			case errCh <- err:
+				return true
+			default:
+				// not the first error; fall back to logging it
+				return false
+			}
+		}
+
+		return false
+	}
+}
+
+// isBoringMountOSXFUSEError returns whether the Wait error is
+// uninteresting; exit status 64 is.
+func isBoringMountOSXFUSEError(err error) bool {
+	if err, ok := err.(*exec.ExitError); ok && err.Exited() {
+		if status, ok := err.Sys().(syscall.WaitStatus); ok && status.ExitStatus() == 64 {
+			return true
+		}
+	}
+	return false
+}
+
 func callMount(dir string, conf *mountConfig, f *os.File, ready chan<- struct{}, errp *error) error {
 	bin := "/Library/Filesystems/osxfusefs.fs/Support/mount_osxfusefs"
 
@@ -80,28 +118,52 @@ func callMount(dir string, conf *mountConfig, f *os.File, ready chan<- struct{},
 	cmd.Env = append(cmd.Env, "MOUNT_FUSEFS_CALL_BY_LIB=")
 	// TODO this is used for fs typenames etc, let app influence it
 	cmd.Env = append(cmd.Env, "MOUNT_FUSEFS_DAEMON_PATH="+bin)
-	var buf bytes.Buffer
-	cmd.Stdout = &buf
-	cmd.Stderr = &buf
 
-	err := cmd.Start()
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return err
+		return fmt.Errorf("setting up mount_osxfusefs stderr: %v", err)
 	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return fmt.Errorf("setting up mount_osxfusefs stderr: %v", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("mount_osxfusefs: %v", err)
+	}
+	helperErrCh := make(chan error, 1)
 	go func() {
-		err := cmd.Wait()
-		if err != nil {
-			if buf.Len() > 0 {
-				output := buf.Bytes()
-				output = bytes.TrimRight(output, "\n")
-				msg := err.Error() + ": " + string(output)
-				err = errors.New(msg)
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go lineLogger(&wg, "mount helper output", neverIgnoreLine, stdout)
+		go lineLogger(&wg, "mount helper error", handleMountOSXFUSE(helperErrCh), stderr)
+		wg.Wait()
+		if err := cmd.Wait(); err != nil {
+			// see if we have a better error to report
+			select {
+			case helperErr := <-helperErrCh:
+				// log the Wait error if it's not what we expected
+				if !isBoringMountOSXFUSEError(err) {
+					log.Printf("mount helper failed: %v", err)
+				}
+				// and now return what we grabbed from stderr as the real
+				// error
+				*errp = helperErr
+				close(ready)
+				return
+			default:
+				// nope, fall back to generic message
 			}
+
+			*errp = fmt.Errorf("mount_osxfusefs: %v", err)
+			close(ready)
+			return
 		}
-		*errp = err
+
+		*errp = nil
 		close(ready)
 	}()
-	return err
+	return nil
 }
 
 func mount(dir string, conf *mountConfig, ready chan<- struct{}, errp *error) (*os.File, error) {

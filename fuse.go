@@ -176,6 +176,13 @@ func Mount(dir string, options ...MountOption) (*Conn, error) {
 
 	if err := initMount(c, &conf); err != nil {
 		c.Close()
+		if err == ErrClosedWithoutInit {
+			// see if we can provide a better error
+			<-c.Ready
+			if err := c.MountError; err != nil {
+				return nil, err
+			}
+		}
 		return nil, err
 	}
 
@@ -191,11 +198,15 @@ func (e *OldVersionError) Error() string {
 	return fmt.Sprintf("kernel FUSE version is too old: %v < %v", e.Kernel, e.LibraryMin)
 }
 
+var (
+	ErrClosedWithoutInit = errors.New("fuse connection closed without init")
+)
+
 func initMount(c *Conn, conf *mountConfig) error {
 	req, err := c.ReadRequest()
 	if err != nil {
 		if err == io.EOF {
-			return fmt.Errorf("missing init, got EOF")
+			return ErrClosedWithoutInit
 		}
 		return err
 	}
