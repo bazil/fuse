@@ -58,13 +58,6 @@ func (f fifo) Attr(ctx context.Context, a *fuse.Attr) error {
 }
 
 func TestMountpointDoesNotExist(t *testing.T) {
-	switch runtime.GOOS {
-	case "linux", "darwin":
-		// nothing
-	default:
-		t.Skip("TODO mount error reporting not implemented on platform")
-	}
-
 	t.Parallel()
 	tmp, err := ioutil.TempDir("", "fusetest")
 	if err != nil {
