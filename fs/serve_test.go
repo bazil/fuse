@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path"
 	"runtime"
 	"strings"
 	"sync"
@@ -54,6 +55,32 @@ type fifo struct{}
 func (f fifo) Attr(ctx context.Context, a *fuse.Attr) error {
 	a.Mode = os.ModeNamedPipe | 0666
 	return nil
+}
+
+func TestMountpointDoesNotExist(t *testing.T) {
+	switch runtime.GOOS {
+	case "linux":
+		// nothing
+	default:
+		t.Skip("TODO mount error reporting not implemented on platform")
+	}
+
+	t.Parallel()
+	tmp, err := ioutil.TempDir("", "fusetest")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmp)
+
+	mountpoint := path.Join(tmp, "does-not-exist")
+	conn, err := fuse.Mount(mountpoint)
+	if err == nil {
+		conn.Close()
+		t.Fatalf("expected error with non-existent mountpoint")
+	}
+	if _, ok := err.(*fuse.MountpointDoesNotExistError); !ok {
+		t.Fatalf("wrong error from mount: %T: %v", err, err)
+	}
 }
 
 type badRootFS struct{}

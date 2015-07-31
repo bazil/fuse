@@ -132,6 +132,18 @@ type Conn struct {
 	proto Protocol
 }
 
+// MountpointDoesNotExistError is an error returned when the
+// mountpoint does not exist.
+type MountpointDoesNotExistError struct {
+	Path string
+}
+
+var _ error = (*MountpointDoesNotExistError)(nil)
+
+func (e *MountpointDoesNotExistError) Error() string {
+	return fmt.Sprintf("mountpoint does not exist: %v", e.Path)
+}
+
 // Mount mounts a new FUSE connection on the named directory
 // and returns a connection for reading and writing FUSE messages.
 //
