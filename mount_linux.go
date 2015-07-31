@@ -1,10 +1,7 @@
 package fuse
 
 import (
-	"bufio"
 	"fmt"
-	"io"
-	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -12,23 +9,15 @@ import (
 	"syscall"
 )
 
-func lineLogger(wg *sync.WaitGroup, prefix string, r io.ReadCloser) {
-	defer wg.Done()
-
-	scanner := bufio.NewScanner(r)
-	for scanner.Scan() {
-		switch line := scanner.Text(); line {
-		case `fusermount: failed to open /etc/fuse.conf: Permission denied`:
-			// Silence this particular message, it occurs way too
-			// commonly and isn't very relevant to whether the mount
-			// succeeds or not.
-			continue
-		default:
-			log.Printf("%s: %s", prefix, line)
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		log.Printf("%s, error reading: %v", prefix, err)
+func handleFusermountStderr(line string) (ignore bool) {
+	switch line {
+	case `fusermount: failed to open /etc/fuse.conf: Permission denied`:
+		// Silence this particular message, it occurs way too
+		// commonly and isn't very relevant to whether the mount
+		// succeeds or not.
+		return true
+	default:
+		return false
 	}
 }
 
@@ -71,8 +60,8 @@ func mount(dir string, conf *mountConfig, ready chan<- struct{}, errp *error) (f
 		return nil, fmt.Errorf("fusermount: %v", err)
 	}
 	wg.Add(2)
-	go lineLogger(&wg, "mount helper output", stdout)
-	go lineLogger(&wg, "mount helper error", stderr)
+	go lineLogger(&wg, "mount helper output", neverIgnoreLine, stdout)
+	go lineLogger(&wg, "mount helper error", handleFusermountStderr, stderr)
 	wg.Wait()
 	if err := cmd.Wait(); err != nil {
 		return nil, fmt.Errorf("fusermount: %v", err)
