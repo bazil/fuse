@@ -161,7 +161,9 @@ const (
 
 	OpenAppend    OpenFlags = syscall.O_APPEND
 	OpenCreate    OpenFlags = syscall.O_CREAT
+	OpenDirectory OpenFlags = syscall.O_DIRECTORY
 	OpenExclusive OpenFlags = syscall.O_EXCL
+	OpenNonblock  OpenFlags = syscall.O_NONBLOCK
 	OpenSync      OpenFlags = syscall.O_SYNC
 	OpenTruncate  OpenFlags = syscall.O_TRUNC
 )
@@ -215,7 +217,9 @@ func accModeName(flags OpenFlags) string {
 var openFlagNames = []flagName{
 	{uint32(OpenAppend), "OpenAppend"},
 	{uint32(OpenCreate), "OpenCreate"},
+	{uint32(OpenDirectory), "OpenDirectory"},
 	{uint32(OpenExclusive), "OpenExclusive"},
+	{uint32(OpenNonblock), "OpenNonblock"},
 	{uint32(OpenSync), "OpenSync"},
 	{uint32(OpenTruncate), "OpenTruncate"},
 }
