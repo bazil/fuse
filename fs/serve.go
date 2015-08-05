@@ -601,7 +601,7 @@ type logResponseHeader struct {
 }
 
 func (m logResponseHeader) String() string {
-	return fmt.Sprintf("ID=%#x", m.ID)
+	return fmt.Sprintf("ID=%v", m.ID)
 }
 
 type response struct {
@@ -685,7 +685,7 @@ type logLinkRequestOldNodeNotFound struct {
 }
 
 func (m *logLinkRequestOldNodeNotFound) String() string {
-	return fmt.Sprintf("In LinkRequest (request %#x), node %d not found", m.Request.Hdr().ID, m.In.OldNode)
+	return fmt.Sprintf("In LinkRequest (request %v), node %d not found", m.Request.Hdr().ID, m.In.OldNode)
 }
 
 type renameNewDirNodeNotFound struct {
@@ -694,7 +694,7 @@ type renameNewDirNodeNotFound struct {
 }
 
 func (m *renameNewDirNodeNotFound) String() string {
-	return fmt.Sprintf("In RenameRequest (request %#x), node %d not found", m.Request.Hdr().ID, m.In.NewDir)
+	return fmt.Sprintf("In RenameRequest (request %v), node %d not found", m.Request.Hdr().ID, m.In.NewDir)
 }
 
 type handlerPanickedError struct {
