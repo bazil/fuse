@@ -626,21 +626,21 @@ func (r response) errstr() string {
 func (r response) String() string {
 	switch {
 	case r.Errno != "" && r.Out != nil:
-		return fmt.Sprintf("-> %s error=%s %s", r.Request, r.errstr(), r.Out)
+		return fmt.Sprintf("-> [%v] %v error=%s", r.Request, r.Out, r.errstr())
 	case r.Errno != "":
-		return fmt.Sprintf("-> %s error=%s", r.Request, r.errstr())
+		return fmt.Sprintf("-> [%v] %s error=%s", r.Request, r.Op, r.errstr())
 	case r.Out != nil:
 		// make sure (seemingly) empty values are readable
 		switch r.Out.(type) {
 		case string:
-			return fmt.Sprintf("-> %s %q", r.Request, r.Out)
+			return fmt.Sprintf("-> [%v] %s %q", r.Request, r.Op, r.Out)
 		case []byte:
-			return fmt.Sprintf("-> %s [% x]", r.Request, r.Out)
+			return fmt.Sprintf("-> [%v] %s [% x]", r.Request, r.Op, r.Out)
 		default:
-			return fmt.Sprintf("-> %s %s", r.Request, r.Out)
+			return fmt.Sprintf("-> [%v] %v", r.Request, r.Out)
 		}
 	default:
-		return fmt.Sprintf("-> %s", r.Request)
+		return fmt.Sprintf("-> [%v] %s", r.Request, r.Op)
 	}
 }
 
