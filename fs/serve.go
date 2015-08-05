@@ -494,7 +494,7 @@ func (c *Server) saveNode(inode uint64, node Node) (id fuse.NodeID, gen uint64) 
 	}
 	sn.generation = c.nodeGen
 	c.nodeRef[node] = id
-	return
+	return id, sn.generation
 }
 
 func (c *Server) saveHandle(handle Handle, nodeID fuse.NodeID) (id fuse.HandleID) {
