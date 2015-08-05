@@ -213,11 +213,11 @@ func accModeName(flags OpenFlags) string {
 }
 
 var openFlagNames = []flagName{
+	{uint32(OpenAppend), "OpenAppend"},
 	{uint32(OpenCreate), "OpenCreate"},
 	{uint32(OpenExclusive), "OpenExclusive"},
-	{uint32(OpenTruncate), "OpenTruncate"},
-	{uint32(OpenAppend), "OpenAppend"},
 	{uint32(OpenSync), "OpenSync"},
+	{uint32(OpenTruncate), "OpenTruncate"},
 }
 
 // The OpenResponseFlags are returned in the OpenResponse.
