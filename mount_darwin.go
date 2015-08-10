@@ -56,7 +56,7 @@ func openOSXFUSEDev() (*os.File, error) {
 func handleMountOSXFUSE(errCh chan<- error) func(line string) (ignore bool) {
 	return func(line string) (ignore bool) {
 		const (
-			noMountpointPrefix = `mount_osxfusefs: `
+			noMountpointPrefix = `mount_osxfuse: `
 			noMountpointSuffix = `: No such file or directory`
 		)
 		if strings.HasPrefix(line, noMountpointPrefix) && strings.HasSuffix(line, noMountpointSuffix) {
