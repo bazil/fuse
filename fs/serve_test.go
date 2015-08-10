@@ -646,6 +646,10 @@ func TestMkdir(t *testing.T) {
 	if mnt.Conn.Protocol().HasUmask() {
 		want.Umask = 0022
 	}
+	if runtime.GOOS == "darwin" {
+		// https://github.com/osxfuse/osxfuse/issues/225
+		want.Umask = 0
+	}
 	if g, e := f.RecordedMkdir(), want; g != e {
 		t.Errorf("mkdir saw %+v, want %+v", g, e)
 	}
@@ -704,6 +708,9 @@ func TestCreate(t *testing.T) {
 		// OS X does not pass O_TRUNC here, Linux does; as this is a
 		// Create, that's acceptable
 		want.Flags &^= fuse.OpenTruncate
+
+		// https://github.com/osxfuse/osxfuse/issues/225
+		want.Umask = 0
 	}
 	got := f.f.RecordedCreate()
 	if runtime.GOOS == "linux" {
@@ -977,6 +984,10 @@ func TestMknod(t *testing.T) {
 	}
 	if mnt.Conn.Protocol().HasUmask() {
 		want.Umask = 0022
+	}
+	if runtime.GOOS == "darwin" {
+		// https://github.com/osxfuse/osxfuse/issues/225
+		want.Umask = 0
 	}
 	if g, e := f.RecordedMknod(), want; g != e {
 		t.Fatalf("mknod saw %+v, want %+v", g, e)
