@@ -927,15 +927,15 @@ func TestMknod(t *testing.T) {
 	}
 	defer mnt.Close()
 
-	defer syscall.Umask(syscall.Umask(0))
-	err = syscall.Mknod(mnt.Dir+"/node", syscall.S_IFIFO|0666, 123)
+	defer syscall.Umask(syscall.Umask(0022))
+	err = syscall.Mknod(mnt.Dir+"/node", syscall.S_IFIFO|0660, 123)
 	if err != nil {
-		t.Fatalf("Mknod: %v", err)
+		t.Fatalf("mknod: %v", err)
 	}
 
 	want := fuse.MknodRequest{
 		Name: "node",
-		Mode: os.FileMode(os.ModeNamedPipe | 0666),
+		Mode: os.FileMode(os.ModeNamedPipe | 0640),
 		Rdev: uint32(123),
 	}
 	if runtime.GOOS == "linux" {
@@ -943,6 +943,9 @@ func TestMknod(t *testing.T) {
 		// isn't a device (we're using a FIFO here, as that
 		// bit is portable.)
 		want.Rdev = 0
+	}
+	if mnt.Conn.Protocol().HasUmask() {
+		want.Umask = 0022
 	}
 	if g, e := f.RecordedMknod(), want; g != e {
 		t.Fatalf("mknod saw %+v, want %+v", g, e)
