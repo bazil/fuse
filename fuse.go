@@ -1586,7 +1586,7 @@ type LookupResponse struct {
 }
 
 func (r *LookupResponse) string() string {
-	return fmt.Sprintf("%v gen=%d valid=%v", r.Node, r.Generation, r.EntryValid)
+	return fmt.Sprintf("%v gen=%d valid=%v attr={%v}", r.Node, r.Generation, r.EntryValid, r.Attr)
 }
 
 func (r *LookupResponse) String() string {
