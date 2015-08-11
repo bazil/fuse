@@ -386,6 +386,15 @@ func TestReadFileFlags(t *testing.T) {
 	_ = f.Close()
 
 	want := fuse.OpenReadWrite | fuse.OpenAppend
+	if runtime.GOOS == "darwin" {
+		// OSXFUSE shares one read and one write handle for all
+		// clients, so it uses a OpenReadOnly handle for performing
+		// our read.
+		//
+		// If this test starts failing in the future, that probably
+		// means they added the feature, and we want to notice that!
+		want = fuse.OpenReadOnly
+	}
 	if g, e := r.fileFlags.Recorded().(fuse.OpenFlags), want; g != e {
 		t.Errorf("read saw file flags %+v, want %+v", g, e)
 	}
