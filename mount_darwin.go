@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path"
 	"strconv"
 	"strings"
 	"sync"
@@ -53,12 +54,10 @@ func openOSXFUSEDev() (*os.File, error) {
 	}
 }
 
-func handleMountOSXFUSE(errCh chan<- error) func(line string) (ignore bool) {
+func handleMountOSXFUSE(helperName string, errCh chan<- error) func(line string) (ignore bool) {
+	var noMountpointPrefix = helperName + `: `
+	const noMountpointSuffix = `: No such file or directory`
 	return func(line string) (ignore bool) {
-		const (
-			noMountpointPrefix = `mount_osxfusefs: `
-			noMountpointSuffix = `: No such file or directory`
-		)
 		if strings.HasPrefix(line, noMountpointPrefix) && strings.HasSuffix(line, noMountpointSuffix) {
 			// re-extract it from the error message in case some layer
 			// changed the path
@@ -136,7 +135,8 @@ func callMount(dir string, conf *mountConfig, f *os.File, ready chan<- struct{},
 		var wg sync.WaitGroup
 		wg.Add(2)
 		go lineLogger(&wg, "mount helper output", neverIgnoreLine, stdout)
-		go lineLogger(&wg, "mount helper error", handleMountOSXFUSE(helperErrCh), stderr)
+		helperName := path.Base(bin)
+		go lineLogger(&wg, "mount helper error", handleMountOSXFUSE(helperName, helperErrCh), stderr)
 		wg.Wait()
 		if err := cmd.Wait(); err != nil {
 			// see if we have a better error to report
