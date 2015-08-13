@@ -89,9 +89,7 @@ func isBoringMountOSXFUSEError(err error) bool {
 	return false
 }
 
-func callMount(dir string, conf *mountConfig, f *os.File, ready chan<- struct{}, errp *error) error {
-	bin := "/Library/Filesystems/osxfusefs.fs/Support/mount_osxfusefs"
-
+func callMount(bin string, dir string, conf *mountConfig, f *os.File, ready chan<- struct{}, errp *error) error {
 	for k, v := range conf.options {
 		if strings.Contains(k, ",") || strings.Contains(v, ",") {
 			// Silly limitation but the mount helper does not
@@ -184,7 +182,7 @@ func mount(dir string, conf *mountConfig, ready chan<- struct{}, errp *error) (*
 	if err != nil {
 		return nil, err
 	}
-	err = callMount(dir, conf, f, ready, errp)
+	err = callMount("/Library/Filesystems/osxfusefs.fs/Support/mount_osxfusefs", dir, conf, f, ready, errp)
 	if err != nil {
 		f.Close()
 		return nil, err
