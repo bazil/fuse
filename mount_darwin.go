@@ -17,8 +17,8 @@ var errNoAvail = errors.New("no available fuse devices")
 
 var errNotLoaded = errors.New("osxfuse is not loaded")
 
-func loadOSXFUSE() error {
-	cmd := exec.Command("/Library/Filesystems/osxfusefs.fs/Support/load_osxfusefs")
+func loadOSXFUSE(bin string) error {
+	cmd := exec.Command(bin)
 	cmd.Dir = "/"
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -174,7 +174,7 @@ func callMount(dir string, conf *mountConfig, f *os.File, ready chan<- struct{},
 func mount(dir string, conf *mountConfig, ready chan<- struct{}, errp *error) (*os.File, error) {
 	f, err := openOSXFUSEDev("/dev/osxfuse")
 	if err == errNotLoaded {
-		err = loadOSXFUSE()
+		err = loadOSXFUSE("/Library/Filesystems/osxfusefs.fs/Support/load_osxfusefs")
 		if err != nil {
 			return nil, err
 		}
