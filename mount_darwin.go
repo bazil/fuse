@@ -13,9 +13,11 @@ import (
 	"syscall"
 )
 
-var errNoAvail = errors.New("no available fuse devices")
-
-var errNotLoaded = errors.New("osxfuse is not loaded")
+var (
+	errNoAvail         = errors.New("no available fuse devices")
+	errNotLoaded       = errors.New("osxfuse is not loaded")
+	errOSXFUSENotFound = errors.New("cannot locate OSXFUSE")
+)
 
 func loadOSXFUSE(bin string) error {
 	cmd := exec.Command(bin)
@@ -170,22 +172,36 @@ func callMount(bin string, dir string, conf *mountConfig, f *os.File, ready chan
 }
 
 func mount(dir string, conf *mountConfig, ready chan<- struct{}, errp *error) (*os.File, error) {
-	f, err := openOSXFUSEDev("/dev/osxfuse")
-	if err == errNotLoaded {
-		err = loadOSXFUSE("/Library/Filesystems/osxfusefs.fs/Support/load_osxfusefs")
+	locations := conf.osxfuseLocations
+	if locations == nil {
+		locations = []OSXFUSEPaths{
+			OSXFUSELocationV3,
+			OSXFUSELocationV2,
+		}
+	}
+	for _, loc := range locations {
+		f, err := openOSXFUSEDev(loc.DevicePrefix)
+		if err == errNotLoaded {
+			err = loadOSXFUSE(loc.Load)
+			if err != nil {
+				if os.IsNotExist(err) {
+					// try the other locations
+					continue
+				}
+				return nil, err
+			}
+			// try again
+			f, err = openOSXFUSEDev(loc.DevicePrefix)
+		}
 		if err != nil {
 			return nil, err
 		}
-		// try again
-		f, err = openOSXFUSEDev("/dev/osxfuse")
+		err = callMount(loc.Mount, dir, conf, f, ready, errp)
+		if err != nil {
+			f.Close()
+			return nil, err
+		}
+		return f, nil
 	}
-	if err != nil {
-		return nil, err
-	}
-	err = callMount("/Library/Filesystems/osxfusefs.fs/Support/mount_osxfusefs", dir, conf, f, ready, errp)
-	if err != nil {
-		f.Close()
-		return nil, err
-	}
-	return f, nil
+	return nil, errOSXFUSENotFound
 }
