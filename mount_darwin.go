@@ -26,11 +26,11 @@ func loadOSXFUSE() error {
 	return err
 }
 
-func openOSXFUSEDev() (*os.File, error) {
+func openOSXFUSEDev(devPrefix string) (*os.File, error) {
 	var f *os.File
 	var err error
 	for i := uint64(0); ; i++ {
-		path := "/dev/osxfuse" + strconv.FormatUint(i, 10)
+		path := devPrefix + strconv.FormatUint(i, 10)
 		f, err = os.OpenFile(path, os.O_RDWR, 0000)
 		if os.IsNotExist(err) {
 			if i == 0 {
@@ -172,14 +172,14 @@ func callMount(dir string, conf *mountConfig, f *os.File, ready chan<- struct{},
 }
 
 func mount(dir string, conf *mountConfig, ready chan<- struct{}, errp *error) (*os.File, error) {
-	f, err := openOSXFUSEDev()
+	f, err := openOSXFUSEDev("/dev/osxfuse")
 	if err == errNotLoaded {
 		err = loadOSXFUSE()
 		if err != nil {
 			return nil, err
 		}
 		// try again
-		f, err = openOSXFUSEDev()
+		f, err = openOSXFUSEDev("/dev/osxfuse")
 	}
 	if err != nil {
 		return nil, err
