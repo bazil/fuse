@@ -2230,8 +2230,20 @@ func TestInvalidateNodeAttr(t *testing.T) {
 			t.Fatalf("stat error: %v", err)
 		}
 	}
-	if g, e := a.attr.Count(), uint32(1); g != e {
-		t.Errorf("wrong Attr call count: %d != %d", g, e)
+	// With OSXFUSE 3.0.4, we seem to see typically two Attr calls by
+	// this point; something not populating the in-kernel cache
+	// properly? Cope with it; we care more about seeing a new Attr
+	// call after the invalidation.
+	//
+	// We still enforce a max number here so that we know that the
+	// invalidate actually did something, and it's not just that every
+	// Stat results in an Attr.
+	before := a.attr.Count()
+	if before == 0 {
+		t.Error("no Attr call seen")
+	}
+	if g, e := before, uint32(3); g > e {
+		t.Errorf("too many Attr calls seen: %d > %d", g, e)
 	}
 
 	t.Logf("invalidating...")
@@ -2244,7 +2256,7 @@ func TestInvalidateNodeAttr(t *testing.T) {
 			t.Fatalf("stat error: %v", err)
 		}
 	}
-	if g, e := a.attr.Count(), uint32(2); g != e {
+	if g, e := a.attr.Count(), before+1; g != e {
 		t.Errorf("wrong Attr call count: %d != %d", g, e)
 	}
 }
