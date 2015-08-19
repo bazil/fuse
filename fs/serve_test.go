@@ -411,6 +411,13 @@ func (r *writeFlags) Attr(ctx context.Context, a *fuse.Attr) error {
 	return nil
 }
 
+func (r *writeFlags) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
+	// OSXFUSE 3.0.4 does a read-modify-write cycle even when the
+	// write was for 4096 bytes.
+	fuseutil.HandleRead(req, resp, []byte(hi))
+	return nil
+}
+
 func (r *writeFlags) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
 	r.fileFlags.Record(req.FileFlags)
 	resp.Size = len(req.Data)
