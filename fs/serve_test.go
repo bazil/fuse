@@ -297,11 +297,17 @@ func (readAll) ReadAll(ctx context.Context) ([]byte, error) {
 }
 
 func testReadAll(t *testing.T, path string) {
-	data, err := ioutil.ReadFile(path)
+	f, err := os.Open(path)
 	if err != nil {
-		t.Fatalf("readAll: %v", err)
+		t.Fatal(err)
 	}
-	if string(data) != hi {
+	defer f.Close()
+	data := make([]byte, 4096)
+	n, err := f.Read(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data[:n]) != hi {
 		t.Errorf("readAll = %q, want %q", data, hi)
 	}
 }
