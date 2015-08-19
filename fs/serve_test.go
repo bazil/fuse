@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -2272,9 +2273,13 @@ type invalidateData struct {
 	t    testing.TB
 	attr record.Counter
 	read record.Counter
+	data atomic.Value
 }
 
-const invalidateDataContent = "hello, world\n"
+const (
+	invalidateDataContent1 = "hello, world\n"
+	invalidateDataContent2 = "so long!\n"
+)
 
 var _ fs.Node = (*invalidateData)(nil)
 
@@ -2282,7 +2287,7 @@ func (i *invalidateData) Attr(ctx context.Context, a *fuse.Attr) error {
 	i.attr.Inc()
 	i.t.Logf("Attr called, #%d", i.attr.Count())
 	a.Mode = 0600
-	a.Size = uint64(len(invalidateDataContent))
+	a.Size = uint64(len(i.data.Load().(string)))
 	return nil
 }
 
@@ -2291,7 +2296,7 @@ var _ fs.HandleReader = (*invalidateData)(nil)
 func (i *invalidateData) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
 	i.read.Inc()
 	i.t.Logf("Read called, #%d", i.read.Count())
-	fuseutil.HandleRead(req, resp, []byte(invalidateDataContent))
+	fuseutil.HandleRead(req, resp, []byte(i.data.Load().(string)))
 	return nil
 }
 
@@ -2302,6 +2307,7 @@ func TestInvalidateNodeData(t *testing.T) {
 	a := &invalidateData{
 		t: t,
 	}
+	a.data.Store(invalidateDataContent1)
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": a}}, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -2318,13 +2324,19 @@ func TestInvalidateNodeData(t *testing.T) {
 	}
 	defer f.Close()
 
-	buf := make([]byte, 4)
-	for i := 0; i < 10; i++ {
-		if _, err := f.ReadAt(buf, 0); err != nil {
-			t.Fatalf("readat error: %v", err)
+	{
+		buf := make([]byte, 100)
+		for i := 0; i < 10; i++ {
+			n, err := f.ReadAt(buf, 0)
+			if err != nil && err != io.EOF {
+				t.Fatalf("readat error: %v", err)
+			}
+			if g, e := string(buf[:n]), invalidateDataContent1; g != e {
+				t.Errorf("wrong content: %q != %q", g, e)
+			}
 		}
 	}
-	if g, e := a.attr.Count(), uint32(1); g != e {
+	if g, e := a.attr.Count(), uint32(2); g != e {
 		t.Errorf("wrong Attr call count: %d != %d", g, e)
 	}
 	if g, e := a.read.Count(), uint32(1); g != e {
@@ -2332,16 +2344,24 @@ func TestInvalidateNodeData(t *testing.T) {
 	}
 
 	t.Logf("invalidating...")
+	a.data.Store(invalidateDataContent2)
 	if err := mnt.Server.InvalidateNodeData(a); err != nil {
 		t.Fatalf("invalidate error: %v", err)
 	}
 
-	for i := 0; i < 10; i++ {
-		if _, err := f.ReadAt(buf, 0); err != nil {
-			t.Fatalf("readat error: %v", err)
+	{
+		buf := make([]byte, 100)
+		for i := 0; i < 10; i++ {
+			n, err := f.ReadAt(buf, 0)
+			if err != nil && err != io.EOF {
+				t.Fatalf("readat error: %v", err)
+			}
+			if g, e := string(buf[:n]), invalidateDataContent2; g != e {
+				t.Errorf("wrong content: %q != %q", g, e)
+			}
 		}
 	}
-	if g, e := a.attr.Count(), uint32(1); g != e {
+	if g, e := a.attr.Count(), uint32(4); g != e {
 		t.Errorf("wrong Attr call count: %d != %d", g, e)
 	}
 	if g, e := a.read.Count(), uint32(2); g != e {
