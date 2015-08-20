@@ -37,7 +37,7 @@ func run(mountpoint string) error {
 	}
 	defer c.Close()
 
-	if p := c.Protocol(); !p.HasInvalidate() || true {
+	if p := c.Protocol(); !p.HasInvalidate() {
 		return fmt.Errorf("kernel FUSE support is too old to have invalidations: version %v", p)
 	}
 
