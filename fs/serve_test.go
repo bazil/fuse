@@ -2336,8 +2336,9 @@ func TestInvalidateNodeData(t *testing.T) {
 			}
 		}
 	}
-	if g, e := a.attr.Count(), uint32(2); g != e {
-		t.Errorf("wrong Attr call count: %d != %d", g, e)
+	attrBefore := a.attr.Count()
+	if g, min := attrBefore, uint32(1); g < min {
+		t.Errorf("wrong Attr call count: %d < %d", g, min)
 	}
 	if g, e := a.read.Count(), uint32(1); g != e {
 		t.Errorf("wrong Read call count: %d != %d", g, e)
@@ -2361,8 +2362,8 @@ func TestInvalidateNodeData(t *testing.T) {
 			}
 		}
 	}
-	if g, e := a.attr.Count(), uint32(4); g != e {
-		t.Errorf("wrong Attr call count: %d != %d", g, e)
+	if g, prev := a.attr.Count(), attrBefore; g <= prev {
+		t.Errorf("did not see Attr call after invalidate: %d <= %d", g, prev)
 	}
 	if g, e := a.read.Count(), uint32(2); g != e {
 		t.Errorf("wrong Read call count: %d != %d", g, e)
@@ -2426,8 +2427,9 @@ func TestInvalidateNodeDataRange(t *testing.T) {
 			t.Fatalf("readat error: %v", err)
 		}
 	}
-	if g, e := a.attr.Count(), uint32(1); g != e {
-		t.Errorf("wrong Attr call count: %d != %d", g, e)
+	attrBefore := a.attr.Count()
+	if g, min := attrBefore, uint32(1); g < min {
+		t.Errorf("wrong Attr call count: %d < %d", g, min)
 	}
 	if g, e := a.read.Count(), uint32(1); g != e {
 		t.Errorf("wrong Read call count: %d != %d", g, e)
@@ -2443,8 +2445,8 @@ func TestInvalidateNodeDataRange(t *testing.T) {
 			t.Fatalf("readat error: %v", err)
 		}
 	}
-	if g, e := a.attr.Count(), uint32(1); g != e {
-		t.Errorf("wrong Attr call count: %d != %d", g, e)
+	if g, prev := a.attr.Count(), attrBefore; g <= prev {
+		t.Errorf("did not see Attr call after invalidate: %d <= %d", g, prev)
 	}
 	// The page invalidated is not the page we're reading, so it
 	// should stay in cache.
