@@ -159,6 +159,8 @@ const (
 	OpenWriteOnly OpenFlags = syscall.O_WRONLY
 	OpenReadWrite OpenFlags = syscall.O_RDWR
 
+	// File was opened in append-only mode, all writes will go to end
+	// of file. OS X does not provide this information.
 	OpenAppend    OpenFlags = syscall.O_APPEND
 	OpenCreate    OpenFlags = syscall.O_CREAT
 	OpenDirectory OpenFlags = syscall.O_DIRECTORY
