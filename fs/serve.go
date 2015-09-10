@@ -657,14 +657,14 @@ func (n notification) String() string {
 		// make sure (seemingly) empty values are readable
 		switch n.Out.(type) {
 		case string:
-			return fmt.Sprintf("=> %s %d %q Err:%v", n.Op, n.Node, n.Out, n.Err)
+			return fmt.Sprintf("=> %s %v %q Err:%v", n.Op, n.Node, n.Out, n.Err)
 		case []byte:
-			return fmt.Sprintf("=> %s %d [% x] Err:%v", n.Op, n.Node, n.Out, n.Err)
+			return fmt.Sprintf("=> %s %v [% x] Err:%v", n.Op, n.Node, n.Out, n.Err)
 		default:
-			return fmt.Sprintf("=> %s %d %s Err:%v", n.Op, n.Node, n.Out, n.Err)
+			return fmt.Sprintf("=> %s %v %s Err:%v", n.Op, n.Node, n.Out, n.Err)
 		}
 	default:
-		return fmt.Sprintf("=> %s %d Err:%v", n.Op, n.Node, n.Err)
+		return fmt.Sprintf("=> %s %v Err:%v", n.Op, n.Node, n.Err)
 	}
 }
 
