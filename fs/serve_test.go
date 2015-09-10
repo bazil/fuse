@@ -2445,7 +2445,7 @@ func (i *invalidateDataPartial) Read(ctx context.Context, req *fuse.ReadRequest,
 	return nil
 }
 
-func TestInvalidateNodeDataRange(t *testing.T) {
+func TestInvalidateNodeDataRangeMiss(t *testing.T) {
 	// This test may see false positive failures when run under
 	// extreme memory pressure.
 	t.Parallel()
@@ -2474,15 +2474,11 @@ func TestInvalidateNodeDataRange(t *testing.T) {
 			t.Fatalf("readat error: %v", err)
 		}
 	}
-	attrBefore := a.attr.Count()
-	if g, min := attrBefore, uint32(1); g < min {
-		t.Errorf("wrong Attr call count: %d < %d", g, min)
-	}
 	if g, e := a.read.Count(), uint32(1); g != e {
 		t.Errorf("wrong Read call count: %d != %d", g, e)
 	}
 
-	t.Logf("invalidating...")
+	t.Logf("invalidating an uninteresting block...")
 	if err := mnt.Server.InvalidateNodeDataRange(a, 4096, 4096); err != nil {
 		t.Fatalf("invalidate error: %v", err)
 	}
@@ -2492,12 +2488,59 @@ func TestInvalidateNodeDataRange(t *testing.T) {
 			t.Fatalf("readat error: %v", err)
 		}
 	}
-	if g, prev := a.attr.Count(), attrBefore; g <= prev {
-		t.Errorf("did not see Attr call after invalidate: %d <= %d", g, prev)
-	}
 	// The page invalidated is not the page we're reading, so it
 	// should stay in cache.
 	if g, e := a.read.Count(), uint32(1); g != e {
+		t.Errorf("wrong Read call count: %d != %d", g, e)
+	}
+}
+
+func TestInvalidateNodeDataRangeHit(t *testing.T) {
+	// This test may see false positive failures when run under
+	// extreme memory pressure.
+	t.Parallel()
+	a := &invalidateDataPartial{
+		t: t,
+	}
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": a}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	if !mnt.Conn.Protocol().HasInvalidate() {
+		t.Skip("Old FUSE protocol")
+	}
+
+	f, err := os.Open(mnt.Dir + "/child")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	const offset = 4096
+	buf := make([]byte, 4)
+	for i := 0; i < 10; i++ {
+		if _, err := f.ReadAt(buf, offset); err != nil {
+			t.Fatalf("readat error: %v", err)
+		}
+	}
+	if g, e := a.read.Count(), uint32(1); g != e {
+		t.Errorf("wrong Read call count: %d != %d", g, e)
+	}
+
+	t.Logf("invalidating where the reads are...")
+	if err := mnt.Server.InvalidateNodeDataRange(a, offset, 4096); err != nil {
+		t.Fatalf("invalidate error: %v", err)
+	}
+
+	for i := 0; i < 10; i++ {
+		if _, err := f.ReadAt(buf, offset); err != nil {
+			t.Fatalf("readat error: %v", err)
+		}
+	}
+	// One new read
+	if g, e := a.read.Count(), uint32(2); g != e {
 		t.Errorf("wrong Read call count: %d != %d", g, e)
 	}
 }
