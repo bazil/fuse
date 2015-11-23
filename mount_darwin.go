@@ -116,9 +116,7 @@ func callMount(bin string, dir string, conf *mountConfig, f *os.File, ready chan
 	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, "MOUNT_FUSEFS_CALL_BY_LIB=")
 
-	// TODO this is used for fs typenames etc, let app influence it
 	daemon := os.Args[0]
-
 	// for OSXFUSE 2.x
 	cmd.Env = append(cmd.Env, "MOUNT_FUSEFS_DAEMON_PATH="+daemon)
 	// for OSXFUSE 3.x
