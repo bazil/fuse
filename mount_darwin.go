@@ -91,7 +91,7 @@ func isBoringMountOSXFUSEError(err error) bool {
 	return false
 }
 
-func callMount(bin string, dir string, conf *mountConfig, f *os.File, ready chan<- struct{}, errp *error) error {
+func callMount(bin string, daemonVar string, dir string, conf *mountConfig, f *os.File, ready chan<- struct{}, errp *error) error {
 	for k, v := range conf.options {
 		if strings.Contains(k, ",") || strings.Contains(v, ",") {
 			// Silly limitation but the mount helper does not
@@ -117,10 +117,9 @@ func callMount(bin string, dir string, conf *mountConfig, f *os.File, ready chan
 	cmd.Env = append(cmd.Env, "MOUNT_FUSEFS_CALL_BY_LIB=")
 
 	daemon := os.Args[0]
-	// for OSXFUSE 2.x
-	cmd.Env = append(cmd.Env, "MOUNT_FUSEFS_DAEMON_PATH="+daemon)
-	// for OSXFUSE 3.x
-	cmd.Env = append(cmd.Env, "MOUNT_OSXFUSE_DAEMON_PATH="+daemon)
+	if daemonVar != "" {
+		cmd.Env = append(cmd.Env, daemonVar+"="+daemon)
+	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -196,7 +195,7 @@ func mount(dir string, conf *mountConfig, ready chan<- struct{}, errp *error) (*
 		if err != nil {
 			return nil, err
 		}
-		err = callMount(loc.Mount, dir, conf, f, ready, errp)
+		err = callMount(loc.Mount, loc.DaemonVar, dir, conf, f, ready, errp)
 		if err != nil {
 			f.Close()
 			return nil, err
