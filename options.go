@@ -144,6 +144,24 @@ func AllowRoot() MountOption {
 	}
 }
 
+// AllowDev enables interpreting character or block special devices on the
+// filesystem.
+func AllowDev() MountOption {
+	return func(conf *mountConfig) error {
+		conf.options["dev"] = ""
+		return nil
+	}
+}
+
+// AllowSUID allows set-user-identifier or set-group-identifier bits to take
+// effect.
+func AllowSUID() MountOption {
+	return func(conf *mountConfig) error {
+		conf.options["suid"] = ""
+		return nil
+	}
+}
+
 // DefaultPermissions makes the kernel enforce access control based on
 // the file mode (as in chmod).
 //
