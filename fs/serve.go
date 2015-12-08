@@ -285,6 +285,10 @@ type HandleReadDirAller interface {
 	ReadDirAll(ctx context.Context) ([]fuse.Dirent, error)
 }
 
+type HandleReadDirer interface {
+	ReadDir(ctx context.Context, offset int64) (*fuse.Dirent, error)
+}
+
 type HandleReader interface {
 	// Read requests to read data from the handle.
 	//
@@ -1219,6 +1223,33 @@ func (c *Server) serve(r fuse.Request) {
 				done(s)
 				r.Respond(s)
 				break
+			} else if h, ok := handle.(HandleReadDirer); ok {
+				var data []byte
+
+				for i := r.Offset; ; i++ {
+					dir, err := h.ReadDir(ctx, i)
+					if err != nil {
+						done(err)
+						r.RespondError(err)
+						return
+					}
+
+					if dir == nil {
+						break
+					}
+
+					if dir.Inode == 0 {
+						dir.Inode = c.dynamicInode(snode.inode, dir.Name)
+					}
+					data = fuse.AppendDirentAt(data, *dir, uint64(i))
+					if len(data) >= r.Size {
+						break
+					}
+				}
+
+				if len(data) != 0 {
+					fuseutil.HandleRead(r, s, data)
+				}
 			}
 		} else {
 			if h, ok := handle.(HandleReadAller); ok {

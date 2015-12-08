@@ -1348,6 +1348,114 @@ func TestReadDirAllBad(t *testing.T) {
 	}
 }
 
+type readDirOne struct {
+	fstestutil.Dir
+}
+
+func (d *readDirOne) ReadDir(ctx context.Context, offset int64) (*fuse.Dirent, error) {
+	dirs := []fuse.Dirent{
+		{Name: "one", Inode: 11, Type: fuse.DT_Dir},
+		{Name: "three", Inode: 13},
+		{Name: "two", Inode: 12, Type: fuse.DT_File},
+	}
+
+	if int(offset) < len(dirs) {
+		return &dirs[int(offset)], nil
+	} else {
+		return nil, nil
+	}
+}
+
+func TestReadDirOne(t *testing.T) {
+	t.Parallel()
+	f := &readDirOne{}
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	fil, err := os.Open(mnt.Dir)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer fil.Close()
+
+	// go Readdir is just Readdirnames + Lstat, there's no point in
+	// testing that here; we have no consumption API for the real
+	// dirent data
+	names, err := fil.Readdirnames(100)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	t.Logf("Got readdir: %q", names)
+
+	if len(names) != 3 ||
+		names[0] != "one" ||
+		names[1] != "three" ||
+		names[2] != "two" {
+		t.Errorf(`expected 3 entries of "one", "three", "two", got: %q`, names)
+		return
+	}
+}
+
+type readDirOneBad struct {
+	fstestutil.Dir
+}
+
+func (d *readDirOneBad) ReadDir(ctx context.Context, offset int64) (*fuse.Dirent, error) {
+	dirs := []fuse.Dirent{
+		{Name: "one", Inode: 11, Type: fuse.DT_Dir},
+		{Name: "three", Inode: 13},
+		{Name: "two", Inode: 12, Type: fuse.DT_File},
+	}
+	// pick a really distinct error, to identify it later
+	if int(offset) < len(dirs) {
+		return &dirs[int(offset)], fuse.Errno(syscall.ENAMETOOLONG)
+	} else {
+		return nil, nil
+	}
+}
+
+func TestReadDirOneBad(t *testing.T) {
+	t.Parallel()
+	f := &readDirOneBad{}
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	fil, err := os.Open(mnt.Dir)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer fil.Close()
+
+	var names []string
+	for {
+		n, err := fil.Readdirnames(1)
+		if err != nil {
+			if nerr, ok := err.(*os.SyscallError); !ok || nerr.Err != syscall.ENAMETOOLONG {
+				t.Fatalf("wrong error: %v", err)
+			}
+			break
+		}
+		names = append(names, n...)
+	}
+
+	t.Logf("Got readdir: %q", names)
+
+	if len(names) != 0 {
+		t.Errorf(`expected 0 entries, got: %q`, names)
+		return
+	}
+}
+
 // Test readdir without any ReadDir methods implemented.
 
 type readDirNotImplemented struct {
