@@ -297,7 +297,8 @@ type HandleReader interface {
 }
 
 type HandleWriter interface {
-	// Write requests to write data into the handle.
+	// Write requests to write data into the handle at the given offset.
+	// Store the amount of data written in resp.Size.
 	//
 	// There is a writeback page cache in the kernel that normally submits
 	// only page-aligned writes spanning one or more pages. However,
