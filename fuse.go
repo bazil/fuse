@@ -436,6 +436,10 @@ func getMessage(c *Conn) *message {
 }
 
 func putMessage(m *message) {
+	if m.noPut {
+		return
+	}
+	m.noPut = false
 	m.buf = m.buf[:bufSize]
 	m.conn = nil
 	m.off = 0
@@ -444,10 +448,11 @@ func putMessage(m *message) {
 
 // a message represents the bytes of a single FUSE message
 type message struct {
-	conn *Conn
-	buf  []byte    // all bytes
-	hdr  *inHeader // header
-	off  int       // offset for reading additional fields
+	conn  *Conn
+	buf   []byte    // all bytes
+	hdr   *inHeader // header
+	off   int       // offset for reading additional fields
+	noPut bool
 }
 
 func (m *message) len() uintptr {
@@ -567,12 +572,31 @@ loop:
 		putMessage(m)
 		return nil, io.EOF
 	}
-	m.buf = m.buf[:n]
 
 	if n < inHeaderSize {
 		putMessage(m)
 		return nil, errors.New("fuse: message too short")
 	}
+
+	// If many small messages come in rapidly (e.g. a bunch of
+	// Forget messages all triggered by the same timeout), we
+	// don't want to waste memory on giant buffers.  Instead, we
+	// allocate a new small buffer for the small message, and
+	// return our old buffer.
+	if n < 256 {
+		newmsg := message{
+			conn:  m.conn,
+			buf:   make([]byte, n),
+			off:   m.off,
+			noPut: true,
+		}
+		newmsg.hdr = (*inHeader)(unsafe.Pointer(&newmsg.buf[0]))
+		copy(newmsg.buf, m.buf)
+		putMessage(m)
+		m = &newmsg
+	}
+
+	m.buf = m.buf[:n]
 
 	// FreeBSD FUSE sends a short length in the header
 	// for FUSE_INIT even though the actual read length is correct.
