@@ -210,11 +210,6 @@ type NodeMknoder interface {
 	Mknod(ctx context.Context, req *fuse.MknodRequest) (Node, error)
 }
 
-// TODO this should be on Handle not Node
-type NodeFsyncer interface {
-	Fsync(ctx context.Context, req *fuse.FsyncRequest) error
-}
-
 type NodeGetxattrer interface {
 	// Getxattr gets an extended attribute by the given name from the
 	// node.
@@ -273,6 +268,10 @@ type HandleFlusher interface {
 	// Because there can be multiple file descriptors referring to a
 	// single opened file, Flush can be called multiple times.
 	Flush(ctx context.Context, req *fuse.FlushRequest) error
+}
+
+type HandleFsyncer interface {
+	Fsync(ctx context.Context, req *fuse.FsyncRequest) error
 }
 
 type HandleReadAller interface {
@@ -1379,13 +1378,21 @@ func (c *Server) serve(r fuse.Request) {
 		r.Respond(s)
 
 	case *fuse.FsyncRequest:
-		n, ok := node.(NodeFsyncer)
+		shandle := c.getHandle(r.Handle)
+		if shandle == nil {
+			done(fuse.ESTALE)
+			r.RespondError(fuse.ESTALE)
+			return
+		}
+		handle := shandle.handle
+
+		h, ok := handle.(HandleFsyncer)
 		if !ok {
 			done(fuse.EIO)
 			r.RespondError(fuse.EIO)
 			break
 		}
-		err := n.Fsync(ctx, r)
+		err := h.Fsync(ctx, r)
 		if err != nil {
 			done(err)
 			r.RespondError(err)

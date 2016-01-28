@@ -139,7 +139,7 @@ type Fsyncs struct {
 	rec RequestRecorder
 }
 
-var _ = fs.NodeFsyncer(&Fsyncs{})
+var _ = fs.HandleFsyncer(&Fsyncs{})
 
 func (r *Fsyncs) Fsync(ctx context.Context, req *fuse.FsyncRequest) error {
 	tmp := *req
