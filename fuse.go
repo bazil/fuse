@@ -411,6 +411,28 @@ const maxWrite = 16 * 1024 * 1024
 var maxRequestSize = syscall.Getpagesize()
 var bufSize = maxRequestSize + maxWrite
 
+const reqPoolSize = 25
+
+type fixedSizeReqPool struct {
+	ch chan interface{}
+}
+
+func (f *fixedSizeReqPool) Get() interface{} {
+	m := <-f.ch
+	return m
+}
+
+func (f *fixedSizeReqPool) Put(m interface{}) {
+	f.ch <- m
+}
+
+type reqPoolIface interface {
+	Get() interface{}
+	Put(i interface{})
+}
+
+var reqPool reqPoolIface
+
 // reqPool is a pool of messages.
 //
 // Lifetime of a logical message is from getMessage to putMessage.
@@ -419,8 +441,18 @@ var bufSize = maxRequestSize + maxWrite
 //
 // Messages in the pool are guaranteed to have conn and off zeroed,
 // buf allocated and len==bufSize, and hdr set.
-var reqPool = sync.Pool{
-	New: allocMessage,
+// var reqPool = sync.Pool{
+// 	New: allocMessage,
+// }
+
+func init() {
+	ch := make(chan interface{}, reqPoolSize)
+
+	for i := 0; i < reqPoolSize; i++ {
+		ch <- allocMessage()
+	}
+
+	reqPool = &fixedSizeReqPool{ch}
 }
 
 func allocMessage() interface{} {
