@@ -634,7 +634,6 @@ func (f *mkdir1) Mkdir(ctx context.Context, req *fuse.MkdirRequest) (fs.Node, er
 }
 
 func TestMkdir(t *testing.T) {
-	t.Parallel()
 	f := &mkdir1{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
 	if err != nil {
@@ -686,7 +685,6 @@ func (f *create1) Create(ctx context.Context, req *fuse.CreateRequest, resp *fus
 }
 
 func TestCreate(t *testing.T) {
-	t.Parallel()
 	f := &create1{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
 	if err != nil {
@@ -960,7 +958,6 @@ func (f *mknod1) Mknod(ctx context.Context, r *fuse.MknodRequest) (fs.Node, erro
 }
 
 func TestMknod(t *testing.T) {
-	t.Parallel()
 	if os.Getuid() != 0 {
 		t.Skip("skipping unless root")
 	}
