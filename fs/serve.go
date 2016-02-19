@@ -838,108 +838,98 @@ func (c *Server) serve(r fuse.Request) {
 		}
 	}()
 
+	if err := c.handleRequest(ctx, node, snode, r, done); err != nil {
+		done(err)
+		r.RespondError(err)
+	}
+}
+
+// handleRequest will either a) call done(s) and r.Respond(s) OR b) return an error.
+func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode, r fuse.Request, done func(resp interface{})) error {
 	switch r := r.(type) {
 	default:
 		// Note: To FUSE, ENOSYS means "this server never implements this request."
 		// It would be inappropriate to return ENOSYS for other operations in this
 		// switch that might only be unavailable in some contexts, not all.
-		done(fuse.ENOSYS)
-		r.RespondError(fuse.ENOSYS)
+		return fuse.ENOSYS
 
 	case *fuse.StatfsRequest:
 		s := &fuse.StatfsResponse{}
 		if fs, ok := c.fs.(FSStatfser); ok {
 			if err := fs.Statfs(ctx, r, s); err != nil {
-				done(err)
-				r.RespondError(err)
-				break
+				return err
 			}
 		}
 		done(s)
 		r.Respond(s)
+		return nil
 
 	// Node operations.
 	case *fuse.GetattrRequest:
 		s := &fuse.GetattrResponse{}
 		if n, ok := node.(NodeGetattrer); ok {
 			if err := n.Getattr(ctx, r, s); err != nil {
-				done(err)
-				r.RespondError(err)
-				break
+				return err
 			}
 		} else {
 			if err := snode.attr(ctx, &s.Attr); err != nil {
-				done(err)
-				r.RespondError(err)
-				break
+				return err
 			}
 		}
 		done(s)
 		r.Respond(s)
+		return nil
 
 	case *fuse.SetattrRequest:
 		s := &fuse.SetattrResponse{}
 		if n, ok := node.(NodeSetattrer); ok {
 			if err := n.Setattr(ctx, r, s); err != nil {
-				done(err)
-				r.RespondError(err)
-				break
+				return err
 			}
 		}
 
 		if err := snode.attr(ctx, &s.Attr); err != nil {
-			done(err)
-			r.RespondError(err)
-			break
+			return err
 		}
 		done(s)
 		r.Respond(s)
+		return nil
 
 	case *fuse.SymlinkRequest:
 		s := &fuse.SymlinkResponse{}
 		initLookupResponse(&s.LookupResponse)
 		n, ok := node.(NodeSymlinker)
 		if !ok {
-			done(fuse.EIO) // XXX or EPERM like Mkdir?
-			r.RespondError(fuse.EIO)
-			break
+			return fuse.EIO // XXX or EPERM like Mkdir?
 		}
 		n2, err := n.Symlink(ctx, r)
 		if err != nil {
-			done(err)
-			r.RespondError(err)
-			break
+			return err
 		}
 		if err := c.saveLookup(ctx, &s.LookupResponse, snode, r.NewName, n2); err != nil {
-			done(err)
-			r.RespondError(err)
-			break
+			return err
 		}
 		done(s)
 		r.Respond(s)
+		return nil
 
 	case *fuse.ReadlinkRequest:
 		n, ok := node.(NodeReadlinker)
 		if !ok {
-			done(fuse.EIO) /// XXX or EPERM?
-			r.RespondError(fuse.EIO)
-			break
+			return fuse.EIO /// XXX or EPERM?
 		}
 		target, err := n.Readlink(ctx, r)
 		if err != nil {
-			done(err)
-			r.RespondError(err)
-			break
+			return err
 		}
 		done(target)
 		r.Respond(target)
+		return nil
 
 	case *fuse.LinkRequest:
 		n, ok := node.(NodeLinker)
 		if !ok {
-			done(fuse.EIO) /// XXX or EPERM?
-			r.RespondError(fuse.EIO)
-			break
+			return fuse.EIO /// XXX or EPERM?
 		}
 		c.meta.Lock()
 		var oldNode *serveNode
@@ -952,52 +942,43 @@ func (c *Server) serve(r fuse.Request) {
 				Request: r.Hdr(),
 				In:      r,
 			})
-			done(fuse.EIO)
-			r.RespondError(fuse.EIO)
-			break
+			return fuse.EIO
 		}
 		n2, err := n.Link(ctx, r, oldNode.node)
 		if err != nil {
-			done(err)
-			r.RespondError(err)
-			break
+			return err
 		}
 		s := &fuse.LookupResponse{}
 		initLookupResponse(s)
 		if err := c.saveLookup(ctx, s, snode, r.NewName, n2); err != nil {
-			done(err)
-			r.RespondError(err)
-			break
+			return err
 		}
 		done(s)
 		r.Respond(s)
+		return nil
 
 	case *fuse.RemoveRequest:
 		n, ok := node.(NodeRemover)
 		if !ok {
-			done(fuse.EIO) /// XXX or EPERM?
-			r.RespondError(fuse.EIO)
-			break
+			return fuse.EIO /// XXX or EPERM?
 		}
 		err := n.Remove(ctx, r)
 		if err != nil {
-			done(err)
-			r.RespondError(err)
-			break
+			return err
 		}
 		done(nil)
 		r.Respond()
+		return nil
 
 	case *fuse.AccessRequest:
 		if n, ok := node.(NodeAccesser); ok {
 			if err := n.Access(ctx, r); err != nil {
-				done(err)
-				r.RespondError(err)
-				break
+				return err
 			}
 		}
 		done(nil)
 		r.Respond()
+		return nil
 
 	case *fuse.LookupRequest:
 		var n2 Node
@@ -1009,45 +990,35 @@ func (c *Server) serve(r fuse.Request) {
 		} else if n, ok := node.(NodeRequestLookuper); ok {
 			n2, err = n.Lookup(ctx, r, s)
 		} else {
-			done(fuse.ENOENT)
-			r.RespondError(fuse.ENOENT)
-			break
+			return fuse.ENOENT
 		}
 		if err != nil {
-			done(err)
-			r.RespondError(err)
-			break
+			return err
 		}
 		if err := c.saveLookup(ctx, s, snode, r.Name, n2); err != nil {
-			done(err)
-			r.RespondError(err)
-			break
+			return err
 		}
 		done(s)
 		r.Respond(s)
+		return nil
 
 	case *fuse.MkdirRequest:
 		s := &fuse.MkdirResponse{}
 		initLookupResponse(&s.LookupResponse)
 		n, ok := node.(NodeMkdirer)
 		if !ok {
-			done(fuse.EPERM)
-			r.RespondError(fuse.EPERM)
-			break
+			return fuse.EPERM
 		}
 		n2, err := n.Mkdir(ctx, r)
 		if err != nil {
-			done(err)
-			r.RespondError(err)
-			break
+			return err
 		}
 		if err := c.saveLookup(ctx, &s.LookupResponse, snode, r.Name, n2); err != nil {
-			done(err)
-			r.RespondError(err)
-			break
+			return err
 		}
 		done(s)
 		r.Respond(s)
+		return nil
 
 	case *fuse.OpenRequest:
 		s := &fuse.OpenResponse{}
@@ -1055,121 +1026,99 @@ func (c *Server) serve(r fuse.Request) {
 		if n, ok := node.(NodeOpener); ok {
 			hh, err := n.Open(ctx, r, s)
 			if err != nil {
-				done(err)
-				r.RespondError(err)
-				break
+				return err
 			}
 			h2 = hh
 		} else {
 			h2 = node
 		}
-		s.Handle = c.saveHandle(h2, hdr.Node)
+		s.Handle = c.saveHandle(h2, r.Hdr().Node)
 		done(s)
 		r.Respond(s)
+		return nil
 
 	case *fuse.CreateRequest:
 		n, ok := node.(NodeCreater)
 		if !ok {
 			// If we send back ENOSYS, FUSE will try mknod+open.
-			done(fuse.EPERM)
-			r.RespondError(fuse.EPERM)
-			break
+			return fuse.EPERM
 		}
 		s := &fuse.CreateResponse{OpenResponse: fuse.OpenResponse{}}
 		initLookupResponse(&s.LookupResponse)
 		n2, h2, err := n.Create(ctx, r, s)
 		if err != nil {
-			done(err)
-			r.RespondError(err)
-			break
+			return err
 		}
 		if err := c.saveLookup(ctx, &s.LookupResponse, snode, r.Name, n2); err != nil {
-			done(err)
-			r.RespondError(err)
-			break
+			return err
 		}
-		s.Handle = c.saveHandle(h2, hdr.Node)
+		s.Handle = c.saveHandle(h2, r.Hdr().Node)
 		done(s)
 		r.Respond(s)
+		return nil
 
 	case *fuse.GetxattrRequest:
 		n, ok := node.(NodeGetxattrer)
 		if !ok {
-			done(fuse.ENOTSUP)
-			r.RespondError(fuse.ENOTSUP)
-			break
+			return fuse.ENOTSUP
 		}
 		s := &fuse.GetxattrResponse{}
 		err := n.Getxattr(ctx, r, s)
 		if err != nil {
-			done(err)
-			r.RespondError(err)
-			break
+			return err
 		}
 		if r.Size != 0 && uint64(len(s.Xattr)) > uint64(r.Size) {
-			done(fuse.ERANGE)
-			r.RespondError(fuse.ERANGE)
-			break
+			return fuse.ERANGE
 		}
 		done(s)
 		r.Respond(s)
+		return nil
 
 	case *fuse.ListxattrRequest:
 		n, ok := node.(NodeListxattrer)
 		if !ok {
-			done(fuse.ENOTSUP)
-			r.RespondError(fuse.ENOTSUP)
-			break
+			return fuse.ENOTSUP
 		}
 		s := &fuse.ListxattrResponse{}
 		err := n.Listxattr(ctx, r, s)
 		if err != nil {
-			done(err)
-			r.RespondError(err)
-			break
+			return err
 		}
 		if r.Size != 0 && uint64(len(s.Xattr)) > uint64(r.Size) {
-			done(fuse.ERANGE)
-			r.RespondError(fuse.ERANGE)
-			break
+			return fuse.ERANGE
 		}
 		done(s)
 		r.Respond(s)
+		return nil
 
 	case *fuse.SetxattrRequest:
 		n, ok := node.(NodeSetxattrer)
 		if !ok {
-			done(fuse.ENOTSUP)
-			r.RespondError(fuse.ENOTSUP)
-			break
+			return fuse.ENOTSUP
 		}
 		err := n.Setxattr(ctx, r)
 		if err != nil {
-			done(err)
-			r.RespondError(err)
-			break
+			return err
 		}
 		done(nil)
 		r.Respond()
+		return nil
 
 	case *fuse.RemovexattrRequest:
 		n, ok := node.(NodeRemovexattrer)
 		if !ok {
-			done(fuse.ENOTSUP)
-			r.RespondError(fuse.ENOTSUP)
-			break
+			return fuse.ENOTSUP
 		}
 		err := n.Removexattr(ctx, r)
 		if err != nil {
-			done(err)
-			r.RespondError(err)
-			break
+			return err
 		}
 		done(nil)
 		r.Respond()
+		return nil
 
 	case *fuse.ForgetRequest:
-		forget := c.dropNode(hdr.Node, r.N)
+		forget := c.dropNode(r.Hdr().Node, r.N)
 		if forget {
 			n, ok := node.(NodeForgetter)
 			if ok {
@@ -1178,14 +1127,13 @@ func (c *Server) serve(r fuse.Request) {
 		}
 		done(nil)
 		r.Respond()
+		return nil
 
 	// Handle operations.
 	case *fuse.ReadRequest:
 		shandle := c.getHandle(r.Handle)
 		if shandle == nil {
-			done(fuse.ESTALE)
-			r.RespondError(fuse.ESTALE)
-			return
+			return fuse.ESTALE
 		}
 		handle := shandle.handle
 
@@ -1195,9 +1143,7 @@ func (c *Server) serve(r fuse.Request) {
 				if shandle.readData == nil {
 					dirs, err := h.ReadDirAll(ctx)
 					if err != nil {
-						done(err)
-						r.RespondError(err)
-						break
+						return err
 					}
 					var data []byte
 					for _, dir := range dirs {
@@ -1211,16 +1157,14 @@ func (c *Server) serve(r fuse.Request) {
 				fuseutil.HandleRead(r, s, shandle.readData)
 				done(s)
 				r.Respond(s)
-				break
+				return nil
 			}
 		} else {
 			if h, ok := handle.(HandleReadAller); ok {
 				if shandle.readData == nil {
 					data, err := h.ReadAll(ctx)
 					if err != nil {
-						done(err)
-						r.RespondError(err)
-						break
+						return err
 					}
 					if data == nil {
 						data = []byte{}
@@ -1230,71 +1174,58 @@ func (c *Server) serve(r fuse.Request) {
 				fuseutil.HandleRead(r, s, shandle.readData)
 				done(s)
 				r.Respond(s)
-				break
+				return nil
 			}
 			h, ok := handle.(HandleReader)
 			if !ok {
 				err := handleNotReaderError{handle: handle}
-				done(err)
-				r.RespondError(err)
-				break
+				return err
 			}
 			if err := h.Read(ctx, r, s); err != nil {
-				done(err)
-				r.RespondError(err)
-				break
+				return err
 			}
 		}
 		done(s)
 		r.Respond(s)
+		return nil
 
 	case *fuse.WriteRequest:
 		shandle := c.getHandle(r.Handle)
 		if shandle == nil {
-			done(fuse.ESTALE)
-			r.RespondError(fuse.ESTALE)
-			return
+			return fuse.ESTALE
 		}
 
 		s := &fuse.WriteResponse{}
 		if h, ok := shandle.handle.(HandleWriter); ok {
 			if err := h.Write(ctx, r, s); err != nil {
-				done(err)
-				r.RespondError(err)
-				break
+				return err
 			}
 			done(s)
 			r.Respond(s)
-			break
+			return nil
 		}
-		done(fuse.EIO)
-		r.RespondError(fuse.EIO)
+		return fuse.EIO
 
 	case *fuse.FlushRequest:
 		shandle := c.getHandle(r.Handle)
 		if shandle == nil {
-			done(fuse.ESTALE)
-			r.RespondError(fuse.ESTALE)
-			return
+			return fuse.ESTALE
 		}
 		handle := shandle.handle
 
 		if h, ok := handle.(HandleFlusher); ok {
 			if err := h.Flush(ctx, r); err != nil {
-				done(err)
-				r.RespondError(err)
-				break
+				return err
 			}
 		}
 		done(nil)
 		r.Respond()
+		return nil
 
 	case *fuse.ReleaseRequest:
 		shandle := c.getHandle(r.Handle)
 		if shandle == nil {
-			done(fuse.ESTALE)
-			r.RespondError(fuse.ESTALE)
-			return
+			return fuse.ESTALE
 		}
 		handle := shandle.handle
 
@@ -1303,13 +1234,12 @@ func (c *Server) serve(r fuse.Request) {
 
 		if h, ok := handle.(HandleReleaser); ok {
 			if err := h.Release(ctx, r); err != nil {
-				done(err)
-				r.RespondError(err)
-				break
+				return err
 			}
 		}
 		done(nil)
 		r.Respond()
+		return nil
 
 	case *fuse.DestroyRequest:
 		if fs, ok := c.fs.(FSDestroyer); ok {
@@ -1317,6 +1247,7 @@ func (c *Server) serve(r fuse.Request) {
 		}
 		done(nil)
 		r.Respond()
+		return nil
 
 	case *fuse.RenameRequest:
 		c.meta.Lock()
@@ -1330,63 +1261,50 @@ func (c *Server) serve(r fuse.Request) {
 				Request: r.Hdr(),
 				In:      r,
 			})
-			done(fuse.EIO)
-			r.RespondError(fuse.EIO)
-			break
+			return fuse.EIO
 		}
 		n, ok := node.(NodeRenamer)
 		if !ok {
-			done(fuse.EIO) // XXX or EPERM like Mkdir?
-			r.RespondError(fuse.EIO)
-			break
+			return fuse.EIO // XXX or EPERM like Mkdir?
 		}
 		err := n.Rename(ctx, r, newDirNode.node)
 		if err != nil {
-			done(err)
-			r.RespondError(err)
-			break
+			return err
 		}
 		done(nil)
 		r.Respond()
+		return nil
 
 	case *fuse.MknodRequest:
 		n, ok := node.(NodeMknoder)
 		if !ok {
-			done(fuse.EIO)
-			r.RespondError(fuse.EIO)
-			break
+			return fuse.EIO
 		}
 		n2, err := n.Mknod(ctx, r)
 		if err != nil {
-			done(err)
-			r.RespondError(err)
-			break
+			return err
 		}
 		s := &fuse.LookupResponse{}
 		initLookupResponse(s)
 		if err := c.saveLookup(ctx, s, snode, r.Name, n2); err != nil {
-			done(err)
-			r.RespondError(err)
-			break
+			return err
 		}
 		done(s)
 		r.Respond(s)
+		return nil
 
 	case *fuse.FsyncRequest:
 		n, ok := node.(NodeFsyncer)
 		if !ok {
-			done(fuse.EIO)
-			r.RespondError(fuse.EIO)
-			break
+			return fuse.EIO
 		}
 		err := n.Fsync(ctx, r)
 		if err != nil {
-			done(err)
-			r.RespondError(err)
-			break
+			return err
 		}
 		done(nil)
 		r.Respond()
+		return nil
 
 	case *fuse.InterruptRequest:
 		c.meta.Lock()
@@ -1398,24 +1316,23 @@ func (c *Server) serve(r fuse.Request) {
 		c.meta.Unlock()
 		done(nil)
 		r.Respond()
+		return nil
 
 		/*	case *FsyncdirRequest:
-				done(ENOSYS)
-				r.RespondError(ENOSYS)
+				return ENOSYS
 
 			case *GetlkRequest, *SetlkRequest, *SetlkwRequest:
-				done(ENOSYS)
-				r.RespondError(ENOSYS)
+				return ENOSYS
 
 			case *BmapRequest:
-				done(ENOSYS)
-				r.RespondError(ENOSYS)
+				return ENOSYS
 
 			case *SetvolnameRequest, *GetxtimesRequest, *ExchangeRequest:
-				done(ENOSYS)
-				r.RespondError(ENOSYS)
+				return ENOSYS
 		*/
 	}
+
+	panic("not reached")
 }
 
 func (c *Server) saveLookup(ctx context.Context, s *fuse.LookupResponse, snode *serveNode, elem string, n2 Node) error {
