@@ -2659,13 +2659,13 @@ func (contextFile) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.O
 
 func TestContext(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
 	const input = "kilroy was here"
-	ctx = context.WithValue(ctx, &contextFileSentinel, input)
 	mnt, err := fstestutil.MountedT(t,
 		fstestutil.SimpleFS{&fstestutil.ChildMap{"child": contextFile{}}},
 		&fs.Config{
-			GetContext: func() context.Context { return ctx },
+			WithContext: func(ctx context.Context, req fuse.Request) context.Context {
+				return context.WithValue(ctx, &contextFileSentinel, input)
+			},
 		})
 	if err != nil {
 		t.Fatal(err)
