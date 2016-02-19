@@ -743,6 +743,7 @@ func initLookupResponse(s *fuse.LookupResponse) {
 func (c *Server) serve(r fuse.Request) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	parentCtx := ctx
 	if c.context != nil {
 		ctx = c.context(ctx, r)
 	}
@@ -839,6 +840,25 @@ func (c *Server) serve(r fuse.Request) {
 	}()
 
 	if err := c.handleRequest(ctx, node, snode, r, done); err != nil {
+		if err == context.Canceled {
+			select {
+			case <-parentCtx.Done():
+				// We canceled the parent context because of an
+				// incoming interrupt request, so return EINTR
+				// to trigger the right behavior in the client app.
+				//
+				// Only do this when it's the parent context that was
+				// canceled, not a context controlled by the program
+				// using this library, so we don't return EINTR too
+				// eagerly -- it might cause busy loops.
+				//
+				// Decent write-up on role of EINTR:
+				// http://250bpm.com/blog:12
+				err = fuse.EINTR
+			default:
+				// nothing
+			}
+		}
 		done(err)
 		r.RespondError(err)
 	}

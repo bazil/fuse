@@ -1053,7 +1053,7 @@ func (it *interrupt) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse
 	default:
 	}
 	<-ctx.Done()
-	return fuse.EINTR
+	return ctx.Err()
 }
 
 func helperInterrupt() {
@@ -1143,6 +1143,51 @@ func TestInterrupt(t *testing.T) {
 		}
 	default:
 		t.Logf("interrupt: this platform has no test coverage")
+	}
+}
+
+// Test deadline
+
+type deadline struct {
+	fstestutil.File
+}
+
+var _ fs.NodeOpener = (*deadline)(nil)
+
+func (it *deadline) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func TestDeadline(t *testing.T) {
+	t.Parallel()
+	child := &deadline{}
+	config := &fs.Config{
+		WithContext: func(ctx context.Context, req fuse.Request) context.Context {
+			// return a context that has already deadlined
+
+			// Server.serve will cancel the parent context, which will
+			// cancel this one, so discarding cancel here should be
+			// safe.
+			ctx, _ = context.WithDeadline(ctx, time.Unix(0, 0))
+			return ctx
+		},
+	}
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": child}}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	f, err := os.Open(mnt.Dir + "/child")
+	if err == nil {
+		f.Close()
+	}
+
+	// not caused by signal -> should not get EINTR;
+	// context.DeadlineExceeded will be translated into EIO
+	if nerr, ok := err.(*os.PathError); !ok || nerr.Err != syscall.EIO {
+		t.Fatalf("wrong error from deadline open: %T: %v", err, err)
 	}
 }
 
