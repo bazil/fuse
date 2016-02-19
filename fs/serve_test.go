@@ -308,8 +308,8 @@ func testReadAll(t *testing.T, path string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(data[:n]) != hi {
-		t.Errorf("readAll = %q, want %q", data, hi)
+	if g, e := string(data[:n]), hi; g != e {
+		t.Errorf("readAll = %q, want %q", g, e)
 	}
 }
 
