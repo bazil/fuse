@@ -2725,3 +2725,28 @@ func TestContext(t *testing.T) {
 		t.Errorf("read wrong data: %q != %q", g, e)
 	}
 }
+
+type goexitFile struct {
+	fstestutil.File
+}
+
+func (goexitFile) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
+	log.Println("calling runtime.Goexit...")
+	runtime.Goexit()
+	panic("not reached")
+}
+
+func TestGoexit(t *testing.T) {
+	t.Parallel()
+	mnt, err := fstestutil.MountedT(t,
+		fstestutil.SimpleFS{&fstestutil.ChildMap{"child": goexitFile{}}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	_, err = ioutil.ReadFile(mnt.Dir + "/child")
+	if nerr, ok := err.(*os.PathError); !ok || nerr.Err != syscall.EIO {
+		t.Fatalf("wrong error from exiting handler: %T: %v", err, err)
+	}
+}

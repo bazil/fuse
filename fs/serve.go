@@ -720,6 +720,25 @@ func (h handlerPanickedError) Errno() fuse.Errno {
 	return fuse.DefaultErrno
 }
 
+// handlerTerminatedError happens when a handler terminates itself
+// with runtime.Goexit. This is most commonly because of incorrect use
+// of testing.TB.FailNow, typically via t.Fatal.
+type handlerTerminatedError struct {
+	Request interface{}
+}
+
+var _ error = handlerTerminatedError{}
+
+func (h handlerTerminatedError) Error() string {
+	return fmt.Sprintf("handler terminated (called runtime.Goexit)")
+}
+
+var _ fuse.ErrorNumber = handlerTerminatedError{}
+
+func (h handlerTerminatedError) Errno() fuse.Errno {
+	return fuse.DefaultErrno
+}
+
 type handleNotReaderError struct {
 	handle Handle
 }
@@ -823,6 +842,7 @@ func (c *Server) serve(r fuse.Request) {
 		c.meta.Unlock()
 	}
 
+	var responded bool
 	defer func() {
 		if rec := recover(); rec != nil {
 			const size = 1 << 16
@@ -833,6 +853,15 @@ func (c *Server) serve(r fuse.Request) {
 			err := handlerPanickedError{
 				Request: r,
 				Err:     rec,
+			}
+			done(err)
+			r.RespondError(err)
+			return
+		}
+
+		if !responded {
+			err := handlerTerminatedError{
+				Request: r,
 			}
 			done(err)
 			r.RespondError(err)
@@ -862,6 +891,9 @@ func (c *Server) serve(r fuse.Request) {
 		done(err)
 		r.RespondError(err)
 	}
+
+	// disarm runtime.Goexit protection
+	responded = true
 }
 
 // handleRequest will either a) call done(s) and r.Respond(s) OR b) return an error.
