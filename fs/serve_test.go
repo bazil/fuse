@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"os/exec"
 	"path"
 	"runtime"
 	"strings"
@@ -1057,6 +1056,37 @@ func (it *interrupt) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse
 	return fuse.EINTR
 }
 
+func helperInterrupt() {
+	log.SetPrefix("interrupt child: ")
+	log.SetFlags(0)
+
+	log.Printf("starting...")
+
+	f, err := os.Open("child")
+	if err != nil {
+		log.Fatalf("cannot open file: %v", err)
+	}
+	defer f.Close()
+
+	log.Printf("reading...")
+	buf := make([]byte, 4096)
+	n, err := syscall.Read(int(f.Fd()), buf)
+	switch err {
+	case nil:
+		log.Fatalf("read: expected error, got data: %q", buf[:n])
+	case syscall.EINTR:
+		log.Printf("read: saw EINTR, all good")
+	default:
+		log.Fatalf("read: wrong error: %v", err)
+	}
+
+	log.Printf("exiting...")
+}
+
+func init() {
+	childHelpers["interrupt"] = helperInterrupt
+}
+
 func TestInterrupt(t *testing.T) {
 	t.Parallel()
 	f := &interrupt{}
@@ -1068,47 +1098,48 @@ func TestInterrupt(t *testing.T) {
 	defer mnt.Close()
 
 	// start a subprocess that can hang until signaled
-	cmd := exec.Command("cat", mnt.Dir+"/child")
-
-	err = cmd.Start()
+	child, err := childCmd("interrupt")
 	if err != nil {
-		t.Errorf("interrupt: cannot start cat: %v", err)
+		t.Fatal(err)
+	}
+	child.Dir = mnt.Dir
+
+	if err := child.Start(); err != nil {
+		t.Errorf("cannot start child: %v", err)
 		return
 	}
 
 	// try to clean up if child is still alive when returning
-	defer cmd.Process.Kill()
+	defer child.Process.Kill()
 
 	// wait till we're sure it's hanging in read
 	<-f.hanging
 
-	err = cmd.Process.Signal(os.Interrupt)
+	//	err = child.Process.Signal(os.Interrupt)
+	err = child.Process.Signal(syscall.SIGIO)
 	if err != nil {
-		t.Errorf("interrupt: cannot interrupt cat: %v", err)
+		t.Errorf("cannot interrupt child: %v", err)
 		return
 	}
 
-	p, err := cmd.Process.Wait()
+	p, err := child.Process.Wait()
 	if err != nil {
-		t.Errorf("interrupt: cat bork: %v", err)
+		t.Errorf("child failed: %v", err)
 		return
 	}
 	switch ws := p.Sys().(type) {
 	case syscall.WaitStatus:
 		if ws.CoreDump() {
-			t.Errorf("interrupt: didn't expect cat to dump core: %v", ws)
+			t.Fatalf("interrupt: didn't expect child to dump core: %v", ws)
 		}
-
-		if ws.Exited() {
-			t.Errorf("interrupt: didn't expect cat to exit normally: %v", ws)
+		if ws.Signaled() {
+			t.Fatalf("interrupt: didn't expect child to exit with a signal: %v", ws)
 		}
-
-		if !ws.Signaled() {
-			t.Errorf("interrupt: expected cat to get a signal: %v", ws)
-		} else {
-			if ws.Signal() != os.Interrupt {
-				t.Errorf("interrupt: cat got wrong signal: %v", ws)
-			}
+		if !ws.Exited() {
+			t.Fatalf("interrupt: expected child to exit normally: %v", ws)
+		}
+		if status := ws.ExitStatus(); status != 0 {
+			t.Errorf("interrupt: child failed: exit status %d", status)
 		}
 	default:
 		t.Logf("interrupt: this platform has no test coverage")
