@@ -883,14 +883,6 @@ func (c *Server) serve(r fuse.Request) {
 				r.RespondError(err)
 				break
 			}
-			if err := snode.attr(ctx, &s.Attr); err != nil {
-				done(err)
-				r.RespondError(err)
-				break
-			}
-			done(s)
-			r.Respond(s)
-			break
 		}
 
 		if err := snode.attr(ctx, &s.Attr); err != nil {
