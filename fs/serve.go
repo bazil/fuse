@@ -92,8 +92,8 @@ type FSInodeGenerator interface {
 type Node interface {
 	// Attr fills attr with the standard metadata for the node.
 	//
-	// *attr is prefilled with default values, so only overwrite it
-	// if you want to ignore the defaults.
+	// Overwriting *attr discards default field values and should
+	// usually be avoided.
 	Attr(ctx context.Context, attr *fuse.Attr) error
 }
 
