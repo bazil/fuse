@@ -374,15 +374,15 @@ type Server struct {
 	nodeGen    uint64
 
 	// Used to ensure worker goroutines finish before Serve returns
-	wg sync.WaitGroup
+	// If there was an error during Serve, it will be assigned to serveErr
+	wg       sync.WaitGroup
+	serveErr error
 }
 
 // Serve serves the FUSE connection by making calls to the methods
 // of fs and the Nodes and Handles it makes available.  It returns only
 // when the connection has been closed or an unexpected error occurs.
 func (s *Server) Serve(fs FS) error {
-	defer s.wg.Wait() // Wait for worker goroutines to complete before return
-
 	s.fs = fs
 	if dyn, ok := fs.(FSInodeGenerator); ok {
 		s.dynamicInode = dyn.GenerateInode
@@ -403,22 +403,29 @@ func (s *Server) Serve(fs FS) error {
 	})
 	s.handle = append(s.handle, nil)
 
-	for {
-		req, err := s.conn.ReadRequest()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return err
-		}
+	s.wg.Add(1)
+	go s.handoffServe(fs)
+	s.wg.Wait() // Wait for worker goroutines to complete before return
+	return s.serveErr
+}
 
-		s.wg.Add(1)
-		go func() {
-			defer s.wg.Done()
-			s.serve(req)
-		}()
+// Receive a request, invoke self in a goroutine to handle further requests, then process the request inline.
+// The idiomatic serve loop introduces significant latency due to golang scheduler logic.
+// See https://github.com/golang/go/issues/15110
+func (s *Server) handoffServe(fs FS) {
+	defer s.wg.Done()
+
+	req, err := s.conn.ReadRequest()
+	if err != nil {
+		if err != io.EOF {
+			s.serveErr = err
+		}
+		return
 	}
-	return nil
+
+	s.wg.Add(1)
+	go s.handoffServe(fs)
+	s.serve(req)
 }
 
 // Serve serves a FUSE connection with the default settings. See
