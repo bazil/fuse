@@ -1452,6 +1452,73 @@ func TestReadDirNotImplemented(t *testing.T) {
 	}
 }
 
+type readDirAllRewind struct {
+	fstestutil.Dir
+	entries atomic.Value
+}
+
+func (d *readDirAllRewind) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
+	entries := d.entries.Load().([]fuse.Dirent)
+	return entries, nil
+}
+
+func TestReadDirAllRewind(t *testing.T) {
+	t.Parallel()
+	f := &readDirAllRewind{}
+	f.entries.Store([]fuse.Dirent{
+		{Name: "one", Inode: 11, Type: fuse.DT_Dir},
+	})
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	fil, err := os.Open(mnt.Dir)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer fil.Close()
+
+	{
+		names, err := fil.Readdirnames(100)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		t.Logf("Got readdir: %q", names)
+		if len(names) != 1 ||
+			names[0] != "one" {
+			t.Errorf(`expected  entry of "one", got: %q`, names)
+			return
+		}
+	}
+
+	f.entries.Store([]fuse.Dirent{
+		{Name: "two", Inode: 12, Type: fuse.DT_File},
+		{Name: "one", Inode: 11, Type: fuse.DT_Dir},
+	})
+	if _, err := fil.Seek(0, os.SEEK_SET); err != nil {
+		t.Fatal(err)
+	}
+
+	{
+		names, err := fil.Readdirnames(100)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		t.Logf("Got readdir: %q", names)
+		if len(names) != 2 ||
+			names[0] != "two" ||
+			names[1] != "one" {
+			t.Errorf(`expected 2 entries of "two", "one", got: %q`, names)
+			return
+		}
+	}
+}
+
 // Test Chmod.
 
 type chmod struct {
