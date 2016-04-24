@@ -217,7 +217,7 @@ func initMount(c *Conn, conf *mountConfig) error {
 
 	min := Protocol{protoVersionMinMajor, protoVersionMinMinor}
 	if r.Kernel.LT(min) {
-		req.RespondError(Errno(syscall.EPROTO))
+		req.RespondError(Errno(syscall.EIO))
 		c.Close()
 		return &OldVersionError{
 			Kernel:     r.Kernel,
