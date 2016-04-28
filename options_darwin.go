@@ -11,3 +11,10 @@ func volumeName(name string) MountOption {
 		return nil
 	}
 }
+
+func daemonTimeout(name string) MountOption {
+	return func(conf *mountConfig) error {
+		conf.options["daemon_timeout"] = name
+		return nil
+	}
+}
