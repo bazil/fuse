@@ -7,3 +7,7 @@ func localVolume(conf *mountConfig) error {
 func volumeName(name string) MountOption {
 	return dummyOption
 }
+
+func daemonTimeout(name string) MountOption {
+	return dummyOption
+}
