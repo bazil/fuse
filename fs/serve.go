@@ -91,6 +91,9 @@ type FSInodeGenerator interface {
 // simple, read-only filesystem.
 type Node interface {
 	// Attr fills attr with the standard metadata for the node.
+	//
+	// Overwriting *attr discards default field values and should
+	// usually be avoided.
 	Attr(ctx context.Context, attr *fuse.Attr) error
 }
 
