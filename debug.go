@@ -19,3 +19,8 @@ func nop(msg interface{}) {}
 //
 // Implementations must not retain msg.
 var Debug func(msg interface{}) = nop
+
+var ShouldDebug bool
+
+// Trace is tested to see if we should trace execution
+var Trace bool

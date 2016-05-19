@@ -33,30 +33,6 @@ func (a *attr) SetFlags(f uint32) {
 	// ignored on freebsd
 }
 
-type setattrIn struct {
-	setattrInCommon
-}
-
-func (in *setattrIn) BkupTime() time.Time {
-	return time.Time{}
-}
-
-func (in *setattrIn) Chgtime() time.Time {
-	return time.Time{}
-}
-
-func (in *setattrIn) Flags() uint32 {
-	return 0
-}
-
 func openFlags(flags uint32) OpenFlags {
 	return OpenFlags(flags)
-}
-
-type getxattrIn struct {
-	getxattrInCommon
-}
-
-type setxattrIn struct {
-	setxattrInCommon
 }

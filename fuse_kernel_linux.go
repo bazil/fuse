@@ -33,22 +33,6 @@ func (a *attr) SetFlags(f uint32) {
 	// Ignored on Linux.
 }
 
-type setattrIn struct {
-	setattrInCommon
-}
-
-func (in *setattrIn) BkupTime() time.Time {
-	return time.Time{}
-}
-
-func (in *setattrIn) Chgtime() time.Time {
-	return time.Time{}
-}
-
-func (in *setattrIn) Flags() uint32 {
-	return 0
-}
-
 func openFlags(flags uint32) OpenFlags {
 	// on amd64, the 32-bit O_LARGEFILE flag is always seen;
 	// on i386, the flag probably depends on the app
@@ -59,12 +43,4 @@ func openFlags(flags uint32) OpenFlags {
 	flags &^= 0x8000
 
 	return OpenFlags(flags)
-}
-
-type getxattrIn struct {
-	getxattrInCommon
-}
-
-type setxattrIn struct {
-	setxattrInCommon
 }

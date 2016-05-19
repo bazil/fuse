@@ -38,7 +38,6 @@ package fuse
 import (
 	"fmt"
 	"syscall"
-	"unsafe"
 )
 
 // The FUSE version implemented by the package.
@@ -87,67 +86,6 @@ var getattrFlagsNames = []flagName{
 
 func (fl GetattrFlags) String() string {
 	return flagString(uint32(fl), getattrFlagsNames)
-}
-
-// The SetattrValid are bit flags describing which fields in the SetattrRequest
-// are included in the change.
-type SetattrValid uint32
-
-const (
-	SetattrMode   SetattrValid = 1 << 0
-	SetattrUid    SetattrValid = 1 << 1
-	SetattrGid    SetattrValid = 1 << 2
-	SetattrSize   SetattrValid = 1 << 3
-	SetattrAtime  SetattrValid = 1 << 4
-	SetattrMtime  SetattrValid = 1 << 5
-	SetattrHandle SetattrValid = 1 << 6
-
-	// Linux only(?)
-	SetattrAtimeNow  SetattrValid = 1 << 7
-	SetattrMtimeNow  SetattrValid = 1 << 8
-	SetattrLockOwner SetattrValid = 1 << 9 // http://www.mail-archive.com/git-commits-head@vger.kernel.org/msg27852.html
-
-	// OS X only
-	SetattrCrtime   SetattrValid = 1 << 28
-	SetattrChgtime  SetattrValid = 1 << 29
-	SetattrBkuptime SetattrValid = 1 << 30
-	SetattrFlags    SetattrValid = 1 << 31
-)
-
-func (fl SetattrValid) Mode() bool      { return fl&SetattrMode != 0 }
-func (fl SetattrValid) Uid() bool       { return fl&SetattrUid != 0 }
-func (fl SetattrValid) Gid() bool       { return fl&SetattrGid != 0 }
-func (fl SetattrValid) Size() bool      { return fl&SetattrSize != 0 }
-func (fl SetattrValid) Atime() bool     { return fl&SetattrAtime != 0 }
-func (fl SetattrValid) Mtime() bool     { return fl&SetattrMtime != 0 }
-func (fl SetattrValid) Handle() bool    { return fl&SetattrHandle != 0 }
-func (fl SetattrValid) AtimeNow() bool  { return fl&SetattrAtimeNow != 0 }
-func (fl SetattrValid) MtimeNow() bool  { return fl&SetattrMtimeNow != 0 }
-func (fl SetattrValid) LockOwner() bool { return fl&SetattrLockOwner != 0 }
-func (fl SetattrValid) Crtime() bool    { return fl&SetattrCrtime != 0 }
-func (fl SetattrValid) Chgtime() bool   { return fl&SetattrChgtime != 0 }
-func (fl SetattrValid) Bkuptime() bool  { return fl&SetattrBkuptime != 0 }
-func (fl SetattrValid) Flags() bool     { return fl&SetattrFlags != 0 }
-
-func (fl SetattrValid) String() string {
-	return flagString(uint32(fl), setattrValidNames)
-}
-
-var setattrValidNames = []flagName{
-	{uint32(SetattrMode), "SetattrMode"},
-	{uint32(SetattrUid), "SetattrUid"},
-	{uint32(SetattrGid), "SetattrGid"},
-	{uint32(SetattrSize), "SetattrSize"},
-	{uint32(SetattrAtime), "SetattrAtime"},
-	{uint32(SetattrMtime), "SetattrMtime"},
-	{uint32(SetattrHandle), "SetattrHandle"},
-	{uint32(SetattrAtimeNow), "SetattrAtimeNow"},
-	{uint32(SetattrMtimeNow), "SetattrMtimeNow"},
-	{uint32(SetattrLockOwner), "SetattrLockOwner"},
-	{uint32(SetattrCrtime), "SetattrCrtime"},
-	{uint32(SetattrChgtime), "SetattrChgtime"},
-	{uint32(SetattrBkuptime), "SetattrBkuptime"},
-	{uint32(SetattrFlags), "SetattrFlags"},
 }
 
 // Flags that can be seen in OpenRequest.Flags.
@@ -347,70 +285,66 @@ var releaseFlagNames = []flagName{
 	{uint32(ReleaseFlush), "ReleaseFlush"},
 }
 
+type OpCode int32
+
 // Opcodes
 const (
-	opLookup      = 1
-	opForget      = 2 // no reply
-	opGetattr     = 3
-	opSetattr     = 4
-	opReadlink    = 5
-	opSymlink     = 6
-	opMknod       = 8
-	opMkdir       = 9
-	opUnlink      = 10
-	opRmdir       = 11
-	opRename      = 12
-	opLink        = 13
-	opOpen        = 14
-	opRead        = 15
-	opWrite       = 16
-	opStatfs      = 17
-	opRelease     = 18
-	opFsync       = 20
-	opSetxattr    = 21
-	opGetxattr    = 22
-	opListxattr   = 23
-	opRemovexattr = 24
-	opFlush       = 25
-	opInit        = 26
-	opOpendir     = 27
-	opReaddir     = 28
-	opReleasedir  = 29
-	opFsyncdir    = 30
-	opGetlk       = 31
-	opSetlk       = 32
-	opSetlkw      = 33
-	opAccess      = 34
-	opCreate      = 35
-	opInterrupt   = 36
-	opBmap        = 37
-	opDestroy     = 38
-	opIoctl       = 39 // Linux?
-	opPoll        = 40 // Linux?
+	OpLookup      = 1
+	OpForget      = 2 // no reply
+	OpGetattr     = 3
+	OpSetattr     = 4
+	OpReadlink    = 5
+	OpSymlink     = 6
+	OpMknod       = 8
+	OpMkdir       = 9
+	OpUnlink      = 10
+	OpRmdir       = 11
+	OpRename      = 12
+	OpLink        = 13
+	OpOpen        = 14
+	OpRead        = 15
+	OpWrite       = 16
+	OpStatfs      = 17
+	OpRelease     = 18
+	OpFsync       = 20
+	OpSetxattr    = 21
+	OpGetxattr    = 22
+	OpListxattr   = 23
+	OpRemovexattr = 24
+	OpFlush       = 25
+	OpInit        = 26
+	OpOpendir     = 27
+	OpReaddir     = 28
+	OpReleasedir  = 29
+	OpFsyncdir    = 30
+	OpGetlk       = 31
+	OpSetlk       = 32
+	OpSetlkw      = 33
+	OpAccess      = 34
+	OpCreate      = 35
+	OpInterrupt   = 36
+	OpBmap        = 37
+	OpDestroy     = 38
+	OpIoctl       = 39 // Linux?
+	OpPoll        = 40 // Linux?
 
 	// OS X
-	opSetvolname = 61
-	opGetxtimes  = 62
-	opExchange   = 63
+	OpSetvolname = 61
+	OpGetxtimes  = 62
+	OpExchange   = 63
+
+	OpInvalid = 0
 )
 
-type entryOut struct {
-	Nodeid         uint64 // Inode ID
-	Generation     uint64 // Inode generation
-	EntryValid     uint64 // Cache timeout for the name
-	AttrValid      uint64 // Cache timeout for the attributes
-	EntryValidNsec uint32
-	AttrValidNsec  uint32
-	Attr           attr
-}
-
-func entryOutSize(p Protocol) uintptr {
-	switch {
-	case p.LT(Protocol{7, 9}):
-		return unsafe.Offsetof(entryOut{}.Attr) + unsafe.Offsetof(entryOut{}.Attr.Blksize)
-	default:
-		return unsafe.Sizeof(entryOut{})
-	}
+type LookupResponse struct {
+	outHeader
+	nodeid         uint64 // Inode ID
+	generation     uint64 // Inode generation
+	entryValid     uint64 // Cache timeout for the name
+	attrValid      uint64 // Cache timeout for the attributes
+	entryValidNsec uint32
+	attrValidNsec  uint32
+	attr           attr
 }
 
 type forgetIn struct {
@@ -418,9 +352,9 @@ type forgetIn struct {
 }
 
 type getattrIn struct {
-	GetattrFlags uint32
+	getattrFlags uint32
 	dummy        uint32
-	Fh           uint64
+	fh           uint64
 }
 
 type attrOut struct {
@@ -430,123 +364,24 @@ type attrOut struct {
 	Attr          attr
 }
 
-func attrOutSize(p Protocol) uintptr {
-	switch {
-	case p.LT(Protocol{7, 9}):
-		return unsafe.Offsetof(attrOut{}.Attr) + unsafe.Offsetof(attrOut{}.Attr.Blksize)
-	default:
-		return unsafe.Sizeof(attrOut{})
-	}
-}
-
-// OS X
-type getxtimesOut struct {
-	Bkuptime     uint64
-	Crtime       uint64
-	BkuptimeNsec uint32
-	CrtimeNsec   uint32
-}
-
-type mknodIn struct {
-	Mode    uint32
-	Rdev    uint32
-	Umask   uint32
-	padding uint32
-	// "filename\x00" follows.
-}
-
-func mknodInSize(p Protocol) uintptr {
-	switch {
-	case p.LT(Protocol{7, 12}):
-		return unsafe.Offsetof(mknodIn{}.Umask)
-	default:
-		return unsafe.Sizeof(mknodIn{})
-	}
-}
-
-type mkdirIn struct {
-	Mode  uint32
-	Umask uint32
-	// filename follows
-}
-
-func mkdirInSize(p Protocol) uintptr {
-	switch {
-	case p.LT(Protocol{7, 12}):
-		return unsafe.Offsetof(mkdirIn{}.Umask) + 4
-	default:
-		return unsafe.Sizeof(mkdirIn{})
-	}
-}
-
-type renameIn struct {
-	Newdir uint64
-	// "oldname\x00newname\x00" follows
-}
-
-// OS X
-type exchangeIn struct {
-	Olddir  uint64
-	Newdir  uint64
-	Options uint64
-	// "oldname\x00newname\x00" follows
-}
-
-type linkIn struct {
-	Oldnodeid uint64
-}
-
-type setattrInCommon struct {
-	Valid     uint32
-	Padding   uint32
-	Fh        uint64
-	Size      uint64
-	LockOwner uint64 // unused on OS X?
-	Atime     uint64
-	Mtime     uint64
-	Unused2   uint64
-	AtimeNsec uint32
-	MtimeNsec uint32
-	Unused3   uint32
-	Mode      uint32
-	Unused4   uint32
-	Uid       uint32
-	Gid       uint32
-	Unused5   uint32
-}
-
 type openIn struct {
+	inHeader
 	Flags  uint32
 	Unused uint32
 }
 
 type openOut struct {
-	Fh        uint64
-	OpenFlags uint32
-	Padding   uint32
-}
-
-type createIn struct {
-	Flags   uint32
-	Mode    uint32
-	Umask   uint32
-	padding uint32
-}
-
-func createInSize(p Protocol) uintptr {
-	switch {
-	case p.LT(Protocol{7, 12}):
-		return unsafe.Offsetof(createIn{}.Umask)
-	default:
-		return unsafe.Sizeof(createIn{})
-	}
+	outHeader
+	fh        uint64
+	openFlags uint32
+	padding   uint32
 }
 
 type releaseIn struct {
-	Fh           uint64
-	Flags        uint32
-	ReleaseFlags uint32
-	LockOwner    uint32
+	fh           uint64
+	flags        uint32
+	releaseFlags uint32
+	lockOwner    uint32
 }
 
 type flushIn struct {
@@ -557,22 +392,14 @@ type flushIn struct {
 }
 
 type readIn struct {
-	Fh        uint64
-	Offset    uint64
-	Size      uint32
-	ReadFlags uint32
-	LockOwner uint64
-	Flags     uint32
+	inHeader
+	fh        uint64
+	offset    uint64
+	size      uint32
+	readFlags uint32
+	lockOwner uint64
+	flags     uint32
 	padding   uint32
-}
-
-func readInSize(p Protocol) uintptr {
-	switch {
-	case p.LT(Protocol{7, 9}):
-		return unsafe.Offsetof(readIn{}.ReadFlags) + 4
-	default:
-		return unsafe.Sizeof(readIn{})
-	}
 }
 
 // The ReadFlags are passed in ReadRequest.
@@ -591,107 +418,10 @@ func (fl ReadFlags) String() string {
 	return flagString(uint32(fl), readFlagNames)
 }
 
-type writeIn struct {
-	Fh         uint64
-	Offset     uint64
-	Size       uint32
-	WriteFlags uint32
-	LockOwner  uint64
-	Flags      uint32
-	padding    uint32
-}
-
-func writeInSize(p Protocol) uintptr {
-	switch {
-	case p.LT(Protocol{7, 9}):
-		return unsafe.Offsetof(writeIn{}.LockOwner)
-	default:
-		return unsafe.Sizeof(writeIn{})
-	}
-}
-
-type writeOut struct {
-	Size    uint32
-	Padding uint32
-}
-
-// The WriteFlags are passed in WriteRequest.
-type WriteFlags uint32
-
-const (
-	WriteCache WriteFlags = 1 << 0
-	// LockOwner field is valid.
-	WriteLockOwner WriteFlags = 1 << 1
-)
-
-var writeFlagNames = []flagName{
-	{uint32(WriteCache), "WriteCache"},
-	{uint32(WriteLockOwner), "WriteLockOwner"},
-}
-
-func (fl WriteFlags) String() string {
-	return flagString(uint32(fl), writeFlagNames)
-}
-
 const compatStatfsSize = 48
 
 type statfsOut struct {
 	St kstatfs
-}
-
-type fsyncIn struct {
-	Fh         uint64
-	FsyncFlags uint32
-	Padding    uint32
-}
-
-type setxattrInCommon struct {
-	Size  uint32
-	Flags uint32
-}
-
-func (setxattrInCommon) position() uint32 {
-	return 0
-}
-
-type getxattrInCommon struct {
-	Size    uint32
-	Padding uint32
-}
-
-func (getxattrInCommon) position() uint32 {
-	return 0
-}
-
-type getxattrOut struct {
-	Size    uint32
-	Padding uint32
-}
-
-type lkIn struct {
-	Fh      uint64
-	Owner   uint64
-	Lk      fileLock
-	LkFlags uint32
-	padding uint32
-}
-
-func lkInSize(p Protocol) uintptr {
-	switch {
-	case p.LT(Protocol{7, 9}):
-		return unsafe.Offsetof(lkIn{}.LkFlags)
-	default:
-		return unsafe.Sizeof(lkIn{})
-	}
-}
-
-type lkOut struct {
-	Lk fileLock
-}
-
-type accessIn struct {
-	Mask    uint32
-	Padding uint32
 }
 
 type initIn struct {
@@ -700,8 +430,6 @@ type initIn struct {
 	MaxReadahead uint32
 	Flags        uint32
 }
-
-const initInSize = int(unsafe.Sizeof(initIn{}))
 
 type initOut struct {
 	Major        uint32
@@ -712,37 +440,21 @@ type initOut struct {
 	MaxWrite     uint32
 }
 
-type interruptIn struct {
-	Unique uint64
-}
-
-type bmapIn struct {
-	Block     uint64
-	BlockSize uint32
-	Padding   uint32
-}
-
-type bmapOut struct {
-	Block uint64
-}
-
 type inHeader struct {
-	Len     uint32
-	Opcode  uint32
-	Unique  uint64
-	Nodeid  uint64
-	Uid     uint32
-	Gid     uint32
-	Pid     uint32
-	Padding uint32
+	len     uint32
+	opcode  uint32
+	unique  uint64
+	nodeid  uint64
+	uid     uint32
+	gid     uint32
+	pid     uint32
+	padding uint32
 }
-
-const inHeaderSize = int(unsafe.Sizeof(inHeader{}))
 
 type outHeader struct {
-	Len    uint32
-	Error  int32
-	Unique uint64
+	len    uint32
+	error  int32
+	unique uint64
 }
 
 type dirent struct {
@@ -754,21 +466,3 @@ type dirent struct {
 }
 
 const direntSize = 8 + 8 + 4 + 4
-
-const (
-	notifyCodePoll       int32 = 1
-	notifyCodeInvalInode int32 = 2
-	notifyCodeInvalEntry int32 = 3
-)
-
-type notifyInvalInodeOut struct {
-	Ino uint64
-	Off int64
-	Len int64
-}
-
-type notifyInvalEntryOut struct {
-	Parent  uint64
-	Namelen uint32
-	padding uint32
-}
