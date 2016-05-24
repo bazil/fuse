@@ -68,9 +68,9 @@ func (r *ReadRequest) Offset() int64 {
 // This means we will only send outHeader plus the first n bytes of data.
 // dataRef is a slice that points into data only to store how many bytes we use.
 type ReadResponse struct {
-	outHeader
-	data    [maxReadSize]byte
 	dataRef []byte
+	outHeader
+	data [maxReadSize]byte
 }
 
 func (r *ReadResponse) Data() []byte {
@@ -87,15 +87,17 @@ const readRequestSize = unsafe.Sizeof(ReadRequest{})
 
 const readResponseBaseSize = unsafe.Offsetof(ReadResponse{}.data)
 
+const readResponseHeaderStart = unsafe.Offsetof(ReadResponse{}.outHeader)
+
 const readResponseSize = unsafe.Sizeof(ReadResponse{})
 
-func readResponse(a *Allocator) *ReadResponse {
-	return (*ReadResponse)(a.allocPointer(readResponseSize))
+func readResponse(a *Allocator, dataSize uint32) *ReadResponse {
+	return (*ReadResponse)(a.allocPointer(readResponseBaseSize + uintptr(dataSize)))
 }
 
 func (r *ReadResponse) Respond(s *RequestScope) {
 	d := (*[readResponseSize]byte)(unsafe.Pointer(r))
-	s.respond(d[:readResponseBaseSize+uintptr(len(r.dataRef))])
+	s.respond(d[readResponseHeaderStart : readResponseBaseSize+uintptr(len(r.dataRef))])
 }
 
 func readInSize(p Protocol) uintptr {
@@ -114,7 +116,7 @@ func parseRead(b []byte, alloc *Allocator, p Protocol) (*ReadRequest, *ReadRespo
 	if req.size > maxReadSize {
 		return nil, nil, fmt.Errorf("Read of %v is larger than %v", req.size, maxReadSize)
 	}
-	resp := readResponse(alloc)
+	resp := readResponse(alloc, req.size)
 	resp.unique = req.unique
 	resp.dataRef = resp.data[:req.size]
 	return req, resp, nil

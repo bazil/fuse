@@ -12,6 +12,8 @@ const maxWrite = 16 * 1024 * 1024
 // TODO(dbentley): Why does this seem reasonable?
 const maxReadSize = maxWrite
 
+const maxFilenameLen = 1024 // Maximum filename length we support
+
 // All requests read from the kernel, without data, are shorter than
 // this.
 var maxRequestSize = syscall.Getpagesize()

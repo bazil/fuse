@@ -135,6 +135,7 @@ func parseLookup(b []byte, alloc *Allocator) (*LookupRequest, *LookupResponse, e
 	if req.name[l-1] != '\x00' {
 		return nil, nil, fmt.Errorf("Malformed LookupRequest: %v", req.name[l-1])
 	}
+
 	return req, resp, nil
 }
 
@@ -143,14 +144,16 @@ type ReadlinkRequest struct {
 }
 
 type ReadlinkResponse struct {
-	outHeader
-	data    [maxReadSize]byte
 	dataRef []byte
+	outHeader
+	data [maxFilenameLen]byte
 }
 
 const readlinkRequestSize = unsafe.Sizeof(ReadlinkRequest{})
 
 const readlinkResponseSize = unsafe.Sizeof(ReadlinkResponse{})
+
+const readlinkResponseHeaderStart = unsafe.Offsetof(ReadlinkResponse{}.outHeader)
 
 const readlinkResponseBaseSize = unsafe.Offsetof(ReadlinkResponse{}.data)
 
@@ -160,7 +163,7 @@ func readlinkResponse(a *Allocator) *ReadlinkResponse {
 
 func (r *ReadlinkResponse) Respond(s *RequestScope) {
 	d := (*[readlinkResponseSize]byte)(unsafe.Pointer(r))
-	s.respond(d[:readlinkResponseBaseSize+uintptr(len(r.dataRef))])
+	s.respond(d[readlinkResponseHeaderStart : readlinkResponseBaseSize+uintptr(len(r.dataRef))])
 }
 
 func (r *ReadlinkResponse) Data(target string) {

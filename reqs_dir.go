@@ -76,9 +76,9 @@ func (r *ReaddirRequest) Size() uint32 {
 // This means we will only send outHeader plus the first n bytes of data.
 // dataRef is a slice that points into data only to store how many bytes we use.
 type ReaddirResponse struct {
-	outHeader
-	data    [maxReadSize]byte
 	dataRef []byte
+	outHeader
+	data [maxReadSize]byte
 }
 
 func (r *ReaddirResponse) Data(d []byte) {
@@ -90,15 +90,17 @@ const readdirRequestSize = unsafe.Sizeof(ReaddirRequest{})
 
 const readdirResponseBaseSize = unsafe.Offsetof(ReaddirResponse{}.data)
 
+const readdirResponseHeaderStart = unsafe.Offsetof(ReaddirResponse{}.outHeader)
+
 const readdirResponseSize = unsafe.Sizeof(ReaddirResponse{})
 
-func readdirResponse(a *Allocator) *ReaddirResponse {
-	return (*ReaddirResponse)(a.allocPointer(readdirResponseSize))
+func readdirResponse(a *Allocator, dataSize uint32) *ReaddirResponse {
+	return (*ReaddirResponse)(a.allocPointer(readdirResponseBaseSize + uintptr(dataSize)))
 }
 
 func (r *ReaddirResponse) Respond(s *RequestScope) {
 	d := (*[readdirResponseSize]byte)(unsafe.Pointer(r))
-	s.respond(d[:readdirResponseBaseSize+uintptr(len(r.dataRef))])
+	s.respond(d[readdirResponseHeaderStart : readdirResponseBaseSize+uintptr(len(r.dataRef))])
 }
 
 func readdirInSize(p Protocol) uintptr {
@@ -117,7 +119,7 @@ func parseReaddir(b []byte, alloc *Allocator, p Protocol) (*ReaddirRequest, *Rea
 	if req.size > maxReadSize {
 		return nil, nil, fmt.Errorf("Readdir of %v is larger than %v", req.size, maxReadSize)
 	}
-	resp := readdirResponse(alloc)
+	resp := readdirResponse(alloc, req.size)
 	resp.unique = req.unique
 	resp.dataRef = resp.data[:req.size]
 	return req, resp, nil
