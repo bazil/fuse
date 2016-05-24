@@ -210,7 +210,7 @@ func (m noOpcode) String() string {
 	return fmt.Sprintf("No opcode %v", m.Opcode)
 }
 
-func parseBuf(b []byte, alloc *Allocator, c *Conn) (Request, Response, error) {
+func processBuf(b []byte, scope *RequestScope, handler Servlet) (req Request, resp Response, err error) {
 	h := (*inHeader)(unsafe.Pointer(&b[0]))
 	if h.len != uint32(len(b)) {
 		switch {
@@ -222,35 +222,67 @@ func parseBuf(b []byte, alloc *Allocator, c *Conn) (Request, Response, error) {
 			return nil, nil, fmt.Errorf("fuse: read %d opcode %d but expected %d", len(b), h.opcode, h.len)
 		}
 	}
+	var handleErr error
 	switch h.opcode {
 	case OpInit:
-		return parseInit(b, alloc)
+		return parseInit(b, scope.alloc)
 	case OpStatfs:
-		return parseStatfs(b, alloc)
+		if req, resp, err = parseStatfs(b, scope.alloc); handler != nil && err == nil {
+			handleErr = handler.HandleStatfs(req.(*StatfsRequest), resp.(*StatfsResponse))
+		}
 	case OpGetattr:
-		return parseGetattr(b, alloc, c.proto)
-	case OpGetxattr, OpListxattr, OpFlush:
-		return parseUnsupported(b, alloc)
+		if req, resp, err = parseGetattr(b, scope.alloc, scope.conn.proto); handler != nil && err == nil {
+			handleErr = handler.HandleGetattr(req.(*GetattrRequest), resp.(*GetattrResponse))
+		}
+	case OpGetxattr, OpListxattr, OpFlush, OpForget:
+		req, resp, err = parseUnsupported(b, scope.alloc)
+		handleErr = ENOTSUP
 	case OpLookup:
-		return parseLookup(b, alloc)
+		if req, resp, err = parseLookup(b, scope.alloc); handler != nil && err == nil {
+			handleErr = handler.HandleLookup(req.(*LookupRequest), resp.(*LookupResponse))
+		}
 	case OpOpendir:
-		return parseOpendir(b, alloc)
+		if req, resp, err = parseOpendir(b, scope.alloc); handler != nil && err == nil {
+			handleErr = handler.HandleOpendir(req.(*OpendirRequest), resp.(*OpendirResponse))
+		}
 	case OpReaddir:
-		return parseReaddir(b, alloc, c.proto)
+		if req, resp, err = parseReaddir(b, scope.alloc, scope.conn.proto); handler != nil && err == nil {
+			handleErr = handler.HandleReaddir(req.(*ReaddirRequest), resp.(*ReaddirResponse))
+		}
 	case OpReleasedir:
-		return parseReleasedir(b, alloc)
+		if req, resp, err = parseReleasedir(b, scope.alloc); handler != nil && err == nil {
+			handleErr = handler.HandleReleasedir(req.(*ReleasedirRequest), resp.(*ReleasedirResponse))
+		}
 	case OpReadlink:
-		return parseReadlink(b, alloc)
+		if req, resp, err = parseReadlink(b, scope.alloc); handler != nil && err == nil {
+			handleErr = handler.HandleReadlink(req.(*ReadlinkRequest), resp.(*ReadlinkResponse))
+		}
 	case OpOpen:
-		return parseOpen(b, alloc)
+		if req, resp, err = parseOpen(b, scope.alloc); handler != nil && err == nil {
+			handleErr = handler.HandleOpen(req.(*OpenRequest), resp.(*OpenResponse))
+		}
 	case OpRead:
-		return parseRead(b, alloc, c.proto)
+		if req, resp, err = parseRead(b, scope.alloc, scope.conn.proto); handler != nil && err == nil {
+			handleErr = handler.HandleRead(req.(*ReadRequest), resp.(*ReadResponse))
+		}
 	case OpRelease:
-		return parseRelease(b, alloc)
+		if req, resp, err = parseRelease(b, scope.alloc); handler != nil && err == nil {
+			handleErr = handler.HandleRelease(req.(*ReleaseRequest), resp.(*ReleaseResponse))
+		}
 	default:
 		log.Printf("Unknown request type %v", h.opcode)
 		return nil, nil, fmt.Errorf("Not implemented")
 	}
+
+	//Note: handler errors are not returned to caller, that's reserved for parsing errors.
+	if err != nil || handler == nil {
+		return
+	} else if handleErr != nil {
+		resp.RespondError(handleErr, scope)
+	} else {
+		resp.Respond(scope)
+	}
+	return
 }
 
 // TODO(dbentley): Attr is written outside fuse and then we have to copy it in.

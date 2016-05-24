@@ -128,3 +128,8 @@ func parseUnsupported(b []byte, alloc *Allocator) (*UnsupportedRequest, *Unsuppo
 	resp.unique = req.unique
 	return req, resp, nil
 }
+
+func (r *UnsupportedResponse) Respond(s *RequestScope) {
+	d := (*[unsupportedResponseSize]byte)(unsafe.Pointer(r))
+	s.respond(d[:])
+}

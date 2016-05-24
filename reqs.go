@@ -9,6 +9,7 @@ type Request interface {
 }
 
 type Response interface {
+	Respond(s *RequestScope)
 	RespondError(err error, s *RequestScope)
 }
 

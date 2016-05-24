@@ -31,6 +31,21 @@ type Conn struct {
 	proto Protocol
 }
 
+// Caller may pass this to Conn.Read() to have us take care of handling and responding.
+// Alternatively, call may pass nil and handle the returned requests manually and selectively.
+type Servlet interface {
+	HandleStatfs(req *StatfsRequest, resp *StatfsResponse) error
+	HandleGetattr(req *GetattrRequest, resp *GetattrResponse) error
+	HandleLookup(req *LookupRequest, resp *LookupResponse) error
+	HandleReadlink(req *ReadlinkRequest, resp *ReadlinkResponse) error
+	HandleOpendir(req *OpendirRequest, resp *OpendirResponse) error
+	HandleReaddir(req *ReaddirRequest, resp *ReaddirResponse) error
+	HandleReleasedir(req *ReleasedirRequest, resp *ReleasedirResponse) error
+	HandleOpen(req *OpenRequest, resp *OpenResponse) error
+	HandleRead(req *ReadRequest, resp *ReadResponse) error
+	HandleRelease(req *ReleaseRequest, resp *ReleaseResponse) error
+}
+
 // MountpointDoesNotExistError is an error returned when the
 // mountpoint does not exist.
 type MountpointDoesNotExistError struct {
@@ -102,7 +117,7 @@ var (
 )
 
 func initMount(c *Conn, conf *mountConfig, a *Allocator) error {
-	scope, err := c.Read(a)
+	scope, err := c.Read(a, nil)
 
 	if err != nil {
 		if err == io.EOF {
@@ -166,7 +181,7 @@ func (c *Conn) Protocol() Protocol {
 	return c.proto
 }
 
-func (c *Conn) Read(alloc *Allocator) (*RequestScope, error) {
+func (c *Conn) Read(alloc *Allocator, handler Servlet) (*RequestScope, error) {
 	scope := alloc.newRequest(c)
 	buf := alloc.alloc(bufSize)
 	n, err := c.read(buf)
@@ -177,7 +192,7 @@ func (c *Conn) Read(alloc *Allocator) (*RequestScope, error) {
 	scope.alloc.free(int(bufSize) - n)
 	buf = buf[0:n]
 
-	req, resp, err := parseBuf(buf, alloc, c)
+	req, resp, err := processBuf(buf, scope, handler)
 	if err != nil {
 		return nil, err
 	}
