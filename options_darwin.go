@@ -18,3 +18,13 @@ func daemonTimeout(name string) MountOption {
 		return nil
 	}
 }
+
+func noAppleXattr(conf *mountConfig) error {
+	conf.options["noapplexattr"] = ""
+	return nil
+}
+
+func noAppleDouble(conf *mountConfig) error {
+	conf.options["noappledouble"] = ""
+	return nil
+}

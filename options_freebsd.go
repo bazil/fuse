@@ -14,3 +14,11 @@ func daemonTimeout(name string) MountOption {
 		return nil
 	}
 }
+
+func noAppleXattr(conf *mountConfig) MountOption {
+	return nil
+}
+
+func noAppleDouble(conf *mountConfig) MountOption {
+	return nil
+}

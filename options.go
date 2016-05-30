@@ -63,7 +63,7 @@ func FSName(name string) MountOption {
 // FreeBSD ignores this option.
 func Subtype(fstype string) MountOption {
 	return func(conf *mountConfig) error {
-		conf.options["subtype"] = fstype
+		conf.options["fssubtype"] = fstype
 		return nil
 	}
 }
@@ -81,6 +81,22 @@ func LocalVolume() MountOption {
 // OS X only. Others ignore this option.
 func VolumeName(name string) MountOption {
 	return volumeName(name)
+}
+
+// NoAppleDouble prefents the kernel extension from storing or retrieving extended
+// attributes in ._<filename> files.
+//
+// OS X only.  Others ignore this option.
+func NoAppleDouble() MountOption {
+	return noAppleDouble
+}
+
+
+// NoAppleXattr causes the kernel extension from using com.apple extended attibutes.
+//
+// OS X only.  Others ignore this option.
+func NoAppleXattr() MountOption {
+	return noAppleXattr
 }
 
 // DaemonTimeout sets the time in seconds between a request and a reply before
