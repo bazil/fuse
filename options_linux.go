@@ -12,10 +12,10 @@ func daemonTimeout(name string) MountOption {
 	return dummyOption
 }
 
-func noAppleXattr(conf *mountConfig) MountOption {
+func noAppleXattr(conf *mountConfig) error {
 	return nil
 }
 
-func noAppleDouble(conf *mountConfig) MountOption {
+func noAppleDouble(conf *mountConfig) error {
 	return nil
 }
