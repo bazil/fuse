@@ -19,3 +19,10 @@ func noAppleXattr(conf *mountConfig) error {
 func noAppleDouble(conf *mountConfig) error {
 	return nil
 }
+
+func subtype(fstype string) MountOption {
+	return func(conf *mountConfig) error {
+		conf.options["subtype"] = fstype
+		return nil
+	}
+}

@@ -28,3 +28,10 @@ func noAppleDouble(conf *mountConfig) error {
 	conf.options["noappledouble"] = ""
 	return nil
 }
+
+func subtype(fstype string) MountOption {
+	return func(conf *mountConfig) error {
+		conf.options["fssubtype"] = fstype
+		return nil
+	}
+}

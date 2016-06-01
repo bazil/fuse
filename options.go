@@ -59,13 +59,9 @@ func FSName(name string) MountOption {
 // `fuse`. The type in a list of mounted file systems will look like
 // `fuse.foo`.
 //
-// OS X ignores this option.
 // FreeBSD ignores this option.
 func Subtype(fstype string) MountOption {
-	return func(conf *mountConfig) error {
-		conf.options["fssubtype"] = fstype
-		return nil
-	}
+	return subtype(fstype)
 }
 
 // LocalVolume sets the volume to be local (instead of network),
