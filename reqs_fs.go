@@ -56,7 +56,7 @@ func (r *initResponse) MaxWrite(max uint32) {
 }
 
 func newInitResponse(a *Allocator) *initResponse {
-	return (*initResponse)(a.allocPointer(initResponseSize))
+	return (*initResponse)(a.allocPointer(initResponseSize, true))
 }
 
 func (r *initResponse) Respond(s *RequestScope) {
@@ -76,7 +76,7 @@ func parseInit(b []byte, alloc *Allocator) (*initRequest, *initResponse, error) 
 }
 
 func statfsResponse(a *Allocator) *StatfsResponse {
-	return (*StatfsResponse)(a.allocPointer(statfsResponseSize))
+	return (*StatfsResponse)(a.allocPointer(statfsResponseSize, true))
 }
 
 func parseStatfs(b []byte, alloc *Allocator) (*StatfsRequest, *StatfsResponse, error) {
@@ -119,7 +119,7 @@ type UnsupportedResponse struct {
 const unsupportedResponseSize = unsafe.Sizeof(UnsupportedResponse{})
 
 func unsupportedResponse(a *Allocator) *UnsupportedResponse {
-	return (*UnsupportedResponse)(a.allocPointer(unsupportedResponseSize))
+	return (*UnsupportedResponse)(a.allocPointer(unsupportedResponseSize, true))
 }
 
 func parseUnsupported(b []byte, alloc *Allocator) (*UnsupportedRequest, *UnsupportedResponse, error) {

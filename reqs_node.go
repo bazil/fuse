@@ -55,7 +55,7 @@ func (r *GetattrResponse) Attr(attr Attr) {
 }
 
 func getattrResponse(a *Allocator) *GetattrResponse {
-	return (*GetattrResponse)(a.allocPointer(getattrResponseSize))
+	return (*GetattrResponse)(a.allocPointer(getattrResponseSize, true))
 }
 
 func parseGetattr(b []byte, alloc *Allocator, proto Protocol) (*GetattrRequest, *GetattrResponse, error) {
@@ -65,7 +65,7 @@ func parseGetattr(b []byte, alloc *Allocator, proto Protocol) (*GetattrRequest, 
 		// the buffer can't hold the entire GetattrRequest object.
 		// alloc extra memory to reserve it (even though we're just going to leave it
 		// zero'ed out)
-		alloc.alloc(getattrRequestSize - inHeaderSize)
+		alloc.alloc(getattrRequestSize-inHeaderSize, true)
 	} else {
 		if len(b) < int(getattrRequestSize) {
 			return nil, nil, corrupt(b, getattrRequestSize)
@@ -85,7 +85,7 @@ type LookupRequest struct {
 const lookupResponseSize = unsafe.Sizeof(LookupResponse{})
 
 func lookupResponse(a *Allocator) *LookupResponse {
-	return (*LookupResponse)(a.allocPointer(lookupResponseSize))
+	return (*LookupResponse)(a.allocPointer(lookupResponseSize, true))
 }
 
 func (r *LookupResponse) NodeID(nodeID NodeID) {
@@ -158,7 +158,7 @@ const readlinkResponseHeaderStart = unsafe.Offsetof(ReadlinkResponse{}.outHeader
 const readlinkResponseBaseSize = unsafe.Offsetof(ReadlinkResponse{}.data)
 
 func readlinkResponse(a *Allocator) *ReadlinkResponse {
-	return (*ReadlinkResponse)(a.allocPointer(readlinkResponseSize))
+	return (*ReadlinkResponse)(a.allocPointer(readlinkResponseSize, true))
 }
 
 func (r *ReadlinkResponse) Respond(s *RequestScope) {

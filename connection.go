@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sync"
 
 	"log"
 	"syscall"
@@ -13,6 +12,7 @@ import (
 )
 
 // A Conn represents a connection to a mounted FUSE file system.
+// This is threadsafe since there's no bookkeeping and file ops are atomic.
 type Conn struct {
 	// Ready is closed when the mount is complete or has failed.
 	Ready <-chan struct{}
@@ -21,11 +21,8 @@ type Conn struct {
 	// after Ready is closed.
 	MountError error
 
-	// File handle for kernel communication. Only safe to access if
-	// rio or wio is held.
+	// File handle for kernel communication.
 	dev *os.File
-	wio sync.RWMutex
-	rio sync.RWMutex
 
 	// Protocol version negotiated with InitRequest/InitResponse.
 	proto Protocol
@@ -165,16 +162,16 @@ func (malformedMessage) String() string {
 
 // Close closes the FUSE connection.
 func (c *Conn) Close() error {
-	c.wio.Lock()
-	defer c.wio.Unlock()
-	c.rio.Lock()
-	defer c.rio.Unlock()
-	return c.dev.Close()
+	err := syscall.Close(c.fd())
+	c.dev = nil
+	return err
 }
 
-// caller must hold wio or rio
 func (c *Conn) fd() int {
-	return int(c.dev.Fd())
+	if c.dev != nil {
+		return int(c.dev.Fd())
+	}
+	return -1
 }
 
 func (c *Conn) Protocol() Protocol {
@@ -182,8 +179,8 @@ func (c *Conn) Protocol() Protocol {
 }
 
 func (c *Conn) Read(alloc *Allocator, handler Servlet) (*RequestScope, error) {
-	scope := alloc.newRequest(c)
-	buf := alloc.alloc(bufSize)
+	scope := alloc.newRequest(c, false)
+	buf := alloc.alloc(bufSize, false)
 	n, err := c.read(buf)
 	if err != nil {
 		return nil, err
@@ -203,9 +200,10 @@ func (c *Conn) Read(alloc *Allocator, handler Servlet) (*RequestScope, error) {
 
 func (c *Conn) read(b []byte) (int, error) {
 	for {
-		c.rio.RLock()
 		n, err := syscall.Read(c.fd(), b)
-		c.rio.RUnlock()
+		if err != nil {
+			log.Println("read.err ", n, err)
+		}
 		if err == syscall.EINTR {
 			// OSXFUSE sends EINTR to userspace when a request interrupt
 			// completed before it got sent to userspace?
@@ -257,8 +255,6 @@ func (c *Conn) writeToKernel(msg []byte) error {
 	out := (*outHeader)(unsafe.Pointer(&msg[0]))
 	out.len = uint32(len(msg))
 
-	c.wio.RLock()
-	defer c.wio.RUnlock()
 	if Trace {
 		log.Print("fuse done")
 	}

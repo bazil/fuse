@@ -15,6 +15,7 @@ type mountConfig struct {
 	options          map[string]string
 	maxReadahead     uint32
 	initFlags        InitFlags
+	threadUnsafe     bool
 	osxfuseLocations []OSXFUSEPaths
 }
 
@@ -156,6 +157,15 @@ func MaxReadahead(n uint32) MountOption {
 func AsyncRead() MountOption {
 	return func(conf *mountConfig) error {
 		conf.initFlags |= InitAsyncRead
+		return nil
+	}
+}
+
+// False means Conn will protect against concurrent reads. True means
+// that the calling code is single threaded and no locking is needed.
+func ThreadUnsafe(threadUnsafe bool) MountOption {
+	return func(conf *mountConfig) error {
+		conf.threadUnsafe = threadUnsafe
 		return nil
 	}
 }

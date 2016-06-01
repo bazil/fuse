@@ -234,9 +234,9 @@ func processBuf(b []byte, scope *RequestScope, handler Servlet) (req Request, re
 		if req, resp, err = parseGetattr(b, scope.alloc, scope.conn.proto); handler != nil && err == nil {
 			handleErr = handler.HandleGetattr(req.(*GetattrRequest), resp.(*GetattrResponse))
 		}
-	case OpGetxattr, OpListxattr, OpFlush, OpForget:
+	case OpGetxattr, OpListxattr, OpFlush, OpForget, OpInterrupt, OpDestroy:
 		req, resp, err = parseUnsupported(b, scope.alloc)
-		handleErr = ENOTSUP
+		handleErr = ENOSYS
 	case OpLookup:
 		if req, resp, err = parseLookup(b, scope.alloc); handler != nil && err == nil {
 			handleErr = handler.HandleLookup(req.(*LookupRequest), resp.(*LookupResponse))

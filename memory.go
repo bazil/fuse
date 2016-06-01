@@ -26,17 +26,24 @@ func MakeAlloc() *Allocator {
 	return &Allocator{buf: make([]byte, memSize)}
 }
 
-func (a *Allocator) newRequest(c *Conn) *RequestScope {
-	a.reset()
+// Note, the allocator funcs take a zeroed flag as an optimization.
+// Set zeroed to true if relying on struct/array default values when casting from bytes.
+// Set to false if bytes are immediately overwritten by the caller making zeroing superfluous.
 
-	scope := requestScope(a)
+func (a *Allocator) newRequest(c *Conn, zeroed bool) *RequestScope {
+
+	a.reset(zeroed)
+
+	scope := requestScope(a, false)
 	scope.alloc = a
 	scope.conn = c
+	scope.Req = nil
+	scope.Resp = nil
 	return scope
 }
 
-func requestScope(a *Allocator) *RequestScope {
-	return (*RequestScope)(a.allocPointer(requestScopeSize))
+func requestScope(a *Allocator, zeroed bool) *RequestScope {
+	return (*RequestScope)(a.allocPointer(requestScopeSize, zeroed))
 }
 
 type Allocator struct {
@@ -44,18 +51,23 @@ type Allocator struct {
 	next int
 }
 
-func (a *Allocator) alloc(size uintptr) []byte {
+func (a *Allocator) alloc(size uintptr, zeroed bool) []byte {
 	s := int(size)
 	if a.next+s > cap(a.buf) {
 		panic(fmt.Sprintf("Not enough capacity: %v + %v > %v", a.next, size, cap(a.buf)))
 	}
 	r := a.buf[a.next : a.next+s]
 	a.next += s
+	if zeroed {
+		for ii := 0; ii < len(r); ii++ {
+			r[ii] = 0
+		}
+	}
 	return r
 }
 
-func (a *Allocator) allocPointer(size uintptr) unsafe.Pointer {
-	return unsafe.Pointer(&a.alloc(size)[0])
+func (a *Allocator) allocPointer(size uintptr, zeroed bool) unsafe.Pointer {
+	return unsafe.Pointer(&a.alloc(size, zeroed)[0])
 }
 
 func (a *Allocator) free(size int) {
@@ -65,10 +77,12 @@ func (a *Allocator) free(size int) {
 	}
 }
 
-func (a *Allocator) reset() {
-	b := a.buf[0:a.next]
-	for idx := range b {
-		b[idx] = 0
+func (a *Allocator) reset(zeroed bool) {
+	if zeroed {
+		b := a.buf[0:a.next]
+		for idx := range b {
+			b[idx] = 0
+		}
 	}
 	a.next = 0
 }

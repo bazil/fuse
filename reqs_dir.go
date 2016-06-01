@@ -31,7 +31,7 @@ func (r *OpendirResponse) Flags(flags OpenResponseFlags) {
 const opendirResponseSize = unsafe.Sizeof(OpendirResponse{})
 
 func opendirResponse(a *Allocator) *OpendirResponse {
-	return (*OpendirResponse)(a.allocPointer(opendirResponseSize))
+	return (*OpendirResponse)(a.allocPointer(opendirResponseSize, true))
 }
 
 func (r *OpendirResponse) Respond(s *RequestScope) {
@@ -95,7 +95,13 @@ const readdirResponseHeaderStart = unsafe.Offsetof(ReaddirResponse{}.outHeader)
 const readdirResponseSize = unsafe.Sizeof(ReaddirResponse{})
 
 func readdirResponse(a *Allocator, dataSize uint32) *ReaddirResponse {
-	return (*ReaddirResponse)(a.allocPointer(readdirResponseBaseSize + uintptr(dataSize)))
+	// Note, bytes are not zeroed by the allocator since we only want to zero the base struct.
+	// The remaining data bytes do not need to be zeroed, they're immediately overwritten by the caller.
+	bytes := a.alloc(readdirResponseBaseSize+uintptr(dataSize), false)
+	for ii := 0; ii < int(readdirResponseBaseSize); ii++ {
+		bytes[ii] = 0
+	}
+	return (*ReaddirResponse)(unsafe.Pointer(&bytes[0]))
 }
 
 func (r *ReaddirResponse) Respond(s *RequestScope) {
@@ -143,7 +149,7 @@ const releasedirRequestSize = unsafe.Sizeof(ReleasedirRequest{})
 const releasedirResponseSize = unsafe.Sizeof(ReleasedirResponse{})
 
 func releasedirResponse(a *Allocator) *ReleasedirResponse {
-	return (*ReleasedirResponse)(a.allocPointer(releasedirResponseSize))
+	return (*ReleasedirResponse)(a.allocPointer(releasedirResponseSize, true))
 }
 
 func (r *ReleasedirResponse) Respond(s *RequestScope) {

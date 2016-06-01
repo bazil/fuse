@@ -27,7 +27,7 @@ func (r *OpenResponse) Flags(flags OpenResponseFlags) {
 const openResponseSize = unsafe.Sizeof(OpenResponse{})
 
 func openResponse(a *Allocator) *OpenResponse {
-	return (*OpenResponse)(a.allocPointer(openResponseSize))
+	return (*OpenResponse)(a.allocPointer(openResponseSize, true))
 }
 
 func (r *OpenResponse) Respond(s *RequestScope) {
@@ -92,7 +92,13 @@ const readResponseHeaderStart = unsafe.Offsetof(ReadResponse{}.outHeader)
 const readResponseSize = unsafe.Sizeof(ReadResponse{})
 
 func readResponse(a *Allocator, dataSize uint32) *ReadResponse {
-	return (*ReadResponse)(a.allocPointer(readResponseBaseSize + uintptr(dataSize)))
+	// Note, bytes are not zeroed by the allocator since we only want to zero the base struct.
+	// The remaining data bytes do not need to be zeroed, they're immediately overwritten by the caller.
+	bytes := a.alloc(readResponseBaseSize+uintptr(dataSize), false)
+	for ii := 0; ii < int(readResponseBaseSize); ii++ {
+		bytes[ii] = 0
+	}
+	return (*ReadResponse)(unsafe.Pointer(&bytes[0]))
 }
 
 func (r *ReadResponse) Respond(s *RequestScope) {
@@ -140,7 +146,7 @@ const releaseRequestSize = unsafe.Sizeof(ReleaseRequest{})
 const releaseResponseSize = unsafe.Sizeof(ReleaseResponse{})
 
 func releaseResponse(a *Allocator) *ReleaseResponse {
-	return (*ReleaseResponse)(a.allocPointer(releaseResponseSize))
+	return (*ReleaseResponse)(a.allocPointer(releaseResponseSize, true))
 }
 
 func (r *ReleaseResponse) Respond(s *RequestScope) {
