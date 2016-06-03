@@ -11,7 +11,7 @@ import (
 )
 
 import (
-	"bazil.org/fuse"
+	"github.com/presotto/fuse"
 )
 
 // A Tree implements a basic read-only directory tree for FUSE.

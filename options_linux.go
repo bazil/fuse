@@ -7,3 +7,22 @@ func localVolume(conf *mountConfig) error {
 func volumeName(name string) MountOption {
 	return dummyOption
 }
+
+func daemonTimeout(name string) MountOption {
+	return dummyOption
+}
+
+func noAppleXattr(conf *mountConfig) error {
+	return nil
+}
+
+func noAppleDouble(conf *mountConfig) error {
+	return nil
+}
+
+func subtype(fstype string) MountOption {
+	return func(conf *mountConfig) error {
+		conf.options["subtype"] = fstype
+		return nil
+	}
+}

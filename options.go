@@ -59,13 +59,9 @@ func FSName(name string) MountOption {
 // `fuse`. The type in a list of mounted file systems will look like
 // `fuse.foo`.
 //
-// OS X ignores this option.
 // FreeBSD ignores this option.
 func Subtype(fstype string) MountOption {
-	return func(conf *mountConfig) error {
-		conf.options["subtype"] = fstype
-		return nil
-	}
+	return subtype(fstype)
 }
 
 // LocalVolume sets the volume to be local (instead of network),
@@ -81,6 +77,30 @@ func LocalVolume() MountOption {
 // OS X only. Others ignore this option.
 func VolumeName(name string) MountOption {
 	return volumeName(name)
+}
+
+// NoAppleDouble prefents the kernel extension from storing or retrieving extended
+// attributes in ._<filename> files.
+//
+// OS X only.  Others ignore this option.
+func NoAppleDouble() MountOption {
+	return noAppleDouble
+}
+
+
+// NoAppleXattr causes the kernel extension from using com.apple extended attibutes.
+//
+// OS X only.  Others ignore this option.
+func NoAppleXattr() MountOption {
+	return noAppleXattr
+}
+
+// DaemonTimeout sets the time in seconds between a request and a reply before
+// the FUSE mount is declared dead.
+//
+// OS X and FreeBSD only. Others ignore this option.
+func DaemonTimeout(name string) MountOption {
+	return daemonTimeout(name)
 }
 
 var ErrCannotCombineAllowOtherAndAllowRoot = errors.New("cannot combine AllowOther and AllowRoot")
