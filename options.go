@@ -83,6 +83,29 @@ func VolumeName(name string) MountOption {
 	return volumeName(name)
 }
 
+// NoAppleDouble makes OSXFUSE disallow files with names used by OS X
+// to store extended attributes on file systems that do not support
+// them natively.
+//
+// Such file names are:
+//
+//     ._*
+//     .DS_Store
+//
+// OS X only.  Others ignore this option.
+func NoAppleDouble() MountOption {
+	return noAppleDouble
+}
+
+// NoAppleXattr makes OSXFUSE disallow extended attributes with the
+// prefix "com.apple.". This disables persistent Finder state and
+// other such information.
+//
+// OS X only.  Others ignore this option.
+func NoAppleXattr() MountOption {
+	return noAppleXattr
+}
+
 // DaemonTimeout sets the time in seconds between a request and a reply before
 // the FUSE mount is declared dead.
 //

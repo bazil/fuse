@@ -11,3 +11,11 @@ func volumeName(name string) MountOption {
 func daemonTimeout(name string) MountOption {
 	return dummyOption
 }
+
+func noAppleXattr(conf *mountConfig) error {
+	return nil
+}
+
+func noAppleDouble(conf *mountConfig) error {
+	return nil
+}
