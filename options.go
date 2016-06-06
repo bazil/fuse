@@ -219,6 +219,16 @@ func WritebackCache() MountOption {
 	}
 }
 
+// AutoInvalData enables the kernel to automatically invalidate 
+// cached pages on file open. The kernel uses mtime and size to
+// determine when to invalidate cached pages.
+func AutoInvalData() MountOption {
+	return func(conf *mountConfig) error {
+		conf.initFlags |= InitAutoInvalData
+		return nil
+	}
+}
+
 // OSXFUSEPaths describes the paths used by an installed OSXFUSE
 // version. See OSXFUSELocationV3 for typical values.
 type OSXFUSEPaths struct {
