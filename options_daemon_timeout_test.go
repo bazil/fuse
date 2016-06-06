@@ -29,7 +29,7 @@ func (c slowCreaterDir) Create(ctx context.Context, req *fuse.CreateRequest, res
 	return nil, nil, fuse.Errno(syscall.ENAMETOOLONG)
 }
 
-func TestDaemonTimeout(t *testing.T) {
+func TestMountOptionDaemonTimeout(t *testing.T) {
 	if runtime.GOOS != "darwin" && runtime.GOOS != "freebsd" {
 		return
 	}
