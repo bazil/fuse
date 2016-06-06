@@ -196,7 +196,7 @@ type createrDir struct {
 
 var _ fs.NodeCreater = createrDir{}
 
-func (createrDir) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse.CreateResponse) (fs.Node, fs.Handle, error) {
+func (c createrDir) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse.CreateResponse) (fs.Node, fs.Handle, error) {
 	// pick a really distinct error, to identify it later
 	return nil, nil, fuse.Errno(syscall.ENAMETOOLONG)
 }

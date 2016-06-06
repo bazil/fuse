@@ -83,6 +83,14 @@ func VolumeName(name string) MountOption {
 	return volumeName(name)
 }
 
+// DaemonTimeout sets the time in seconds between a request and a reply before
+// the FUSE mount is declared dead.
+//
+// OS X and FreeBSD only. Others ignore this option.
+func DaemonTimeout(name string) MountOption {
+	return daemonTimeout(name)
+}
+
 var ErrCannotCombineAllowOtherAndAllowRoot = errors.New("cannot combine AllowOther and AllowRoot")
 
 // AllowOther allows other users to access the file system.
