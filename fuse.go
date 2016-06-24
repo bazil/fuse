@@ -235,7 +235,7 @@ func initMount(c *Conn, conf *mountConfig) error {
 	s := &InitResponse{
 		Library:      proto,
 		MaxReadahead: conf.maxReadahead,
-		MaxWrite:     128 * 1024,
+		MaxWrite:     maxWrite,
 		Flags:        InitBigWrites | conf.initFlags,
 	}
 	r.Respond(s)
