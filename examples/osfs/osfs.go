@@ -69,21 +69,25 @@ func (d *dir) Create(ctx context.Context, request *fuse.CreateRequest, response 
 
 func (d *dir) Lookup(ctx context.Context, name string) (_ fs.Node, retErr error) {
 	path := filepath.Join(d.path, name)
-	_, err := os.Stat(path)
+	stat, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, fuse.ENOENT
 		}
 		return nil, err
 	}
+	if stat.IsDir() {
+		return &dir{node{path}}, nil
+	}
 	return &file{node{path}}, nil
 }
 
 func (d *dir) Mkdir(ctx context.Context, request *fuse.MkdirRequest) (_ fs.Node, retErr error) {
-	if err := os.Mkdir(request.Name, request.Mode); err != nil {
+	path := filepath.Join(d.path, request.Name)
+	if err := os.Mkdir(path, request.Mode); err != nil {
 		return nil, err
 	}
-	return &dir{node{filepath.Join(d.path, request.Name)}}, nil
+	return &dir{node{path}}, nil
 }
 
 func (d *dir) ReadDirAll(ctx context.Context) (_ []fuse.Dirent, retErr error) {
