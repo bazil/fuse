@@ -58,6 +58,18 @@ func (n *node) Attr(ctx context.Context, attr *fuse.Attr) (retErr error) {
 }
 
 func (n *node) Setattr(ctx context.Context, request *fuse.SetattrRequest, response *fuse.SetattrResponse) (retErr error) {
+	if request.Valid.Uid() || request.Valid.Gid() {
+		uid, gid := -1, -1
+		if request.Valid.Uid() {
+			uid = int(request.Uid)
+		}
+		if request.Valid.Gid() {
+			gid = int(request.Gid)
+		}
+		if err := os.Chown(n.path, uid, gid); err != nil {
+			return err
+		}
+	}
 	if request.Valid.Mode() {
 		if err := os.Chmod(n.path, request.Mode); err != nil {
 			return err
@@ -65,6 +77,30 @@ func (n *node) Setattr(ctx context.Context, request *fuse.SetattrRequest, respon
 	}
 	if request.Valid.Size() {
 		if err := os.Truncate(n.path, int64(request.Size)); err != nil {
+			return err
+		}
+	}
+	if request.Valid.Mtime() || request.Valid.Atime() {
+		var mtime, atime time.Time
+		if !request.Valid.Mtime() || !request.Valid.Atime() {
+			stat, err := os.Stat(n.path)
+			if err != nil {
+				return err
+			}
+			mtime = stat.ModTime()
+			if st, ok := stat.Sys().(*syscall.Stat_t); ok {
+				atime = time.Unix(st.Atim.Unix())
+			} else {
+				atime = time.Now()
+			}
+		}
+		if request.Valid.Mtime() {
+			mtime = request.Mtime
+		}
+		if request.Valid.Atime() {
+			atime = request.Atime
+		}
+		if err := os.Chtimes(n.path, mtime, atime); err != nil {
 			return err
 		}
 	}
