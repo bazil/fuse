@@ -7,6 +7,8 @@ package osfs // import "bazil.org/fuse/examples/osfs"
 import (
 	"io/ioutil"
 	"os"
+	"syscall"
+	"time"
 	"path/filepath"
 
 	"bazil.org/fuse"
@@ -40,6 +42,18 @@ func (n *node) Attr(ctx context.Context, attr *fuse.Attr) (retErr error) {
 	}
 	attr.Size = uint64(stat.Size())
 	attr.Mode = stat.Mode()
+	attr.Mtime = stat.ModTime()
+	if st, ok := stat.Sys().(*syscall.Stat_t); ok {
+		attr.Inode = st.Ino
+		attr.Blocks = uint64(st.Blocks)
+		attr.Atime = time.Unix(st.Atim.Unix())
+		attr.Ctime = time.Unix(st.Ctim.Unix())
+		attr.Nlink = uint32(st.Nlink)
+		attr.Uid = st.Uid
+		attr.Gid = st.Gid
+		attr.Rdev = uint32(st.Rdev)
+		attr.BlockSize = uint32(st.Blksize)
+	}
 	return nil
 }
 
