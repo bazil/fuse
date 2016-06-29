@@ -43,6 +43,10 @@ func TestMountOptionDaemonTimeout(t *testing.T) {
 		nil,
 		fuse.DaemonTimeout("2"),
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
 
 	// This should fail by the kernel timing out the request.
 	f, err := os.Create(mnt.Dir + "/child")
