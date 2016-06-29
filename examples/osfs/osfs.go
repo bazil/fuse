@@ -111,9 +111,24 @@ func (d *dir) ReadDirAll(ctx context.Context) (_ []fuse.Dirent, retErr error) {
 	}
 	dirents := make([]fuse.Dirent, len(stats))
 	for i, stat := range stats {
-		t := fuse.DT_File
-		if stat.IsDir() {
+		t := fuse.DT_Unknown
+		switch stat.Mode() & os.ModeType {
+		case os.ModeDir:
 			t = fuse.DT_Dir
+		case os.ModeSymlink:
+			t = fuse.DT_Link
+		case os.ModeNamedPipe:
+			t = fuse.DT_FIFO
+		case os.ModeSocket:
+			t = fuse.DT_Socket
+		case os.ModeDevice:
+			if stat.Mode() & os.ModeCharDevice == 0 {
+				t = fuse.DT_Block
+			} else {
+				t = fuse.DT_Char
+			}
+		case 0:
+			t = fuse.DT_File
 		}
 		dirents[i] = fuse.Dirent{
 			Name: filepath.Base(stat.Name()),
