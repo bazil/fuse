@@ -19,6 +19,8 @@ type benchCreateDir struct {
 	fstestutil.Dir
 }
 
+var _ fs.NodeCreater = (*benchCreateDir)(nil)
+
 func (f *benchCreateDir) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse.CreateResponse) (fs.Node, fs.Handle, error) {
 	child := &dummyFile{}
 	return child, child, nil
