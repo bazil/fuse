@@ -338,9 +338,10 @@ const (
 	// See also fs.Intr.
 	EINTR = Errno(syscall.EINTR)
 
-	ERANGE  = Errno(syscall.ERANGE)
-	ENOTSUP = Errno(syscall.ENOTSUP)
-	EEXIST  = Errno(syscall.EEXIST)
+	ERANGE    = Errno(syscall.ERANGE)
+	ENOTSUP   = Errno(syscall.ENOTSUP)
+	EEXIST    = Errno(syscall.EEXIST)
+	ENOTEMPTY = Errno(syscall.ENOTEMPTY)
 )
 
 // DefaultErrno is the errno used when error returned does not
@@ -348,13 +349,14 @@ const (
 const DefaultErrno = EIO
 
 var errnoNames = map[Errno]string{
-	ENOSYS: "ENOSYS",
-	ESTALE: "ESTALE",
-	ENOENT: "ENOENT",
-	EIO:    "EIO",
-	EPERM:  "EPERM",
-	EINTR:  "EINTR",
-	EEXIST: "EEXIST",
+	ENOSYS:    "ENOSYS",
+	ESTALE:    "ESTALE",
+	ENOENT:    "ENOENT",
+	EIO:       "EIO",
+	EPERM:     "EPERM",
+	EINTR:     "EINTR",
+	EEXIST:    "EEXIST",
+	ENOTEMPTY: "ENOTEMPTY",
 }
 
 // Errno implements Error and ErrorNumber using a syscall.Errno.
