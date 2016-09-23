@@ -188,7 +188,7 @@ func AllowSUID() MountOption {
 	}
 }
 
-// NoExec disable de execution of binaries in the file system
+// NoExec disable the execution of binaries on the file system
 
 func NoExec() MountOption {
 	return func(conf *mountConfig) error {
