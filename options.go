@@ -188,6 +188,15 @@ func AllowSUID() MountOption {
 	}
 }
 
+// NoExec disable de execution of binaries in the file system
+
+func NoExec() MountOption {
+	return func(conf *mountConfig) error {
+		conf.options["noexec"] = ""
+		return nil
+	}
+}
+
 // DefaultPermissions makes the kernel enforce access control based on
 // the file mode (as in chmod).
 //
