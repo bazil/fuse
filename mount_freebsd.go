@@ -10,6 +10,9 @@ import (
 	"syscall"
 )
 
+// Maximum file write size we are prepared to receive from the kernel.
+const maxWrite = 128 * 1024
+
 func handleMountFusefsStderr(errCh chan<- error) func(line string) (ignore bool) {
 	return func(line string) (ignore bool) {
 		const (

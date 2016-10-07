@@ -11,6 +11,10 @@ import (
 	"syscall"
 )
 
+// Maximum file write size we are prepared to receive from the kernel. Linux
+// appears to limit writes to 128 KiB.
+const maxWrite = 128 * 1024
+
 func handleFusermountStderr(errCh chan<- error) func(line string) (ignore bool) {
 	return func(line string) (ignore bool) {
 		if line == `fusermount: failed to open /etc/fuse.conf: Permission denied` {
