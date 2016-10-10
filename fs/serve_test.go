@@ -369,6 +369,10 @@ func (r *readFlags) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.
 }
 
 func TestReadFileFlags(t *testing.T) {
+	if fuse.IsRunningUnderTravis {
+	  t.SkipNow()
+	}
+
 	t.Parallel()
 	r := &readFlags{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": r}}, nil)
@@ -431,6 +435,10 @@ func (r *writeFlags) Write(ctx context.Context, req *fuse.WriteRequest, resp *fu
 }
 
 func TestWriteFileFlags(t *testing.T) {
+	if fuse.IsRunningUnderTravis {
+	  t.SkipNow()
+	}
+
 	t.Parallel()
 	r := &writeFlags{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": r}}, nil)

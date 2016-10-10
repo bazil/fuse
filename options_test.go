@@ -161,6 +161,10 @@ func (f unwritableFile) Attr(ctx context.Context, a *fuse.Attr) error {
 }
 
 func TestMountOptionDefaultPermissions(t *testing.T) {
+	if fuse.IsRunningUnderTravis {
+	  t.SkipNow()
+	}
+
 	if runtime.GOOS == "freebsd" {
 		t.Skip("FreeBSD does not support DefaultPermissions")
 	}

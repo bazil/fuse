@@ -1,8 +1,11 @@
 package fuse
 
 import (
+  "os"
 	"runtime"
 )
+
+var IsRunningUnderTravis = len(os.Getenv("TRAVIS")) > 0
 
 func stack() string {
 	buf := make([]byte, 1024)
