@@ -1764,6 +1764,12 @@ func (r *ReadRequest) Respond(resp *ReadResponse) {
 	r.respond(buf)
 }
 
+func (r *ReadRequest) StreamingRespond(resp *StreamingReadResponse) {
+	buf := resp.Data()
+	r.respond(buf)
+	returnBuffer(buf)
+}
+
 // A ReadResponse is the response to a ReadRequest.
 type ReadResponse struct {
 	Data []byte
@@ -1771,6 +1777,28 @@ type ReadResponse struct {
 
 func (r *ReadResponse) String() string {
 	return fmt.Sprintf("Read %d", len(r.Data))
+}
+
+func NewStreamingReadResponse() *StreamingReadResponse {
+	return &StreamingReadResponse{buf: newStreamingBuffer()}
+}
+
+// A StreamingReadResponse is the response to a ReadRequests wich
+// supports streaming the response via a io.Writer
+type StreamingReadResponse struct {
+	buf *bytes.Buffer
+}
+
+func (resp *StreamingReadResponse) Write(p []byte) (int, error) {
+	return resp.buf.Write(p)
+}
+
+func (resp *StreamingReadResponse) Data() []byte {
+	return resp.buf.Bytes()
+}
+
+func (r *StreamingReadResponse) String() string {
+	return fmt.Sprintf("Read %d", len(r.Data()))
 }
 
 type jsonReadResponse struct {

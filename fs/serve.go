@@ -303,6 +303,16 @@ type HandleReader interface {
 	Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error
 }
 
+type HandleStreamingReader interface {
+	// StreamingRead requests to read data from the handle.
+	//
+	// In contrast to `HandleReader` this interface uses a
+	// StreamingReadResponse which implements the io.Writer
+	// interface.
+
+	StreamingRead(ctx context.Context, req *fuse.ReadRequest, resp *fuse.StreamingReadResponse) error
+}
+
 type HandleWriter interface {
 	// Write requests to write data into the handle at the given offset.
 	// Store the amount of data written in resp.Size.
@@ -1241,14 +1251,29 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 				r.Respond(s)
 				return nil
 			}
-			h, ok := handle.(HandleReader)
+			if h, ok := handle.(HandleReader); ok {
+				if err := h.Read(ctx, r, s); err != nil {
+					return err
+				}
+
+				done(s)
+				r.Respond(s)
+				return nil
+			}
+			h, ok := handle.(HandleStreamingReader)
 			if !ok {
 				err := handleNotReaderError{handle: handle}
 				return err
 			}
-			if err := h.Read(ctx, r, s); err != nil {
+
+			s := fuse.NewStreamingReadResponse()
+			if err := h.StreamingRead(ctx, r, s); err != nil {
 				return err
 			}
+
+			done(s)
+			r.StreamingRespond(s)
+			return nil
 		}
 		done(s)
 		r.Respond(s)
