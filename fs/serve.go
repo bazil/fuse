@@ -3,6 +3,7 @@
 package fs // import "bazil.org/fuse/fs"
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"hash/fnv"
@@ -13,8 +14,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"golang.org/x/net/context"
 )
 
 import (

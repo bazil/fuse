@@ -3,11 +3,10 @@
 package fs
 
 import (
+	"context"
 	"os"
 	pathpkg "path"
 	"strings"
-
-	"golang.org/x/net/context"
 )
 
 import (
