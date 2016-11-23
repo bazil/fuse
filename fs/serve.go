@@ -345,7 +345,7 @@ type Config struct {
 func New(conn *fuse.Conn, config *Config) *Server {
 	s := &Server{
 		conn:         conn,
-		req:          map[fuse.RequestID]*serveRequest{},
+		req:          map[fuse.RequestID]func(){},
 		nodeRef:      map[Node]fuse.NodeID{},
 		dynamicInode: GenerateDynamicInode,
 	}
@@ -371,7 +371,7 @@ type Server struct {
 
 	// state, protected by meta
 	meta       sync.Mutex
-	req        map[fuse.RequestID]*serveRequest
+	req        map[fuse.RequestID]func() // map request to cancel functions
 	node       []*serveNode
 	nodeRef    map[Node]fuse.NodeID
 	handle     []*serveHandle
@@ -435,11 +435,6 @@ func Serve(c *fuse.Conn, fs FS) error {
 }
 
 type nothing struct{}
-
-type serveRequest struct {
-	Request fuse.Request
-	cancel  func()
-}
 
 type serveNode struct {
 	inode      uint64
@@ -773,8 +768,6 @@ func (c *Server) serve(r fuse.Request) {
 		ctx = c.context(ctx, r)
 	}
 
-	req := &serveRequest{Request: r, cancel: cancel}
-
 	c.debug(request{
 		Op:      opName(r),
 		Request: r.Hdr(),
@@ -813,7 +806,7 @@ func (c *Server) serve(r fuse.Request) {
 		//
 		// TODO this might have been because of missing done() calls
 	} else {
-		c.req[hdr.ID] = req
+		c.req[hdr.ID] = cancel
 	}
 	c.meta.Unlock()
 
@@ -1372,10 +1365,9 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 
 	case *fuse.InterruptRequest:
 		c.meta.Lock()
-		ireq := c.req[r.IntrID]
-		if ireq != nil && ireq.cancel != nil {
-			ireq.cancel()
-			ireq.cancel = nil
+		if cancel := c.req[r.IntrID]; cancel != nil {
+			cancel()
+			delete(c.req, r.IntrID)
 		}
 		c.meta.Unlock()
 		done(nil)
