@@ -124,9 +124,10 @@ type Conn struct {
 
 	// File handle for kernel communication. Only safe to access if
 	// rio or wio is held.
-	dev *os.File
-	wio sync.RWMutex
-	rio sync.RWMutex
+	dev     *os.File
+	wio     sync.RWMutex
+	rio     sync.Mutex
+	readbuf []byte // large buffer for reading kernel requests; guarded by rio
 
 	// Protocol version negotiated with InitRequest/InitResponse.
 	proto Protocol
@@ -166,7 +167,8 @@ func Mount(dir string, options ...MountOption) (*Conn, error) {
 
 	ready := make(chan struct{}, 1)
 	c := &Conn{
-		Ready: ready,
+		Ready:   ready,
+		readbuf: make([]byte, maxBufSize),
 	}
 	f, err := mount(dir, &conf, ready, &c.MountError)
 	if err != nil {
@@ -406,7 +408,9 @@ func (h *Header) RespondError(err error) {
 // All requests read from the kernel, without data, are shorter than
 // this.
 var maxRequestSize = syscall.Getpagesize()
-var bufSize = maxRequestSize + maxWrite
+var maxBufSize = maxRequestSize + maxWrite
+
+const bufSize = 128 // 128 bytes is enough for the vast majority of messages.
 
 // reqPool is a pool of messages.
 //
@@ -420,10 +424,14 @@ var reqPool = sync.Pool{
 	New: allocMessage,
 }
 
-func allocMessage() interface{} {
-	m := &message{buf: make([]byte, bufSize)}
+func makeMessage(n int) *message {
+	m := &message{buf: make([]byte, n)}
 	m.hdr = (*inHeader)(unsafe.Pointer(&m.buf[0]))
 	return m
+}
+
+func allocMessage() interface{} {
+	return makeMessage(bufSize)
 }
 
 func getMessage(c *Conn) *message {
@@ -433,6 +441,12 @@ func getMessage(c *Conn) *message {
 }
 
 func putMessage(m *message) {
+	// Don't save messages with giant buffers.
+	// It just creates memory pressure, which triggers GC activity,
+	// which then empties the sync.Pool.
+	if cap(m.buf) < bufSize || cap(m.buf) > bufSize*2 {
+		return
+	}
 	m.buf = m.buf[:bufSize]
 	m.conn = nil
 	m.off = 0
@@ -546,16 +560,28 @@ func (c *Conn) Protocol() Protocol {
 // Caller must call either Request.Respond or Request.RespondError in
 // a reasonable time. Caller must not retain Request after that call.
 func (c *Conn) ReadRequest() (Request, error) {
-	m := getMessage(c)
-loop:
-	c.rio.RLock()
-	n, err := syscall.Read(c.fd(), m.buf)
-	c.rio.RUnlock()
-	if err == syscall.EINTR {
-		// OSXFUSE sends EINTR to userspace when a request interrupt
-		// completed before it got sent to userspace?
-		goto loop
+	var m *message
+	var n int
+	var err error
+	c.rio.Lock()
+	for m == nil {
+		n, err = syscall.Read(c.fd(), c.readbuf)
+		if err == syscall.EINTR {
+			// OSXFUSE sends EINTR to userspace when a request interrupt
+			// completed before it got sent to userspace?
+			continue
+		}
+		if n <= bufSize {
+			m = getMessage(c)
+		} else {
+			m = makeMessage(n)
+			m.conn = c
+		}
+		if n > 0 {
+			copy(m.buf, c.readbuf[:n])
+		}
 	}
+	c.rio.Unlock()
 	if err != nil && err != syscall.ENODEV {
 		putMessage(m)
 		return nil, err
