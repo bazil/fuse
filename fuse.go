@@ -622,7 +622,9 @@ func (c *Conn) ReadRequest() (Request, error) {
 	var req Request
 	switch m.hdr.Opcode {
 	default:
-		Debug(noOpcode{Opcode: m.hdr.Opcode})
+		if Debug != nil {
+			Debug(noOpcode{Opcode: m.hdr.Opcode})
+		}
 		goto unrecognized
 
 	case opLookup:
@@ -1075,7 +1077,9 @@ func (c *Conn) ReadRequest() (Request, error) {
 	return req, nil
 
 corrupt:
-	Debug(malformedMessage{})
+	if Debug != nil {
+		Debug(malformedMessage{})
+	}
 	putMessage(m)
 	return nil, fmt.Errorf("fuse: malformed message")
 
@@ -1121,7 +1125,7 @@ func (c *Conn) writeToKernel(msg []byte) error {
 	c.wio.RLock()
 	defer c.wio.RUnlock()
 	nn, err := syscall.Write(c.fd(), msg)
-	if err == nil && nn != len(msg) {
+	if err == nil && nn != len(msg) && Debug != nil {
 		Debug(bugShortKernelWrite{
 			Written: int64(nn),
 			Length:  int64(len(msg)),
@@ -1133,7 +1137,7 @@ func (c *Conn) writeToKernel(msg []byte) error {
 }
 
 func (c *Conn) respond(msg []byte) {
-	if err := c.writeToKernel(msg); err != nil {
+	if err := c.writeToKernel(msg); err != nil && Debug != nil {
 		Debug(bugKernelWriteError{
 			Error: errorString(err),
 			Stack: stack(),
