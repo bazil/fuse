@@ -1,5 +1,9 @@
 package fuse
 
+func autoXattr(conf *mountConfig) error {
+	return nil
+}
+
 func localVolume(conf *mountConfig) error {
 	return nil
 }

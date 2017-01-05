@@ -1,5 +1,10 @@
 package fuse
 
+func autoXattr(conf *mountConfig) error {
+	conf.options["auto_xattr"] = ""
+	return nil
+}
+
 func localVolume(conf *mountConfig) error {
 	conf.options["local"] = ""
 	return nil

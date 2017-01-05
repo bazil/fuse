@@ -68,6 +68,14 @@ func Subtype(fstype string) MountOption {
 	}
 }
 
+// AutoXattr makes osxfuse automatically handle xattr operations using "._"
+// prefixed files.
+//
+// OS X only. Others ignore this option.
+func AutoXattr() MountOption {
+	return autoXattr
+}
+
 // LocalVolume sets the volume to be local (instead of network),
 // changing the behavior of Finder, Spotlight, and such.
 //
