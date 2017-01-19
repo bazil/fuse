@@ -74,6 +74,10 @@ type FSInodeGenerator interface {
 	GenerateInode(parentInode uint64, name string) uint64
 }
 
+type FSSetvolnamer interface {
+	Setvolname(ctx context.Context, req *fuse.SetvolnameRequest) error
+}
+
 // A Node is the interface required of a file or directory.
 // See the documentation for type FS for general information
 // pertaining to all methods.
@@ -1309,6 +1313,16 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 	case *fuse.DestroyRequest:
 		if fs, ok := c.fs.(FSDestroyer); ok {
 			fs.Destroy()
+		}
+		done(nil)
+		r.Respond()
+		return nil
+
+	case *fuse.SetvolnameRequest:
+		if fs, ok := c.fs.(FSSetvolnamer); ok {
+			if err := fs.Setvolname(ctx, r); err != nil {
+				return err
+			}
 		}
 		done(nil)
 		r.Respond()

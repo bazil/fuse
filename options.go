@@ -308,3 +308,10 @@ func AllowNonEmptyMount() MountOption {
 		return nil
 	}
 }
+
+// Enables setting of the volume name (FUSE_SETVOLNAME).
+//
+// OS X only. Others ignore this option.
+func Setvolname() MountOption {
+	return setvolname()
+}

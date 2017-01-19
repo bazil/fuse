@@ -1013,7 +1013,16 @@ loop:
 
 	// OS X
 	case opSetvolname:
-		panic("opSetvolname")
+		buf := m.bytes()
+		n := len(buf)
+		if n == 0 || buf[n-1] != '\x00' {
+			goto corrupt
+		}
+		req = &SetvolnameRequest{
+			Header: m.Header(),
+			Name:   string(buf[:n-1]),
+		}
+
 	case opGetxtimes:
 		panic("opGetxtimes")
 	case opExchange:
@@ -1821,6 +1830,24 @@ func (r *DestroyRequest) String() string {
 
 // Respond replies to the request.
 func (r *DestroyRequest) Respond() {
+	buf := newBuffer(0)
+	r.respond(buf)
+}
+
+// SetvolnameRequest is sent by the kernel when the volume is renamed.
+type SetvolnameRequest struct {
+	Header `json:"-"`
+	Name   string
+}
+
+var _ = Request(&SetvolnameRequest{})
+
+func (r *SetvolnameRequest) String() string {
+	return fmt.Sprintf("Setvolname [%s] %q", &r.Header, r.Name)
+}
+
+// Respond replies to the request.
+func (r *SetvolnameRequest) Respond() {
 	buf := newBuffer(0)
 	r.respond(buf)
 }

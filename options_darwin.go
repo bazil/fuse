@@ -33,3 +33,10 @@ func exclCreate(conf *mountConfig) error {
 	conf.options["excl_create"] = ""
 	return nil
 }
+
+func setvolname() MountOption {
+	return func(conf *mountConfig) error {
+		conf.initFlags |= InitVolRename
+		return nil
+	}
+}

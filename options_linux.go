@@ -23,3 +23,7 @@ func noAppleDouble(conf *mountConfig) error {
 func exclCreate(conf *mountConfig) error {
 	return nil
 }
+
+func setvolname() MountOption {
+	return dummyOption
+}
