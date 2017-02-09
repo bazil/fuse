@@ -24,7 +24,7 @@ func loadOSXFUSE(bin string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
-	return err
+	return fmt.Errorf("Error loading fuse (%s): %s", bin, err)
 }
 
 func openOSXFUSEDev(devPrefix string) (*os.File, error) {
