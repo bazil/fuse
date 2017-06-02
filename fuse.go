@@ -392,7 +392,9 @@ func (e Errno) MarshalText() ([]byte, error) {
 
 func (h *Header) RespondError(err error) {
 	errno := DefaultErrno
-	if ferr, ok := err.(ErrorNumber); ok {
+	if eno, ok := err.(syscall.Errno); ok {
+		errno = Errno(eno)
+	} else if ferr, ok := err.(ErrorNumber); ok {
 		errno = ferr.Errno()
 	}
 	// FUSE uses negative errors!
