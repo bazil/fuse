@@ -155,7 +155,7 @@ func AllowOther() MountOption {
 	}
 }
 
-// AllowRoot allows other users to access the file system.
+// AllowRoot allows root to access the file system.
 //
 // Only one of AllowOther or AllowRoot can be used.
 //
