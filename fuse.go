@@ -319,7 +319,7 @@ func (h *Header) respond(msg []byte) {
 // Operations may return an error value that implements ErrorNumber to
 // control what specific error number (errno) to return.
 type ErrorNumber interface {
-	// Errno returns the the error number (errno) for this error.
+	// Errno returns the error number (errno) for this error.
 	Errno() Errno
 }
 
@@ -737,7 +737,7 @@ loop:
 			Header: m.Header(),
 			Name:   string(name[:i]),
 			// observed on Linux: mkdirIn.Mode & syscall.S_IFMT == 0,
-			// and this causes fileMode to go into it's "no idea"
+			// and this causes fileMode to go into its "no idea"
 			// code branch; enforce type to directory
 			Mode: fileMode((in.Mode &^ syscall.S_IFMT) | syscall.S_IFDIR),
 		}

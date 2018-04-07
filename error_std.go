@@ -10,7 +10,7 @@ package fuse
 // ENODATA, only ENOATTR. ENOATTR is not in any of the standards,
 // ENODATA exists but is only used for STREAMs.
 //
-// Each platform will define it a errNoXattr constant, and this file
+// Each platform will define it an errNoXattr constant, and this file
 // will enforce that it implements the right interfaces and hide the
 // implementation.
 //

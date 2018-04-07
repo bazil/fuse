@@ -126,7 +126,7 @@ func NoAppleXattr() MountOption {
 // For more information, see
 // https://github.com/osxfuse/osxfuse/issues/209
 //
-// OS X only. Others ignore this options.
+// OS X only. Others ignore this option.
 // Requires OSXFUSE 3.4.1 or newer.
 func ExclCreate() MountOption {
 	return exclCreate

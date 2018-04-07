@@ -56,7 +56,7 @@ func isBoringFusermountError(err error) bool {
 }
 
 func mount(dir string, conf *mountConfig, ready chan<- struct{}, errp *error) (fusefd *os.File, err error) {
-	// linux mount is never delayed
+	// Linux mount is never delayed
 	close(ready)
 
 	fds, err := syscall.Socketpair(syscall.AF_FILE, syscall.SOCK_STREAM, 0)

@@ -110,7 +110,7 @@ func Mounted(filesys fs.FS, conf *fs.Config, options ...fuse.MountOption) (*Moun
 }
 
 // MountedFuncT mounts a filesystem at a temporary directory,
-// directing it's debug log to the testing logger.
+// directing its debug log to the testing logger.
 //
 // See MountedFunc for usage.
 //
@@ -129,7 +129,7 @@ func MountedFuncT(t testing.TB, fn func(*Mount) fs.FS, conf *fs.Config, options 
 }
 
 // MountedT mounts the filesystem at a temporary directory,
-// directing it's debug log to the testing logger.
+// directing its debug log to the testing logger.
 //
 // See Mounted for usage.
 //

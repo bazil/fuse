@@ -87,7 +87,7 @@ func TestRootErr(t *testing.T) {
 	t.Parallel()
 	mnt, err := fstestutil.MountedT(t, badRootFS{}, nil)
 	if err == nil {
-		// path for synchronous mounts (linux): started out fine, now
+		// path for synchronous mounts (Linux): started out fine, now
 		// wait for Serve to cycle through
 		err = <-mnt.Error
 		// without this, unmount will keep failing with EBUSY; nudge
@@ -394,7 +394,7 @@ func TestReadFileFlags(t *testing.T) {
 	want := fuse.OpenReadWrite | fuse.OpenAppend
 	if runtime.GOOS == "darwin" {
 		// OSXFUSE shares one read and one write handle for all
-		// clients, so it uses a OpenReadOnly handle for performing
+		// clients, so it uses an OpenReadOnly handle for performing
 		// our read.
 		//
 		// If this test starts failing in the future, that probably
@@ -456,7 +456,7 @@ func TestWriteFileFlags(t *testing.T) {
 	want := fuse.OpenReadWrite | fuse.OpenAppend
 	if runtime.GOOS == "darwin" {
 		// OSXFUSE shares one read and one write handle for all
-		// clients, so it uses a OpenWriteOnly handle for performing
+		// clients, so it uses an OpenWriteOnly handle for performing
 		// our read.
 		//
 		// If this test starts failing in the future, that probably
@@ -1936,7 +1936,7 @@ type setxattr struct {
 func testSetxattr(t *testing.T, size int) {
 	const linux_XATTR_NAME_MAX = 64 * 1024
 	if size > linux_XATTR_NAME_MAX && runtime.GOOS == "linux" {
-		t.Skip("large xattrs are not supported by linux")
+		t.Skip("large xattrs are not supported by Linux")
 	}
 
 	t.Parallel()

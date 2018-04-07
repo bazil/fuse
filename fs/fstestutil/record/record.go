@@ -255,7 +255,7 @@ func (r *Mknods) RecordedMknod() fuse.MknodRequest {
 	return *(val.(*fuse.MknodRequest))
 }
 
-// Opens records a Open request and its fields.
+// Opens records an Open request and its fields.
 type Opens struct {
 	rec RequestRecorder
 }

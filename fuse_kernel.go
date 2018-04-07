@@ -7,7 +7,7 @@
 
 
    This -- and only this -- header file may also be distributed under
-   the terms of the BSD Licence as follows:
+   the terms of the BSD License as follows:
 
    Copyright (C) 2001-2007 Miklos Szeredi. All rights reserved.
 

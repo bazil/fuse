@@ -95,7 +95,7 @@ type Node interface {
 	// Fields with reasonable defaults are prepopulated. For example,
 	// all times are set to a fixed moment when the program started.
 	//
-	// If Inode is left as 0, a dynamic inode number is chosen.
+	// If inode is left as 0, a dynamic inode number is chosen.
 	//
 	// The result may be cached for the duration set in Valid.
 	Attr(ctx context.Context, attr *fuse.Attr) error
@@ -796,7 +796,7 @@ func (c *Server) serve(r fuse.Request) {
 				Request: logResponseHeader{ID: hdr.ID},
 				Error:   fuse.ESTALE.ErrnoName(),
 				// this is the only place that sets both Error and
-				// Out; not sure if i want to do that; might get rid
+				// Out; not sure if I want to do that; might get rid
 				// of len(c.node) things altogether
 				Out: logMissingNode{
 					MaxNode: fuse.NodeID(len(c.node)),
