@@ -4,9 +4,10 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"context"
+
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
-	"golang.org/x/net/context"
 )
 
 // Writes gathers data from FUSE Write calls.

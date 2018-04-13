@@ -4,9 +4,10 @@ import (
 	"sync"
 	"time"
 
+	"context"
+
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
-	"golang.org/x/net/context"
 )
 
 type nothing struct{}

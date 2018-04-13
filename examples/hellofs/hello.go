@@ -7,10 +7,11 @@ import (
 	"log"
 	"os"
 
+	"context"
+
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
 	_ "bazil.org/fuse/fs/fstestutil"
-	"golang.org/x/net/context"
 )
 
 func usage() {

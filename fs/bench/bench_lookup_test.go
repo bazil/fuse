@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"golang.org/x/net/context"
+	"context"
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
