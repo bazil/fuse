@@ -208,10 +208,9 @@ func TestStatfs(t *testing.T) {
 		if g, e := st.Files, uint64(13); g != e {
 			t.Errorf("got Files = %d; want %d", g, e)
 		}
-		// TODO https://github.com/bazil/fuse/issues/194
-		// if g, e := st.Ffree, uint64(11); g != e {
-		// 	t.Errorf("got Ffree = %d; want %d", g, e)
-		// }
+		if g, e := st.Ffree, uint64(11); g != e {
+			t.Errorf("got Ffree = %d; want %d", g, e)
+		}
 		if g, e := st.Bsize, int64(1000); g != e {
 			t.Errorf("got Bsize = %d; want %d", g, e)
 		}
