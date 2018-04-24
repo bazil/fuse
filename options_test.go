@@ -1,6 +1,7 @@
 package fuse_test
 
 import (
+	"context"
 	"os"
 	"runtime"
 	"syscall"
@@ -9,7 +10,6 @@ import (
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
 	"bazil.org/fuse/fs/fstestutil"
-	"golang.org/x/net/context"
 )
 
 func init() {

@@ -2,6 +2,7 @@ package fs_test
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -22,7 +23,6 @@ import (
 	"bazil.org/fuse/fs/fstestutil/record"
 	"bazil.org/fuse/fuseutil"
 	"bazil.org/fuse/syscallx"
-	"golang.org/x/net/context"
 )
 
 // TO TEST:
