@@ -7,14 +7,17 @@ import (
 // HandleRead handles a read request assuming that data is the entire file content.
 // It adjusts the amount returned in resp according to req.Offset and req.Size.
 func HandleRead(req *fuse.ReadRequest, resp *fuse.ReadResponse, data []byte) {
-	if req.Offset >= int64(len(data)) {
-		data = nil
-	} else {
-		data = data[req.Offset:]
+	if req.Offset >= int64(len(data)) || req.Size == 0 {
+		resp.Data = resp.Data[0:0]
+		return
 	}
-	if len(data) > req.Size {
-		data = data[:req.Size]
+	size := req.Size
+	if len(data)-int(req.Offset) < req.Size {
+		size = len(data)
 	}
-	n := copy(resp.Data[:req.Size], data)
+	if len(resp.Data) < size {
+		resp.Data = append(resp.Data, make([]byte, size-len(resp.Data))...)
+	}
+	n := copy(resp.Data[:size], data[req.Offset:])
 	resp.Data = resp.Data[:n]
 }
