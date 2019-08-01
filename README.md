@@ -26,7 +26,7 @@ based on.
 
 Recipe using Go Modules (requires Go 1.12 or higher).
 
-    git clone https://github.com/bazil/fuse
+    git clone https://github.com/bazil/fuse ;# clone outside of GOPATH
 
 Build and install 'hellofs':
 
