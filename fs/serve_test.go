@@ -415,6 +415,8 @@ func TestReadFileFlags(t *testing.T) {
 	}
 	_ = f.Close()
 
+	got := r.fileFlags.Recorded().(fuse.OpenFlags)
+	got &^= fuse.OpenNonblock
 	want := fuse.OpenReadWrite | fuse.OpenAppend
 	if runtime.GOOS == "darwin" {
 		// OSXFUSE shares one read and one write handle for all
@@ -425,7 +427,7 @@ func TestReadFileFlags(t *testing.T) {
 		// means they added the feature, and we want to notice that!
 		want = fuse.OpenReadOnly
 	}
-	if g, e := r.fileFlags.Recorded().(fuse.OpenFlags), want; g != e {
+	if g, e := got, want; g != e {
 		t.Errorf("read saw file flags %+v, want %+v", g, e)
 	}
 }
@@ -477,6 +479,8 @@ func TestWriteFileFlags(t *testing.T) {
 	}
 	_ = f.Close()
 
+	got := r.fileFlags.Recorded().(fuse.OpenFlags)
+	got &^= fuse.OpenNonblock
 	want := fuse.OpenReadWrite | fuse.OpenAppend
 	if runtime.GOOS == "darwin" {
 		// OSXFUSE shares one read and one write handle for all
@@ -487,7 +491,7 @@ func TestWriteFileFlags(t *testing.T) {
 		// means they added the feature, and we want to notice that!
 		want = fuse.OpenWriteOnly
 	}
-	if g, e := r.fileFlags.Recorded().(fuse.OpenFlags), want; g != e {
+	if g, e := got, want; g != e {
 		t.Errorf("write saw file flags %+v, want %+v", g, e)
 	}
 }
