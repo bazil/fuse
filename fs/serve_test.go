@@ -26,7 +26,7 @@ import (
 )
 
 func maybeParallel(t *testing.T) {
-	t.Parallel()
+	// t.Parallel()
 }
 
 // TO TEST:

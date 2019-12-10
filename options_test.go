@@ -17,7 +17,7 @@ func init() {
 }
 
 func maybeParallel(t *testing.T) {
-	t.Parallel()
+	// t.Parallel()
 }
 
 func TestMountOptionFSName(t *testing.T) {
