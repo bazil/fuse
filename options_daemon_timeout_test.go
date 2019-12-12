@@ -36,7 +36,7 @@ func TestMountOptionDaemonTimeout(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping time-based test in short mode")
 	}
-	t.Parallel()
+	maybeParallel(t)
 
 	mnt, err := fstestutil.MountedT(t,
 		fstestutil.SimpleFS{slowCreaterDir{}},

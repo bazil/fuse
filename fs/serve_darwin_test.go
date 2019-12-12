@@ -14,7 +14,7 @@ type exchangeData struct {
 }
 
 func TestExchangeDataNotSupported(t *testing.T) {
-	t.Parallel()
+	maybeParallel(t)
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{
 		"one": &exchangeData{},
 		"two": &exchangeData{},

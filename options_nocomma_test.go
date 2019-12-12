@@ -14,7 +14,7 @@ import (
 )
 
 func TestMountOptionCommaError(t *testing.T) {
-	t.Parallel()
+	maybeParallel(t)
 	// this test is not tied to any specific option, it just needs
 	// some string content
 	var evil = "FuseTest,Marker"

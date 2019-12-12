@@ -16,11 +16,15 @@ func init() {
 	fstestutil.DebugByDefault()
 }
 
+func maybeParallel(t *testing.T) {
+	t.Parallel()
+}
+
 func TestMountOptionFSName(t *testing.T) {
 	if runtime.GOOS == "freebsd" {
 		t.Skip("FreeBSD does not support FSName")
 	}
-	t.Parallel()
+	maybeParallel(t)
 	const name = "FuseTestMarker"
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}}, nil,
 		fuse.FSName(name),
@@ -43,7 +47,7 @@ func testMountOptionFSNameEvil(t *testing.T, evil string) {
 	if runtime.GOOS == "freebsd" {
 		t.Skip("FreeBSD does not support FSName")
 	}
-	t.Parallel()
+	maybeParallel(t)
 	var name = "FuseTest" + evil + "Marker"
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}}, nil,
 		fuse.FSName(name),
@@ -100,7 +104,7 @@ func TestMountOptionSubtype(t *testing.T) {
 	if runtime.GOOS == "freebsd" {
 		t.Skip("FreeBSD does not support Subtype")
 	}
-	t.Parallel()
+	maybeParallel(t)
 	const name = "FuseTestMarker"
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}}, nil,
 		fuse.Subtype(name),
@@ -124,7 +128,7 @@ func TestMountOptionSubtype(t *testing.T) {
 // TODO test AllowOther; hard because needs system-level authorization
 
 func TestMountOptionAllowOtherThenAllowRoot(t *testing.T) {
-	t.Parallel()
+	maybeParallel(t)
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}}, nil,
 		fuse.AllowOther(),
 		fuse.AllowRoot(),
@@ -140,7 +144,7 @@ func TestMountOptionAllowOtherThenAllowRoot(t *testing.T) {
 // TODO test AllowRoot; hard because needs system-level authorization
 
 func TestMountOptionAllowRootThenAllowOther(t *testing.T) {
-	t.Parallel()
+	maybeParallel(t)
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}}, nil,
 		fuse.AllowRoot(),
 		fuse.AllowOther(),
@@ -164,7 +168,7 @@ func TestMountOptionDefaultPermissions(t *testing.T) {
 	if runtime.GOOS == "freebsd" {
 		t.Skip("FreeBSD does not support DefaultPermissions")
 	}
-	t.Parallel()
+	maybeParallel(t)
 
 	mnt, err := fstestutil.MountedT(t,
 		fstestutil.SimpleFS{
@@ -202,7 +206,7 @@ func (createrDir) Create(ctx context.Context, req *fuse.CreateRequest, resp *fus
 }
 
 func TestMountOptionReadOnly(t *testing.T) {
-	t.Parallel()
+	maybeParallel(t)
 
 	mnt, err := fstestutil.MountedT(t,
 		fstestutil.SimpleFS{createrDir{}},
