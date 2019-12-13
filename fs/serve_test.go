@@ -576,11 +576,6 @@ func TestWrite(t *testing.T) {
 
 // Test Write of a larger buffer.
 
-type writeLarge struct {
-	fstestutil.File
-	record.Writes
-}
-
 func TestWriteLarge(t *testing.T) {
 	maybeParallel(t)
 	w := &write{}
