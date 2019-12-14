@@ -37,6 +37,4 @@ func BenchmarkLookup(b *testing.B) {
 			b.Fatalf("Stat: wrong error: %v", err)
 		}
 	}
-
-	b.StopTimer()
 }

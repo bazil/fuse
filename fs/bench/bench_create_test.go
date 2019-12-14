@@ -49,6 +49,4 @@ func BenchmarkCreate(b *testing.B) {
 		}
 		f.Close()
 	}
-
-	b.StopTimer()
 }
