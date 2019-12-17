@@ -183,74 +183,96 @@ func (f testStatFS) Statfs(ctx context.Context, req *fuse.StatfsRequest, resp *f
 	return nil
 }
 
+func doStatfs(ctx context.Context, dir string) (*struct{}, error) {
+	// Perform an operation that forces the OS X mount to be ready, so
+	// we know the Statfs handler will really be called. OS X insists
+	// on volumes answering Statfs calls very early (before FUSE
+	// handshake), so OSXFUSE gives made-up answers for a few brief moments
+	// during the mount process.
+	if _, err := os.Stat(dir + "/does-not-exist"); !os.IsNotExist(err) {
+		return nil, err
+	}
+
+	success := true
+	badf := func(fmt string, args ...interface{}) {
+		success = false
+		log.Printf(fmt, args...)
+	}
+	{
+		var st syscall.Statfs_t
+		if err := syscall.Statfs(dir, &st); err != nil {
+			return nil, fmt.Errorf("Statfs failed: %v", err)
+		}
+		log.Printf("Statfs got: %#v", st)
+		if g, e := st.Blocks, uint64(42); g != e {
+			badf("got Blocks = %d; want %d", g, e)
+		}
+		if g, e := st.Bfree, uint64(10); g != e {
+			badf("got Bfree = %d; want %d", g, e)
+		}
+		if g, e := st.Bavail, uint64(3); g != e {
+			badf("got Bavail = %d; want %d", g, e)
+		}
+		if g, e := st.Files, uint64(13); g != e {
+			badf("got Files = %d; want %d", g, e)
+		}
+		if g, e := st.Ffree, uint64(11); g != e {
+			badf("got Ffree = %d; want %d", g, e)
+		}
+		if g, e := st.Bsize, int64(1000); g != e {
+			badf("got Bsize = %d; want %d", g, e)
+		}
+		if g, e := st.Namelen, int64(34); g != e {
+			badf("got Namelen = %d; want %d", g, e)
+		}
+		if g, e := st.Frsize, int64(7); g != e {
+			badf("got Frsize = %d; want %d", g, e)
+		}
+	}
+
+	{
+		var st syscall.Statfs_t
+		f, err := os.Open(dir)
+		if err != nil {
+			return nil, fmt.Errorf("Open for fstatfs failed: %v", err)
+		}
+		defer f.Close()
+		err = syscall.Fstatfs(int(f.Fd()), &st)
+		if err != nil {
+			return nil, fmt.Errorf("Fstatfs failed: %v", err)
+		}
+		log.Printf("Fstatfs got: %#v", st)
+		if g, e := st.Blocks, uint64(42); g != e {
+			badf("got Blocks = %d; want %d", g, e)
+		}
+		if g, e := st.Files, uint64(13); g != e {
+			badf("got Files = %d; want %d", g, e)
+		}
+	}
+
+	if !success {
+		return nil, errors.New("bad statfs")
+	}
+	return &struct{}{}, nil
+}
+
+var statfsHelper = helpers.Register("statfs", httpjson.ServePOST(doStatfs))
+
 func TestStatfs(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	mnt, err := fstestutil.MountedT(t, testStatFS{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
 
-	// Perform an operation that forces the OS X mount to be ready, so
-	// we know the Statfs handler will really be called. OS X insists
-	// on volumes answering Statfs calls very early (before FUSE
-	// handshake), so OSXFUSE gives made-up answers for a few brief moments
-	// during the mount process.
-	if _, err := os.Stat(mnt.Dir + "/does-not-exist"); !os.IsNotExist(err) {
-		t.Fatal(err)
-	}
-
-	{
-		var st syscall.Statfs_t
-		err = syscall.Statfs(mnt.Dir, &st)
-		if err != nil {
-			t.Errorf("Statfs failed: %v", err)
-		}
-		t.Logf("Statfs got: %#v", st)
-		if g, e := st.Blocks, uint64(42); g != e {
-			t.Errorf("got Blocks = %d; want %d", g, e)
-		}
-		if g, e := st.Bfree, uint64(10); g != e {
-			t.Errorf("got Bfree = %d; want %d", g, e)
-		}
-		if g, e := st.Bavail, uint64(3); g != e {
-			t.Errorf("got Bavail = %d; want %d", g, e)
-		}
-		if g, e := st.Files, uint64(13); g != e {
-			t.Errorf("got Files = %d; want %d", g, e)
-		}
-		if g, e := st.Ffree, uint64(11); g != e {
-			t.Errorf("got Ffree = %d; want %d", g, e)
-		}
-		if g, e := st.Bsize, int64(1000); g != e {
-			t.Errorf("got Bsize = %d; want %d", g, e)
-		}
-		if g, e := st.Namelen, int64(34); g != e {
-			t.Errorf("got Namelen = %d; want %d", g, e)
-		}
-		if g, e := st.Frsize, int64(7); g != e {
-			t.Errorf("got Frsize = %d; want %d", g, e)
-		}
-	}
-
-	{
-		var st syscall.Statfs_t
-		f, err := os.Open(mnt.Dir)
-		if err != nil {
-			t.Errorf("Open for fstatfs failed: %v", err)
-		}
-		defer f.Close()
-		err = syscall.Fstatfs(int(f.Fd()), &st)
-		if err != nil {
-			t.Errorf("Fstatfs failed: %v", err)
-		}
-		t.Logf("Fstatfs got: %#v", st)
-		if g, e := st.Blocks, uint64(42); g != e {
-			t.Errorf("got Blocks = %d; want %d", g, e)
-		}
-		if g, e := st.Files, uint64(13); g != e {
-			t.Errorf("got Files = %d; want %d", g, e)
-		}
+	control := statfsHelper.Spawn(ctx, t)
+	defer control.Close()
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, mnt.Dir, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 }
 
