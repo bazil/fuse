@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -2195,43 +2196,35 @@ var mmapWrites = map[int]byte{
 	mmapSize - 1:    'z',
 }
 
-func helperMmap() {
-	f, err := os.Create("child")
+func doMmap(ctx context.Context, dir string) (*struct{}, error) {
+	f, err := os.Create(filepath.Join(dir, "child"))
 	if err != nil {
-		log.Fatalf("Create: %v", err)
+		return nil, fmt.Errorf("Create: %v", err)
 	}
 	defer f.Close()
-
 	data, err := syscall.Mmap(int(f.Fd()), 0, mmapSize, syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {
-		log.Fatalf("Mmap: %v", err)
+		return nil, fmt.Errorf("Mmap: %v", err)
 	}
-
 	for i, b := range mmapWrites {
 		data[i] = b
 	}
-
 	if err := syscallx.Msync(data, syscall.MS_SYNC); err != nil {
-		log.Fatalf("Msync: %v", err)
+		return nil, fmt.Errorf("Msync: %v", err)
 	}
-
 	if err := syscall.Munmap(data); err != nil {
-		log.Fatalf("Munmap: %v", err)
+		return nil, fmt.Errorf("Munmap: %v", err)
 	}
-
 	if err := f.Sync(); err != nil {
-		log.Fatalf("Fsync = %v", err)
+		return nil, fmt.Errorf("Fsync = %v", err)
 	}
-
-	err = f.Close()
-	if err != nil {
-		log.Fatalf("Close: %v", err)
+	if err := f.Close(); err != nil {
+		return nil, fmt.Errorf("Close: %v", err)
 	}
+	return &struct{}{}, nil
 }
 
-func init() {
-	childHelpers["mmap"] = helperMmap
-}
+var mmapHelper = helpers.Register("mmap", httpjson.ServePOST(doMmap))
 
 type mmap struct {
 	inMemoryFile
@@ -2242,6 +2235,8 @@ type mmap struct {
 }
 
 func TestMmap(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	w := &mmap{}
 	w.data = make([]byte, mmapSize)
@@ -2256,13 +2251,11 @@ func TestMmap(t *testing.T) {
 	// would need to be served by the same process, and there might
 	// not be a thread free to do that). Merely bumping GOMAXPROCS is
 	// not enough to prevent the hangs reliably.
-	child, err := childCmd("mmap")
-	if err != nil {
-		t.Fatal(err)
-	}
-	child.Dir = mnt.Dir
-	if err := child.Run(); err != nil {
-		t.Fatal(err)
+	control := mmapHelper.Spawn(ctx, t)
+	defer control.Close()
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, mnt.Dir, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 
 	got := w.bytes()
