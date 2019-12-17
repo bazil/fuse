@@ -58,7 +58,9 @@ func childCmd(childName string) (*exec.Cmd, error) {
 }
 
 func TestMain(m *testing.M) {
+	helpers.AddFlag(flag.CommandLine)
 	flag.Parse()
+	helpers.RunIfNeeded()
 	if childMode.fn != nil {
 		childMode.fn()
 		os.Exit(0)

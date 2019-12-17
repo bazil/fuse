@@ -7,8 +7,10 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -21,6 +23,8 @@ import (
 	"bazil.org/fuse/fs"
 	"bazil.org/fuse/fs/fstestutil"
 	"bazil.org/fuse/fs/fstestutil/record"
+	"bazil.org/fuse/fs/fstestutil/spawntest"
+	"bazil.org/fuse/fs/fstestutil/spawntest/httpjson"
 	"bazil.org/fuse/fuseutil"
 	"bazil.org/fuse/syscallx"
 )
@@ -28,6 +32,8 @@ import (
 func maybeParallel(t *testing.T) {
 	// t.Parallel()
 }
+
+var helpers spawntest.Registry
 
 // TO TEST:
 //	Lookup(*LookupRequest, *LookupResponse)
@@ -1066,6 +1072,8 @@ type interrupt struct {
 
 	// strobes to signal we have a read hanging
 	hanging chan struct{}
+	// strobes to signal kernel asked us to interrupt read
+	interrupted chan struct{}
 }
 
 func (interrupt) Attr(ctx context.Context, a *fuse.Attr) error {
@@ -1079,45 +1087,97 @@ func (it *interrupt) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse
 	case it.hanging <- struct{}{}:
 	default:
 	}
+	log.Printf("reading...")
 	<-ctx.Done()
+	log.Printf("read done")
+	select {
+	case it.interrupted <- struct{}{}:
+	default:
+	}
 	return ctx.Err()
 }
 
-func helperInterrupt() {
+type interruptHelp struct {
+	mu     sync.Mutex
+	result *interruptResult
+}
+
+type interruptResult struct {
+	OK    bool
+	Read  []byte
+	Error string
+}
+
+func (i *interruptHelp) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	switch req.URL.Path {
+	case "/read":
+		httpjson.ServePOST(i.doRead).ServeHTTP(w, req)
+	case "/report":
+		httpjson.ServePOST(i.doReport).ServeHTTP(w, req)
+	default:
+		http.NotFound(w, req)
+	}
+}
+
+func (i *interruptHelp) doRead(ctx context.Context, dir string) (struct{}, error) {
 	log.SetPrefix("interrupt child: ")
 	log.SetFlags(0)
 
 	log.Printf("starting...")
 
-	f, err := os.Open("child")
+	f, err := os.Open(filepath.Join(dir, "child"))
 	if err != nil {
 		log.Fatalf("cannot open file: %v", err)
 	}
-	defer f.Close()
 
-	log.Printf("reading...")
-	buf := make([]byte, 4096)
-	n, err := syscall.Read(int(f.Fd()), buf)
-	switch err {
-	case nil:
-		log.Fatalf("read: expected error, got data: %q", buf[:n])
-	case syscall.EINTR:
-		log.Printf("read: saw EINTR, all good")
-	default:
-		log.Fatalf("read: wrong error: %v", err)
+	i.mu.Lock()
+	// background this so we can return a response to the test
+	go func() {
+		defer i.mu.Unlock()
+		defer f.Close()
+		log.Printf("reading...")
+		buf := make([]byte, 4096)
+		n, err := syscall.Read(int(f.Fd()), buf)
+		var r interruptResult
+		switch err {
+		case nil:
+			buf = buf[:n]
+			log.Printf("read: expected error, got data: %q", buf)
+			r.Read = buf
+		case syscall.EINTR:
+			log.Printf("read: saw EINTR, all good")
+			r.OK = true
+		default:
+			msg := err.Error()
+			log.Printf("read: wrong error: %s", msg)
+			r.Error = msg
+		}
+		i.result = &r
+		log.Printf("read done...")
+	}()
+	return struct{}{}, nil
+}
+
+func (i *interruptHelp) doReport(ctx context.Context, _ struct{}) (*interruptResult, error) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	if i.result == nil {
+		return nil, errors.New("no result yet")
 	}
-
-	log.Printf("exiting...")
+	return i.result, nil
 }
 
-func init() {
-	childHelpers["interrupt"] = helperInterrupt
-}
+var interruptHelper = helpers.Register("interrupt", &interruptHelp{})
 
 func TestInterrupt(t *testing.T) {
 	maybeParallel(t)
-	f := &interrupt{}
-	f.hanging = make(chan struct{}, 1)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	f := &interrupt{
+		hanging:     make(chan struct{}, 1),
+		interrupted: make(chan struct{}, 1),
+	}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -1125,75 +1185,42 @@ func TestInterrupt(t *testing.T) {
 	defer mnt.Close()
 
 	// start a subprocess that can hang until signaled
-	child, err := childCmd("interrupt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	child.Dir = mnt.Dir
+	control := interruptHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	if err := child.Start(); err != nil {
-		t.Errorf("cannot start child: %v", err)
-		return
+	var nothing struct{}
+	if err := control.JSON("/read").Call(ctx, mnt.Dir, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
-
-	// try to clean up if child is still alive when returning
-	defer child.Process.Kill()
 
 	// wait till we're sure it's hanging in read
 	<-f.hanging
 
-	//	err = child.Process.Signal(os.Interrupt)
-	var sig os.Signal = syscall.SIGIO
-	if runtime.GOOS == "darwin" {
-		// I can't get OSXFUSE 3.2.0 to trigger EINTR return from
-		// read(2), at least in a Go application. Works on Linux. So,
-		// on OS X, we just check that the signal at least kills the
-		// child, aborting the read, so operations on hanging FUSE
-		// filesystems can be aborted.
-		sig = os.Interrupt
-	}
-
-	err = child.Process.Signal(sig)
-	if err != nil {
-		t.Errorf("cannot interrupt child: %v", err)
+	if err := control.Signal(syscall.SIGSTOP); err != nil {
+		t.Errorf("cannot send SIGSTOP: %v", err)
 		return
 	}
 
-	p, err := child.Process.Wait()
-	if err != nil {
-		t.Errorf("child failed: %v", err)
+	// give the process enough time to receive SIGSTOP, otherwise it
+	// won't interrupt the syscall.
+	<-f.interrupted
+
+	if err := control.Signal(syscall.SIGCONT); err != nil {
+		t.Errorf("cannot send SIGCONT: %v", err)
 		return
 	}
-	switch ws := p.Sys().(type) {
-	case syscall.WaitStatus:
-		if ws.CoreDump() {
-			t.Fatalf("interrupt: didn't expect child to dump core: %v", ws)
+
+	var result interruptResult
+	if err := control.JSON("/report").Call(ctx, struct{}{}, &result); err != nil {
+		t.Fatalf("calling helper: %v", err)
+	}
+	if !result.OK {
+		if msg := result.Error; msg != "" {
+			t.Errorf("unexpected error from read: %v", msg)
 		}
-		switch runtime.GOOS {
-		case "darwin":
-			// see comment above about EINTR on OS X
-			if ws.Exited() {
-				t.Fatalf("interrupt: expected child to die from signal, got exit status: %v", ws.ExitStatus())
-			}
-			if !ws.Signaled() {
-				t.Fatalf("interrupt: expected child to die from signal: %v", ws)
-			}
-			if got := ws.Signal(); got != sig {
-				t.Errorf("interrupt: child failed: signal %d", got)
-			}
-		default:
-			if ws.Signaled() {
-				t.Fatalf("interrupt: didn't expect child to exit with a signal: %v", ws)
-			}
-			if !ws.Exited() {
-				t.Fatalf("interrupt: expected child to exit normally: %v", ws)
-			}
-			if status := ws.ExitStatus(); status != 0 {
-				t.Errorf("interrupt: child failed: exit status %d", status)
-			}
+		if data := result.Read; len(data) > 0 {
+			t.Errorf("unexpected successful read: %q", data)
 		}
-	default:
-		t.Logf("interrupt: this platform has no test coverage")
 	}
 }
 
