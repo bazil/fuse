@@ -305,45 +305,76 @@ func (root) Attr(ctx context.Context, a *fuse.Attr) error {
 	return nil
 }
 
+type statResult struct {
+	Mode    os.FileMode
+	Ino     uint64
+	Nlink   uint64
+	UID     uint32
+	GID     uint32
+	Blksize int64
+}
+
+func doStat(ctx context.Context, path string) (*statResult, error) {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	r := &statResult{
+		Mode: fi.Mode(),
+	}
+	switch stat := fi.Sys().(type) {
+	case *syscall.Stat_t:
+		r.Ino = stat.Ino
+		r.Nlink = stat.Nlink
+		r.UID = stat.Uid
+		r.GID = stat.Gid
+		// convert stat.Blksize  because it's int64 on Linux but
+		// int32 on Darwin.
+		r.Blksize = int64(stat.Blksize)
+	}
+	return r, nil
+}
+
+var statHelper = helpers.Register("stat", httpjson.ServePOST(doStat))
+
 func TestStatRoot(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	mnt, err := fstestutil.MountedT(t, root{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
-
-	fi, err := os.Stat(mnt.Dir)
-	if err != nil {
-		t.Fatalf("root getattr failed with %v", err)
+	control := statHelper.Spawn(ctx, t)
+	defer control.Close()
+	var got statResult
+	if err := control.JSON("/").Call(ctx, mnt.Dir, &got); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
-	mode := fi.Mode()
-	if (mode & os.ModeType) != os.ModeDir {
-		t.Errorf("root is not a directory: %#v", fi)
+	if (got.Mode & os.ModeType) != os.ModeDir {
+		t.Errorf("root is not a directory: %v", got.Mode)
 	}
-	if mode.Perm() != 0555 {
-		t.Errorf("root has weird access mode: %v", mode.Perm())
+	if p := got.Mode.Perm(); p != 0555 {
+		t.Errorf("root has weird access mode: %v", p)
 	}
-	switch stat := fi.Sys().(type) {
-	case *syscall.Stat_t:
-		if stat.Ino != 1 {
-			t.Errorf("root has wrong inode: %v", stat.Ino)
-		}
-		if stat.Nlink != 1 {
-			t.Errorf("root has wrong link count: %v", stat.Nlink)
-		}
-		if stat.Uid != 0 {
-			t.Errorf("root has wrong uid: %d", stat.Uid)
-		}
-		if stat.Gid != 0 {
-			t.Errorf("root has wrong gid: %d", stat.Gid)
-		}
-		if mnt.Conn.Protocol().HasAttrBlockSize() {
-			// convert stat.Blksize too because it's int64 on Linux but
-			// int32 on Darwin.
-			if g, e := int64(stat.Blksize), int64(65536); g != e {
-				t.Errorf("root has wrong blocksize: %d != %d", g, e)
-			}
+	if got.Ino != 1 {
+		t.Errorf("root has wrong inode: %v", got.Ino)
+	}
+	if got.Nlink != 1 {
+		t.Errorf("root has wrong link count: %v", got.Nlink)
+	}
+	if got.UID != 0 {
+		t.Errorf("root has wrong uid: %d", got.UID)
+	}
+	if got.GID != 0 {
+		t.Errorf("root has wrong gid: %d", got.GID)
+	}
+	if mnt.Conn.Protocol().HasAttrBlockSize() {
+		// convert got.Blksize too because it's int64 on Linux but
+		// int32 on Darwin.
+		if g, e := int64(got.Blksize), int64(65536); g != e {
+			t.Errorf("root has wrong blocksize: %d != %d", g, e)
 		}
 	}
 }
