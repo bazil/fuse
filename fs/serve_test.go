@@ -672,8 +672,67 @@ type write struct {
 	record.Fsyncs
 }
 
+type createWriteFsyncHelp struct {
+	mu   sync.Mutex
+	file *os.File
+}
+
+func (cwf *createWriteFsyncHelp) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	switch req.URL.Path {
+	case "/createWrite":
+		httpjson.ServePOST(cwf.doCreateWrite).ServeHTTP(w, req)
+	case "/fsync":
+		httpjson.ServePOST(cwf.doFsync).ServeHTTP(w, req)
+	case "/close":
+		httpjson.ServePOST(cwf.doClose).ServeHTTP(w, req)
+	default:
+		http.NotFound(w, req)
+	}
+}
+
+func (cwf *createWriteFsyncHelp) doCreateWrite(ctx context.Context, path string) (*struct{}, error) {
+	cwf.mu.Lock()
+	defer cwf.mu.Unlock()
+	f, err := os.Create(path)
+	if err != nil {
+		return nil, fmt.Errorf("Create: %v", err)
+	}
+	cwf.file = f
+	n, err := f.Write([]byte(hi))
+	if err != nil {
+		return nil, fmt.Errorf("Write: %v", err)
+	}
+	if n != len(hi) {
+		return nil, fmt.Errorf("short write; n=%d; hi=%d", n, len(hi))
+	}
+	return &struct{}{}, nil
+}
+
+func (cwf *createWriteFsyncHelp) doFsync(ctx context.Context, _ struct{}) (*struct{}, error) {
+	cwf.mu.Lock()
+	defer cwf.mu.Unlock()
+	if err := cwf.file.Sync(); err != nil {
+		return nil, fmt.Errorf("Fsync = %v", err)
+	}
+	return &struct{}{}, nil
+}
+
+func (cwf *createWriteFsyncHelp) doClose(ctx context.Context, _ struct{}) (*struct{}, error) {
+	cwf.mu.Lock()
+	defer cwf.mu.Unlock()
+	if err := cwf.file.Close(); err != nil {
+		return nil, fmt.Errorf("Close: %v", err)
+	}
+
+	return &struct{}{}, nil
+}
+
+var createWriteFsyncHelper = helpers.Register("createWriteFsync", &createWriteFsyncHelp{})
+
 func TestWrite(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	w := &write{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": w}}, nil)
 	if err != nil {
@@ -681,34 +740,23 @@ func TestWrite(t *testing.T) {
 	}
 	defer mnt.Close()
 
-	f, err := os.Create(mnt.Dir + "/child")
-	if err != nil {
-		t.Fatalf("Create: %v", err)
+	control := createWriteFsyncHelper.Spawn(ctx, t)
+	defer control.Close()
+	var nothing struct{}
+	if err := control.JSON("/createWrite").Call(ctx, mnt.Dir+"/child", &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
-	defer f.Close()
-	n, err := f.Write([]byte(hi))
-	if err != nil {
-		t.Fatalf("Write: %v", err)
-	}
-	if n != len(hi) {
-		t.Fatalf("short write; n=%d; hi=%d", n, len(hi))
-	}
-
-	err = syscall.Fsync(int(f.Fd()))
-	if err != nil {
-		t.Fatalf("Fsync = %v", err)
+	if err := control.JSON("/fsync").Call(ctx, struct{}{}, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 	if w.RecordedFsync() == (fuse.FsyncRequest{}) {
 		t.Errorf("never received expected fsync call")
 	}
-
-	err = f.Close()
-	if err != nil {
-		t.Fatalf("Close: %v", err)
-	}
-
 	if got := string(w.RecordedWriteData()); got != hi {
 		t.Errorf("write = %q, want %q", got, hi)
+	}
+	if err := control.JSON("/close").Call(ctx, struct{}{}, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 }
 
