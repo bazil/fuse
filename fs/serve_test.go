@@ -1049,30 +1049,36 @@ func (f *create3) Remove(ctx context.Context, r *fuse.RemoveRequest) error {
 	return fuse.ENOENT
 }
 
+func doCreateWriteRemove(ctx context.Context, path string) (*struct{}, error) {
+	if err := ioutil.WriteFile(path, []byte(hi), 0666); err != nil {
+		return nil, fmt.Errorf("WriteFile: %v", err)
+	}
+	if err := os.Remove(path); err != nil {
+		return nil, fmt.Errorf("Remove: %v", err)
+	}
+	if err := os.Remove(path); !errors.Is(err, syscall.ENOENT) {
+		return nil, fmt.Errorf("second Remove: wrong error: %v", err)
+	}
+	return &struct{}{}, nil
+}
+
+var createWriteRemoveHelper = helpers.Register("createWriteRemove", httpjson.ServePOST(doCreateWriteRemove))
+
 func TestCreateWriteRemove(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	f := &create3{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
-
-	err = ioutil.WriteFile(mnt.Dir+"/foo", []byte(hi), 0666)
-	if err != nil {
-		t.Fatalf("create3 WriteFile: %v", err)
-	}
-	if got := string(f.f.RecordedWriteData()); got != hi {
-		t.Fatalf("create3 write = %q, want %q", got, hi)
-	}
-
-	err = os.Remove(mnt.Dir + "/foo")
-	if err != nil {
-		t.Fatalf("Remove: %v", err)
-	}
-	err = os.Remove(mnt.Dir + "/foo")
-	if err == nil {
-		t.Fatalf("second Remove = nil; want some error")
+	control := createWriteRemoveHelper.Spawn(ctx, t)
+	defer control.Close()
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, mnt.Dir+"/foo", &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 }
 
