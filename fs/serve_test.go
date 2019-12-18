@@ -828,8 +828,24 @@ type writeTruncateFlush struct {
 	record.Flushes
 }
 
+type writeFileRequest struct {
+	Path string
+	Data []byte
+}
+
+func doWriteFile(ctx context.Context, req writeFileRequest) (*struct{}, error) {
+	if err := ioutil.WriteFile(req.Path, req.Data, 0666); err != nil {
+		return nil, fmt.Errorf("WriteFile: %v", err)
+	}
+	return &struct{}{}, nil
+}
+
+var writeFileHelper = helpers.Register("writeFile", httpjson.ServePOST(doWriteFile))
+
 func TestWriteTruncateFlush(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	w := &writeTruncateFlush{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": w}}, nil)
 	if err != nil {
@@ -837,9 +853,15 @@ func TestWriteTruncateFlush(t *testing.T) {
 	}
 	defer mnt.Close()
 
-	err = ioutil.WriteFile(mnt.Dir+"/child", []byte(hi), 0666)
-	if err != nil {
-		t.Fatalf("WriteFile: %v", err)
+	control := writeFileHelper.Spawn(ctx, t)
+	defer control.Close()
+	var nothing struct{}
+	req := writeFileRequest{
+		Path: mnt.Dir + "/child",
+		Data: []byte(hi),
+	}
+	if err := control.JSON("/").Call(ctx, req, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 	if w.RecordedSetattr() == (fuse.SetattrRequest{}) {
 		t.Errorf("writeTruncateFlush expected Setattr")
