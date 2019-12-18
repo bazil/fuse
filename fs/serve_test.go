@@ -929,12 +929,11 @@ func TestMkdir(t *testing.T) {
 	}
 }
 
-// Test Create (and fsync)
+// Test Create
 
 type create1file struct {
 	fstestutil.File
 	record.Creates
-	record.Fsyncs
 }
 
 type create1 struct {
@@ -952,7 +951,24 @@ func (f *create1) Create(ctx context.Context, req *fuse.CreateRequest, resp *fus
 	return &f.f, &f.f, nil
 }
 
+func doCreate(ctx context.Context, path string) (*struct{}, error) {
+	// uniform umask needed to make os.Mkdir's mode into something
+	// reproducible
+	syscall.Umask(0022)
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0640)
+	if err != nil {
+		return nil, fmt.Errorf("create1 WriteFile: %v", err)
+	}
+	_ = f.Close()
+	return &struct{}{}, nil
+}
+
+var createHelper = helpers.Register("create", httpjson.ServePOST(doCreate))
+
 func TestCreate(t *testing.T) {
+	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	f := &create1{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
 	if err != nil {
@@ -960,14 +976,12 @@ func TestCreate(t *testing.T) {
 	}
 	defer mnt.Close()
 
-	// uniform umask needed to make os.Create's 0666 into something
-	// reproducible
-	defer syscall.Umask(syscall.Umask(0022))
-	ff, err := os.OpenFile(mnt.Dir+"/foo", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0640)
-	if err != nil {
-		t.Fatalf("create1 WriteFile: %v", err)
+	control := createHelper.Spawn(ctx, t)
+	defer control.Close()
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, mnt.Dir+"/foo", &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
-	defer ff.Close()
 
 	want := fuse.CreateRequest{
 		Name:  "foo",
@@ -994,17 +1008,6 @@ func TestCreate(t *testing.T) {
 	if g, e := got, want; g != e {
 		t.Fatalf("create saw %+v, want %+v", g, e)
 	}
-
-	err = syscall.Fsync(int(ff.Fd()))
-	if err != nil {
-		t.Fatalf("Fsync = %v", err)
-	}
-
-	if f.f.RecordedFsync() == (fuse.FsyncRequest{}) {
-		t.Errorf("never received expected fsync call")
-	}
-
-	ff.Close()
 }
 
 // Test Create + Write + Remove
