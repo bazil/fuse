@@ -397,31 +397,45 @@ func (readAll) ReadAll(ctx context.Context) ([]byte, error) {
 	return []byte(hi), nil
 }
 
-func testReadAll(t *testing.T, path string) {
+type readResult struct {
+	Data []byte
+}
+
+func doRead(ctx context.Context, path string) (*readResult, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 	defer f.Close()
 	data := make([]byte, 4096)
 	n, err := f.Read(data)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
-	if g, e := string(data[:n]), hi; g != e {
-		t.Errorf("readAll = %q, want %q", g, e)
-	}
+	r := &readResult{Data: data[:n]}
+	return r, nil
 }
+
+var readHelper = helpers.Register("read", httpjson.ServePOST(doRead))
 
 func TestReadAll(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": readAll{}}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
-
-	testReadAll(t, mnt.Dir+"/child")
+	control := readHelper.Spawn(ctx, t)
+	defer control.Close()
+	var got readResult
+	if err := control.JSON("/").Call(ctx, mnt.Dir+"/child", &got); err != nil {
+		t.Fatalf("calling helper: %v", err)
+	}
+	if g, e := string(got.Data), hi; g != e {
+		t.Errorf("readAll = %q, want %q", g, e)
+	}
 }
 
 // Test Read.
@@ -443,13 +457,22 @@ func (readWithHandleRead) Read(ctx context.Context, req *fuse.ReadRequest, resp 
 
 func TestReadAllWithHandleRead(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": readWithHandleRead{}}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
-
-	testReadAll(t, mnt.Dir+"/child")
+	control := readHelper.Spawn(ctx, t)
+	defer control.Close()
+	var got readResult
+	if err := control.JSON("/").Call(ctx, mnt.Dir+"/child", &got); err != nil {
+		t.Fatalf("calling helper: %v", err)
+	}
+	if g, e := string(got.Data), hi; g != e {
+		t.Errorf("readAll = %q, want %q", g, e)
+	}
 }
 
 type readFlags struct {
@@ -2357,13 +2380,22 @@ func (directRead) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.Re
 
 func TestDirectRead(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": directRead{}}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
-
-	testReadAll(t, mnt.Dir+"/child")
+	control := readHelper.Spawn(ctx, t)
+	defer control.Close()
+	var got readResult
+	if err := control.JSON("/").Call(ctx, mnt.Dir+"/child", &got); err != nil {
+		t.Fatalf("calling helper: %v", err)
+	}
+	if g, e := string(got.Data), hi; g != e {
+		t.Errorf("readAll = %q, want %q", g, e)
+	}
 }
 
 // Test direct Write.
