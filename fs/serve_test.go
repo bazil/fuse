@@ -570,8 +570,25 @@ func (r *writeFlags) Write(ctx context.Context, req *fuse.WriteRequest, resp *fu
 	return nil
 }
 
+func doWriteFileFlags(ctx context.Context, path string) (*struct{}, error) {
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND, 0666)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	if _, err := f.Write(make([]byte, 4096)); err != nil {
+		return nil, err
+	}
+	_ = f.Close()
+	return &struct{}{}, nil
+}
+
+var writeFileFlagsHelper = helpers.Register("writeFileFlags", httpjson.ServePOST(doWriteFileFlags))
+
 func TestWriteFileFlags(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	r := &writeFlags{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": r}}, nil)
 	if err != nil {
@@ -583,15 +600,12 @@ func TestWriteFileFlags(t *testing.T) {
 		t.Skip("Old FUSE protocol")
 	}
 
-	f, err := os.OpenFile(mnt.Dir+"/child", os.O_RDWR|os.O_APPEND, 0666)
-	if err != nil {
-		t.Fatal(err)
+	control := writeFileFlagsHelper.Spawn(ctx, t)
+	defer control.Close()
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, mnt.Dir+"/child", &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
-	defer f.Close()
-	if _, err := f.Write(make([]byte, 4096)); err != nil {
-		t.Fatal(err)
-	}
-	_ = f.Close()
 
 	got := r.fileFlags.Recorded().(fuse.OpenFlags)
 	got &^= fuse.OpenNonblock
