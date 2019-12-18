@@ -37,7 +37,7 @@ func (r *ReleaseWaiter) Release(ctx context.Context, req *fuse.ReleaseRequest) e
 // WaitForRelease waits for Release to be called.
 //
 // With zero duration, wait forever. Otherwise, timeout early
-// in a more controller way than `-test.timeout`.
+// in a more controlled way than `-test.timeout`.
 //
 // Returns whether a Release was seen. Always true if dur==0.
 func (r *ReleaseWaiter) WaitForRelease(dur time.Duration) bool {
