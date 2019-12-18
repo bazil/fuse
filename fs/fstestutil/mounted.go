@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -35,12 +36,24 @@ func (mnt *Mount) Close() {
 		return
 	}
 	mnt.closed = true
+	prev := ""
 	for tries := 0; tries < 1000; tries++ {
 		err := fuse.Unmount(mnt.Dir)
 		if err != nil {
-			// TODO do more than log?
-			log.Printf("unmount error: %v", err)
-			time.Sleep(10 * time.Millisecond)
+			msg := err.Error()
+			// hide repeating errors
+			if msg != prev {
+				// TODO do more than log?
+
+				// silence a very common message we can't do anything
+				// about, for the first few tries. it'll still show if
+				// the condition persists.
+				if !strings.HasSuffix(err.Error(), ": Device or resource busy") || tries > 10 {
+					log.Printf("unmount error: %v", err)
+					prev = msg
+				}
+			}
+			time.Sleep(100 * time.Millisecond)
 			continue
 		}
 		break
