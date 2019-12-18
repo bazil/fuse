@@ -145,17 +145,30 @@ func (f testPanic) Mkdir(ctx context.Context, req *fuse.MkdirRequest) (fs.Node, 
 	panic(panicSentinel{})
 }
 
+func doPanic(ctx context.Context, dir string) (*struct{}, error) {
+	err := os.Mkdir(dir+"/trigger-a-panic", 0700)
+	if nerr, ok := err.(*os.PathError); !ok || nerr.Err != syscall.ENAMETOOLONG {
+		return nil, fmt.Errorf("wrong error from panicking handler: %T: %v", err, err)
+	}
+	return &struct{}{}, nil
+}
+
+var panicHelper = helpers.Register("panic", httpjson.ServePOST(doPanic))
+
 func TestPanic(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	mnt, err := fstestutil.MountedT(t, testPanic{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
-
-	err = os.Mkdir(mnt.Dir+"/trigger-a-panic", 0700)
-	if nerr, ok := err.(*os.PathError); !ok || nerr.Err != syscall.ENAMETOOLONG {
-		t.Fatalf("wrong error from panicking handler: %T: %v", err, err)
+	control := panicHelper.Spawn(ctx, t)
+	defer control.Close()
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, mnt.Dir, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 }
 
