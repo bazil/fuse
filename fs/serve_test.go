@@ -886,7 +886,22 @@ func (f *mkdir1) Mkdir(ctx context.Context, req *fuse.MkdirRequest) (fs.Node, er
 	return &mkdir1{}, nil
 }
 
+func doMkdir(ctx context.Context, path string) (*struct{}, error) {
+	// uniform umask needed to make os.Mkdir's mode into something
+	// reproducible
+	syscall.Umask(0022)
+	if err := os.Mkdir(path, 0771); err != nil {
+		return nil, fmt.Errorf("mkdir: %v", err)
+	}
+	return &struct{}{}, nil
+}
+
+var mkdirHelper = helpers.Register("mkdir", httpjson.ServePOST(doMkdir))
+
 func TestMkdir(t *testing.T) {
+	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	f := &mkdir1{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
 	if err != nil {
@@ -894,13 +909,13 @@ func TestMkdir(t *testing.T) {
 	}
 	defer mnt.Close()
 
-	// uniform umask needed to make os.Mkdir's mode into something
-	// reproducible
-	defer syscall.Umask(syscall.Umask(0022))
-	err = os.Mkdir(mnt.Dir+"/foo", 0771)
-	if err != nil {
-		t.Fatalf("mkdir: %v", err)
+	control := mkdirHelper.Spawn(ctx, t)
+	defer control.Close()
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, mnt.Dir+"/foo", &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
+
 	want := fuse.MkdirRequest{Name: "foo", Mode: os.ModeDir | 0751}
 	if mnt.Conn.Protocol().HasUmask() {
 		want.Umask = 0022
