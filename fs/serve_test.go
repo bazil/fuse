@@ -762,8 +762,39 @@ func TestWrite(t *testing.T) {
 
 // Test Write of a larger buffer.
 
+func makeLargeData() (one, large []byte) {
+	o := []byte("xyzzyfoo")
+	l := bytes.Repeat(o, 8192)
+	return o, l
+}
+
+func doWriteLarge(ctx context.Context, path string) (*struct{}, error) {
+	f, err := os.Create(path)
+	if err != nil {
+		return nil, fmt.Errorf("Create: %v", err)
+	}
+	defer f.Close()
+	_, large := makeLargeData()
+	n, err := f.Write(large)
+	if err != nil {
+		return nil, fmt.Errorf("Write: %v", err)
+	}
+	if g, e := n, len(large); g != e {
+		return nil, fmt.Errorf("short write: %d != %d", g, e)
+	}
+	err = f.Close()
+	if err != nil {
+		return nil, fmt.Errorf("Close: %v", err)
+	}
+	return &struct{}{}, nil
+}
+
+var writeLargeHelper = helpers.Register("writeLarge", httpjson.ServePOST(doWriteLarge))
+
 func TestWriteLarge(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	w := &write{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": w}}, nil)
 	if err != nil {
@@ -771,31 +802,19 @@ func TestWriteLarge(t *testing.T) {
 	}
 	defer mnt.Close()
 
-	f, err := os.Create(mnt.Dir + "/child")
-	if err != nil {
-		t.Fatalf("Create: %v", err)
-	}
-	defer f.Close()
-	const one = "xyzzyfoo"
-	large := bytes.Repeat([]byte(one), 8192)
-	n, err := f.Write(large)
-	if err != nil {
-		t.Fatalf("Write: %v", err)
-	}
-	if g, e := n, len(large); g != e {
-		t.Fatalf("short write: %d != %d", g, e)
-	}
-
-	err = f.Close()
-	if err != nil {
-		t.Fatalf("Close: %v", err)
+	control := writeLargeHelper.Spawn(ctx, t)
+	defer control.Close()
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, mnt.Dir+"/child", &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 
 	got := w.RecordedWriteData()
+	one, large := makeLargeData()
 	if g, e := len(got), len(large); g != e {
 		t.Errorf("write wrong length: %d != %d", g, e)
 	}
-	if g := strings.Replace(string(got), one, "", -1); g != "" {
+	if g := bytes.Replace(got, one, nil, -1); len(g) > 0 {
 		t.Errorf("write wrong data: expected repeats of %q, also got %q", one, g)
 	}
 }
