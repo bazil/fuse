@@ -631,8 +631,21 @@ type release struct {
 	record.ReleaseWaiter
 }
 
+func doOpen(ctx context.Context, path string) (*struct{}, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	f.Close()
+	return &struct{}{}, nil
+}
+
+var openHelper = helpers.Register("open", httpjson.ServePOST(doOpen))
+
 func TestRelease(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	r := &release{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": r}}, nil)
 	if err != nil {
@@ -640,11 +653,12 @@ func TestRelease(t *testing.T) {
 	}
 	defer mnt.Close()
 
-	f, err := os.Open(mnt.Dir + "/child")
-	if err != nil {
-		t.Fatal(err)
+	control := openHelper.Spawn(ctx, t)
+	defer control.Close()
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, mnt.Dir+"/child", &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
-	f.Close()
 	if !r.WaitForRelease(1 * time.Second) {
 		t.Error("Close did not Release in time")
 	}
