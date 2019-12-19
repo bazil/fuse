@@ -1593,8 +1593,28 @@ func (it *deadline) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.
 	return nil, ctx.Err()
 }
 
+type openRequest struct {
+	Path      string
+	WantErrno syscall.Errno
+}
+
+func doOpenErr(ctx context.Context, req openRequest) (*struct{}, error) {
+	f, err := os.Open(req.Path)
+	if err == nil {
+		f.Close()
+	}
+	if !errors.Is(err, req.WantErrno) {
+		return nil, err
+	}
+	return &struct{}{}, nil
+}
+
+var openErrHelper = helpers.Register("openErr", httpjson.ServePOST(doOpenErr))
+
 func TestDeadline(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	child := &deadline{}
 	config := &fs.Config{
 		WithContext: func(ctx context.Context, req fuse.Request) context.Context {
@@ -1612,16 +1632,18 @@ func TestDeadline(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := openErrHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	f, err := os.Open(mnt.Dir + "/child")
-	if err == nil {
-		f.Close()
+	req := openRequest{
+		Path: mnt.Dir + "/child",
+		// not caused by signal -> should not get EINTR;
+		// context.DeadlineExceeded will be translated into EIO
+		WantErrno: syscall.EIO,
 	}
-
-	// not caused by signal -> should not get EINTR;
-	// context.DeadlineExceeded will be translated into EIO
-	if nerr, ok := err.(*os.PathError); !ok || nerr.Err != syscall.EIO {
-		t.Fatalf("wrong error from deadline open: %T: %v", err, err)
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, req, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 }
 
