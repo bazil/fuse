@@ -2600,20 +2600,27 @@ func (f *listxattrSize) Listxattr(ctx context.Context, req *fuse.ListxattrReques
 
 func TestListxattrSize(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	f := &listxattrSize{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := listxattrHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	n, err := syscallx.Listxattr(mnt.Dir+"/child", nil)
-	if err != nil {
-		t.Errorf("Listxattr unexpected error: %v", err)
-		return
+	req := listxattrRequest{
+		Path: mnt.Dir + "/child",
+		Size: 0,
 	}
-	if g, e := n, len("one\x00two\x00"); g != e {
-		t.Errorf("Getxattr incorrect size: %d != %d", g, e)
+	var res listxattrResult
+	if err := control.JSON("/").Call(ctx, req, &res); err != nil {
+		t.Fatalf("calling helper: %v", err)
+	}
+	if g, e := res.Size, len("one\x00two\x00"); g != e {
+		t.Errorf("Listxattr incorrect size: %d != %d", g, e)
 	}
 }
 
