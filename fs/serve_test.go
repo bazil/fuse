@@ -1260,25 +1260,57 @@ func (f *rename1) Rename(ctx context.Context, r *fuse.RenameRequest, newDir fs.N
 	return fuse.EIO
 }
 
+type renameRequest struct {
+	OldName   string
+	NewName   string
+	WantErrno syscall.Errno
+}
+
+func doRename(ctx context.Context, req renameRequest) (*struct{}, error) {
+	if err := os.Rename(req.OldName, req.NewName); !errors.Is(err, req.WantErrno) {
+		return nil, err
+	}
+	return &struct{}{}, nil
+}
+
+var renameHelper = helpers.Register("rename", httpjson.ServePOST(doRename))
+
 func TestRename(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	f := &rename1{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := renameHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	err = os.Rename(mnt.Dir+"/old", mnt.Dir+"/new")
-	if err != nil {
-		t.Fatalf("Rename: %v", err)
+	{
+		req := renameRequest{
+			OldName: mnt.Dir + "/old",
+			NewName: mnt.Dir + "/new",
+		}
+		var nothing struct{}
+		if err := control.JSON("/").Call(ctx, req, &nothing); err != nil {
+			t.Fatalf("calling helper: %v", err)
+		}
 	}
 	if g, e := f.renamed.Count(), uint32(1); g != e {
 		t.Fatalf("expected rename didn't happen: %d != %d", g, e)
 	}
-	err = os.Rename(mnt.Dir+"/old2", mnt.Dir+"/new2")
-	if err == nil {
-		t.Fatal("expected error on second Rename; got nil")
+	{
+		req := renameRequest{
+			OldName:   mnt.Dir + "/old2",
+			NewName:   mnt.Dir + "/new2",
+			WantErrno: syscall.ENOENT,
+		}
+		var nothing struct{}
+		if err := control.JSON("/").Call(ctx, req, &nothing); err != nil {
+			t.Fatalf("calling helper: %v", err)
+		}
 	}
 }
 
