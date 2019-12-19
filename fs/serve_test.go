@@ -1401,20 +1401,23 @@ func (dataHandleTest) Open(ctx context.Context, req *fuse.OpenRequest, resp *fus
 
 func TestDataHandle(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	f := &dataHandleTest{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := readHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	data, err := ioutil.ReadFile(mnt.Dir + "/child")
-	if err != nil {
-		t.Errorf("readAll: %v", err)
-		return
+	var got readResult
+	if err := control.JSON("/").Call(ctx, mnt.Dir+"/child", &got); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
-	if string(data) != hi {
-		t.Errorf("readAll = %q, want %q", data, hi)
+	if g, e := string(got.Data), hi; g != e {
+		t.Errorf("readAll = %q, want %q", g, e)
 	}
 }
 
