@@ -2322,23 +2322,69 @@ func (f *getxattr) Getxattr(ctx context.Context, req *fuse.GetxattrRequest, resp
 	return nil
 }
 
+type getxattrRequest struct {
+	Path      string
+	Name      string
+	Size      int
+	WantErrno syscall.Errno
+}
+
+type getxattrResult struct {
+	// only one of Data and Size is set
+
+	Data []byte
+	Size int
+}
+
+func doGetxattr(ctx context.Context, req getxattrRequest) (*getxattrResult, error) {
+	buf := make([]byte, req.Size)
+	n, err := syscallx.Getxattr(req.Path, req.Name, buf)
+	if req.WantErrno != 0 {
+		if !errors.Is(err, req.WantErrno) {
+			return nil, fmt.Errorf("wrong error: %v", err)
+		}
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("unexpected error: %v", err)
+	}
+	if req.Size == 0 {
+		r := &getxattrResult{
+			Size: n,
+		}
+		return r, nil
+	}
+	r := &getxattrResult{
+		Data: buf[:n],
+	}
+	return r, nil
+}
+
+var getxattrHelper = helpers.Register("getxattr", httpjson.ServePOST(doGetxattr))
+
 func TestGetxattr(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	f := &getxattr{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := getxattrHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	buf := make([]byte, 8192)
-	n, err := syscallx.Getxattr(mnt.Dir+"/child", "not-there", buf)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-		return
+	req := getxattrRequest{
+		Path: mnt.Dir + "/child",
+		Name: "not-there",
+		Size: 8192,
 	}
-	buf = buf[:n]
-	if g, e := string(buf), "hello, world"; g != e {
+	var res getxattrResult
+	if err := control.JSON("/").Call(ctx, req, &res); err != nil {
+		t.Fatalf("calling helper: %v", err)
+	}
+	if g, e := string(res.Data), "hello, world"; g != e {
 		t.Errorf("wrong getxattr content: %#v != %#v", g, e)
 	}
 	seen := f.RecordedGetxattr()
@@ -2360,21 +2406,26 @@ func (f *getxattrTooSmall) Getxattr(ctx context.Context, req *fuse.GetxattrReque
 
 func TestGetxattrTooSmall(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	f := &getxattrTooSmall{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := getxattrHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	buf := make([]byte, 3)
-	_, err = syscallx.Getxattr(mnt.Dir+"/child", "whatever", buf)
-	if err == nil {
-		t.Error("Getxattr = nil; want some error")
+	req := getxattrRequest{
+		Path:      mnt.Dir + "/child",
+		Name:      "whatever",
+		Size:      3,
+		WantErrno: syscall.ERANGE,
 	}
-	if err != syscall.ERANGE {
-		t.Errorf("unexpected error: %v", err)
-		return
+	var res getxattrResult
+	if err := control.JSON("/").Call(ctx, req, &res); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 }
 
@@ -2391,19 +2442,27 @@ func (f *getxattrSize) Getxattr(ctx context.Context, req *fuse.GetxattrRequest, 
 
 func TestGetxattrSize(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	f := &getxattrSize{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := getxattrHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	n, err := syscallx.Getxattr(mnt.Dir+"/child", "whatever", nil)
-	if err != nil {
-		t.Errorf("Getxattr unexpected error: %v", err)
-		return
+	req := getxattrRequest{
+		Path: mnt.Dir + "/child",
+		Name: "whatever",
+		Size: 0,
 	}
-	if g, e := n, len("hello, world"); g != e {
+	var res getxattrResult
+	if err := control.JSON("/").Call(ctx, req, &res); err != nil {
+		t.Fatalf("calling helper: %v", err)
+	}
+	if g, e := res.Size, len("hello, world"); g != e {
 		t.Errorf("Getxattr incorrect size: %d != %d", g, e)
 	}
 }
