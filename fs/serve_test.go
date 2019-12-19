@@ -1894,19 +1894,10 @@ func (d *readDirAllBad) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	return r, fuse.Errno(syscall.ENAMETOOLONG)
 }
 
-func TestReadDirAllBad(t *testing.T) {
-	maybeParallel(t)
-	f := &readDirAllBad{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
+func doReaddirBad(ctx context.Context, path string) (*struct{}, error) {
+	fil, err := os.Open(path)
 	if err != nil {
-		t.Fatal(err)
-	}
-	defer mnt.Close()
-
-	fil, err := os.Open(mnt.Dir)
-	if err != nil {
-		t.Error(err)
-		return
+		return nil, err
 	}
 	defer fil.Close()
 
@@ -1914,21 +1905,42 @@ func TestReadDirAllBad(t *testing.T) {
 	for {
 		n, err := fil.Readdirnames(1)
 		if err != nil {
-			if nerr, ok := err.(*os.SyscallError); !ok || nerr.Err != syscall.ENAMETOOLONG {
-				t.Fatalf("wrong error: %v", err)
+			if !errors.Is(err, syscall.ENAMETOOLONG) {
+				return nil, fmt.Errorf("wrong error: %v", err)
 			}
 			break
 		}
 		names = append(names, n...)
 	}
 
-	t.Logf("Got readdir: %q", names)
+	log.Printf("Got readdir: %q", names)
 
 	// TODO could serve partial results from ReadDirAll but the
 	// shandle.readData mechanism makes that awkward.
 	if len(names) != 0 {
-		t.Errorf(`expected 0 entries, got: %q`, names)
-		return
+		return nil, fmt.Errorf("expected 0 entries, got: %q", names)
+	}
+	return &struct{}{}, nil
+}
+
+var readdirBadHelper = helpers.Register("readdirBad", httpjson.ServePOST(doReaddirBad))
+
+func TestReadDirAllBad(t *testing.T) {
+	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	f := &readDirAllBad{}
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+	control := readdirBadHelper.Spawn(ctx, t)
+	defer control.Close()
+
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, mnt.Dir, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 }
 
