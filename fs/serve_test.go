@@ -1843,7 +1843,7 @@ func doReaddir(ctx context.Context, path string) ([]string, error) {
 	// go Readdir is just Readdirnames + Lstat, there's no point in
 	// testing that here; we have no consumption API for the real
 	// dirent data
-	names, err := f.Readdirnames(100)
+	names, err := f.Readdirnames(-1)
 	if err != nil {
 		return nil, err
 	}
@@ -1952,26 +1952,25 @@ type readDirNotImplemented struct {
 
 func TestReadDirNotImplemented(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	f := &readDirNotImplemented{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := readdirHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	fil, err := os.Open(mnt.Dir)
-	if err != nil {
-		t.Error(err)
-		return
+	var names []string
+	if err := control.JSON("/").Call(ctx, mnt.Dir, &names); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
-	defer fil.Close()
+	t.Logf("Got readdir: %q", names)
 
-	// go Readdir is just Readdirnames + Lstat, there's no point in
-	// testing that here; we have no consumption API for the real
-	// dirent data
-	names, err := fil.Readdirnames(100)
-	if len(names) > 0 || err != io.EOF {
-		t.Fatalf("expected EOF got names=%v err=%v", names, err)
+	if len(names) != 0 {
+		t.Errorf(`expected 0 entries, got: %q`, names)
 	}
 }
 
