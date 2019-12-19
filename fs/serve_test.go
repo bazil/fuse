@@ -1595,11 +1595,13 @@ func (it *deadline) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.
 
 type openRequest struct {
 	Path      string
+	Flags     int
+	Perm      os.FileMode
 	WantErrno syscall.Errno
 }
 
 func doOpenErr(ctx context.Context, req openRequest) (*struct{}, error) {
-	f, err := os.Open(req.Path)
+	f, err := os.OpenFile(req.Path, req.Flags, req.Perm)
 	if err == nil {
 		f.Close()
 	}
@@ -1636,7 +1638,9 @@ func TestDeadline(t *testing.T) {
 	defer control.Close()
 
 	req := openRequest{
-		Path: mnt.Dir + "/child",
+		Path:  mnt.Dir + "/child",
+		Flags: os.O_RDONLY,
+		Perm:  0,
 		// not caused by signal -> should not get EINTR;
 		// context.DeadlineExceeded will be translated into EIO
 		WantErrno: syscall.EIO,
@@ -2152,29 +2156,27 @@ func (f *open) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenR
 
 func TestOpen(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	f := &open{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := openErrHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	// node: mode only matters with O_CREATE
-	fil, err := os.OpenFile(mnt.Dir+"/child", os.O_WRONLY|os.O_APPEND, 0)
-	if err == nil {
-		t.Error("Open err == nil, expected ENAMETOOLONG")
-		fil.Close()
-		return
+	req := openRequest{
+		Path:  mnt.Dir + "/child",
+		Flags: os.O_WRONLY | os.O_APPEND,
+		// note: mode only matters with O_CREATE
+		Perm:      0,
+		WantErrno: syscall.ENAMETOOLONG,
 	}
-
-	switch err2 := err.(type) {
-	case *os.PathError:
-		if err2.Err == syscall.ENAMETOOLONG {
-			break
-		}
-		t.Errorf("unexpected inner error: %#v", err2)
-	default:
-		t.Errorf("unexpected error: %v", err)
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, req, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 
 	want := fuse.OpenRequest{Dir: false, Flags: fuse.OpenWriteOnly | fuse.OpenAppend}
