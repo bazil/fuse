@@ -1776,21 +1776,34 @@ type truncateWithOpen struct {
 	record.Setattrs
 }
 
+func doTruncateWithOpen(ctx context.Context, path string) (*struct{}, error) {
+	fil, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC, 0666)
+	if err != nil {
+		return nil, err
+	}
+	_ = fil.Close()
+	return &struct{}{}, nil
+}
+
+var truncateWithOpenHelper = helpers.Register("truncateWithOpen", httpjson.ServePOST(doTruncateWithOpen))
+
 func TestTruncateWithOpen(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	f := &truncateWithOpen{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := truncateWithOpenHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	fil, err := os.OpenFile(mnt.Dir+"/child", os.O_WRONLY|os.O_TRUNC, 0666)
-	if err != nil {
-		t.Error(err)
-		return
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, mnt.Dir+"/child", &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
-	fil.Close()
 
 	gotr := f.RecordedSetattr()
 	if gotr == (fuse.SetattrRequest{}) {
