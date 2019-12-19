@@ -2211,32 +2211,44 @@ func (f *openNonSeekable) Open(ctx context.Context, req *fuse.OpenRequest, resp 
 	return f, nil
 }
 
+func doOpenNonseekable(ctx context.Context, path string) (*struct{}, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	if _, err := f.Seek(0, os.SEEK_SET); !errors.Is(err, syscall.ESPIPE) {
+		return nil, fmt.Errorf("wrong error: %v", err)
+	}
+	return &struct{}{}, nil
+}
+
+var openNonseekableHelper = helpers.Register("openNonseekable", httpjson.ServePOST(doOpenNonseekable))
+
 func TestOpenNonSeekable(t *testing.T) {
 	if runtime.GOOS == "darwin" {
 		t.Skip("OSXFUSE shares one read and one write handle for all clients, does not support open modes")
 	}
 
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	f := &openNonSeekable{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
-
 	if !mnt.Conn.Protocol().HasOpenNonSeekable() {
 		t.Skip("Old FUSE protocol")
 	}
+	control := openNonseekableHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	fil, err := os.Open(mnt.Dir + "/child")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer fil.Close()
-
-	_, err = fil.Seek(0, os.SEEK_SET)
-	if nerr, ok := err.(*os.PathError); !ok || nerr.Err != syscall.ESPIPE {
-		t.Fatalf("wrong error: %v", err)
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, mnt.Dir+"/child", &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 }
 
