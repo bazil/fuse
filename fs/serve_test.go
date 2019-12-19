@@ -2259,25 +2259,37 @@ type fsyncDir struct {
 	record.Fsyncs
 }
 
+func doOpenFsyncClose(ctx context.Context, path string) (*struct{}, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	err = f.Sync()
+	if err != nil {
+		return nil, err
+	}
+	return &struct{}{}, nil
+}
+
+var openFsyncCloseHelper = helpers.Register("openFsyncClose", httpjson.ServePOST(doOpenFsyncClose))
+
 func TestFsyncDir(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	f := &fsyncDir{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := openFsyncCloseHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	fil, err := os.Open(mnt.Dir)
-	if err != nil {
-		t.Errorf("fsyncDir open: %v", err)
-		return
-	}
-	defer fil.Close()
-	err = fil.Sync()
-	if err != nil {
-		t.Errorf("fsyncDir sync: %v", err)
-		return
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, mnt.Dir, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 
 	got := f.RecordedFsync()
