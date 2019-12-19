@@ -1326,10 +1326,25 @@ func (f *mknod1) Mknod(ctx context.Context, r *fuse.MknodRequest) (fs.Node, erro
 	return fifo{}, nil
 }
 
+func doMknod(ctx context.Context, path string) (*struct{}, error) {
+	// uniform umask needed to make mknod's mode into something
+	// reproducible
+	syscall.Umask(0022)
+	if err := syscall.Mknod(path, syscall.S_IFIFO|0660, 123); err != nil {
+		return nil, err
+	}
+	return &struct{}{}, nil
+}
+
+var mknodHelper = helpers.Register("mknod", httpjson.ServePOST(doMknod))
+
 func TestMknod(t *testing.T) {
 	if os.Getuid() != 0 {
 		t.Skip("skipping unless root")
 	}
+	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	f := &mknod1{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
@@ -1337,11 +1352,12 @@ func TestMknod(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := mknodHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	defer syscall.Umask(syscall.Umask(0022))
-	err = syscall.Mknod(mnt.Dir+"/node", syscall.S_IFIFO|0660, 123)
-	if err != nil {
-		t.Fatalf("mknod: %v", err)
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, mnt.Dir+"/node", &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 
 	want := fuse.MknodRequest{
