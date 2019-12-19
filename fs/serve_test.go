@@ -2480,23 +2480,67 @@ func (f *listxattr) Listxattr(ctx context.Context, req *fuse.ListxattrRequest, r
 	return nil
 }
 
+type listxattrRequest struct {
+	Path      string
+	Size      int
+	WantErrno syscall.Errno
+}
+
+type listxattrResult struct {
+	// only one of Data and Size is set
+
+	Data []byte
+	Size int
+}
+
+func doListxattr(ctx context.Context, req listxattrRequest) (*listxattrResult, error) {
+	buf := make([]byte, req.Size)
+	n, err := syscallx.Listxattr(req.Path, buf)
+	if req.WantErrno != 0 {
+		if !errors.Is(err, req.WantErrno) {
+			return nil, fmt.Errorf("wrong error: %v", err)
+		}
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("unexpected error: %v", err)
+	}
+	if req.Size == 0 {
+		r := &listxattrResult{
+			Size: n,
+		}
+		return r, nil
+	}
+	r := &listxattrResult{
+		Data: buf[:n],
+	}
+	return r, nil
+}
+
+var listxattrHelper = helpers.Register("listxattr", httpjson.ServePOST(doListxattr))
+
 func TestListxattr(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	f := &listxattr{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := listxattrHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	buf := make([]byte, 8192)
-	n, err := syscallx.Listxattr(mnt.Dir+"/child", buf)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-		return
+	req := listxattrRequest{
+		Path: mnt.Dir + "/child",
+		Size: 8192,
 	}
-	buf = buf[:n]
-	if g, e := string(buf), "one\x00two\x00"; g != e {
+	var res listxattrResult
+	if err := control.JSON("/").Call(ctx, req, &res); err != nil {
+		t.Fatalf("calling helper: %v", err)
+	}
+	if g, e := string(res.Data), "one\x00two\x00"; g != e {
 		t.Errorf("wrong listxattr content: %#v != %#v", g, e)
 	}
 
