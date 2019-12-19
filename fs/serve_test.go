@@ -1654,19 +1654,42 @@ type truncate struct {
 	record.Setattrs
 }
 
+type truncateRequest struct {
+	Path   string
+	ToSize int64
+}
+
+func doTruncate(ctx context.Context, req truncateRequest) (*struct{}, error) {
+	if err := os.Truncate(req.Path, req.ToSize); err != nil {
+		return nil, err
+	}
+	return &struct{}{}, nil
+}
+
+var truncateHelper = helpers.Register("truncate", httpjson.ServePOST(doTruncate))
+
 func testTruncate(t *testing.T, toSize int64) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	f := &truncate{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := truncateHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	err = os.Truncate(mnt.Dir+"/child", toSize)
-	if err != nil {
-		t.Fatalf("Truncate: %v", err)
+	req := truncateRequest{
+		Path:   mnt.Dir + "/child",
+		ToSize: toSize,
 	}
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, req, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
+	}
+
 	gotr := f.RecordedSetattr()
 	if gotr == (fuse.SetattrRequest{}) {
 		t.Fatalf("no recorded SetattrRequest")
@@ -1680,12 +1703,9 @@ func testTruncate(t *testing.T, toSize int64) {
 	t.Logf("Got request: %#v", gotr)
 }
 
-func TestTruncate42(t *testing.T) {
-	testTruncate(t, 42)
-}
-
-func TestTruncate0(t *testing.T) {
-	testTruncate(t, 0)
+func TestTruncate(t *testing.T) {
+	t.Run("42", func(t *testing.T) { testTruncate(t, 42) })
+	t.Run("0", func(t *testing.T) { testTruncate(t, 0) })
 }
 
 // Test ftruncate
