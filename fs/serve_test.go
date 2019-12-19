@@ -2095,20 +2095,42 @@ func (f *chmod) Setattr(ctx context.Context, req *fuse.SetattrRequest, resp *fus
 	return nil
 }
 
+type chmodRequest struct {
+	Path string
+	Mode os.FileMode
+}
+
+func doChmod(ctx context.Context, req chmodRequest) (*struct{}, error) {
+	if err := os.Chmod(req.Path, req.Mode); err != nil {
+		return nil, err
+	}
+	return &struct{}{}, nil
+}
+
+var chmodHelper = helpers.Register("chmod", httpjson.ServePOST(doChmod))
+
 func TestChmod(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	f := &chmod{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := chmodHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	err = os.Chmod(mnt.Dir+"/child", 0764)
-	if err != nil {
-		t.Errorf("chmod: %v", err)
-		return
+	req := chmodRequest{
+		Path: mnt.Dir + "/child",
+		Mode: 0764,
 	}
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, req, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
+	}
+
 	got := f.RecordedSetattr()
 	if g, e := got.Mode, os.FileMode(0764); g != e {
 		t.Errorf("wrong mode: %v != %v", g, e)
