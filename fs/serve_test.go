@@ -1984,8 +1984,57 @@ func (d *readDirAllRewind) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error
 	return entries, nil
 }
 
+type readdirRewindHelp struct {
+	mu   sync.Mutex
+	file *os.File
+}
+
+func (r *readdirRewindHelp) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	switch req.URL.Path {
+	case "/openReaddir":
+		httpjson.ServePOST(r.doOpenReaddir).ServeHTTP(w, req)
+	case "/rewindReaddirClose":
+		httpjson.ServePOST(r.doRewindReaddirClose).ServeHTTP(w, req)
+	default:
+		http.NotFound(w, req)
+	}
+}
+
+func (r *readdirRewindHelp) doOpenReaddir(ctx context.Context, path string) ([]string, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	r.file = f
+	names, err := f.Readdirnames(100)
+	if err != nil {
+		return nil, err
+	}
+	return names, nil
+}
+
+func (r *readdirRewindHelp) doRewindReaddirClose(ctx context.Context, _ struct{}) ([]string, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	defer r.file.Close()
+	if _, err := r.file.Seek(0, os.SEEK_SET); err != nil {
+		return nil, err
+	}
+	names, err := r.file.Readdirnames(100)
+	if err != nil {
+		return nil, err
+	}
+	return names, nil
+}
+
+var readdirRewindHelper = helpers.Register("readdirRewind", &readdirRewindHelp{})
+
 func TestReadDirAllRewind(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	f := &readDirAllRewind{}
 	f.entries.Store([]fuse.Dirent{
 		{Name: "one", Inode: 11, Type: fuse.DT_Dir},
@@ -1995,19 +2044,13 @@ func TestReadDirAllRewind(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
-
-	fil, err := os.Open(mnt.Dir)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	defer fil.Close()
+	control := readdirRewindHelper.Spawn(ctx, t)
+	defer control.Close()
 
 	{
-		names, err := fil.Readdirnames(100)
-		if err != nil {
-			t.Error(err)
-			return
+		var names []string
+		if err := control.JSON("/openReaddir").Call(ctx, mnt.Dir, &names); err != nil {
+			t.Fatalf("calling helper: %v", err)
 		}
 		t.Logf("Got readdir: %q", names)
 		if len(names) != 1 ||
@@ -2021,15 +2064,10 @@ func TestReadDirAllRewind(t *testing.T) {
 		{Name: "two", Inode: 12, Type: fuse.DT_File},
 		{Name: "one", Inode: 11, Type: fuse.DT_Dir},
 	})
-	if _, err := fil.Seek(0, os.SEEK_SET); err != nil {
-		t.Fatal(err)
-	}
-
 	{
-		names, err := fil.Readdirnames(100)
-		if err != nil {
-			t.Error(err)
-			return
+		var names []string
+		if err := control.JSON("/rewindReaddirClose").Call(ctx, struct{}{}, &names); err != nil {
+			t.Fatalf("calling helper: %v", err)
 		}
 		t.Logf("Got readdir: %q", names)
 		if len(names) != 2 ||
