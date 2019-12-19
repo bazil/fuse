@@ -1715,28 +1715,42 @@ type ftruncate struct {
 	record.Setattrs
 }
 
+func doFtruncate(ctx context.Context, req truncateRequest) (*struct{}, error) {
+	f, err := os.OpenFile(req.Path, os.O_WRONLY, 0666)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	if err := f.Truncate(req.ToSize); err != nil {
+		return nil, err
+	}
+	return &struct{}{}, nil
+}
+
+var ftruncateHelper = helpers.Register("ftruncate", httpjson.ServePOST(doFtruncate))
+
 func testFtruncate(t *testing.T, toSize int64) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	f := &ftruncate{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := ftruncateHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	{
-		fil, err := os.OpenFile(mnt.Dir+"/child", os.O_WRONLY, 0666)
-		if err != nil {
-			t.Error(err)
-			return
-		}
-		defer fil.Close()
-
-		err = fil.Truncate(toSize)
-		if err != nil {
-			t.Fatalf("Ftruncate: %v", err)
-		}
+	req := truncateRequest{
+		Path:   mnt.Dir + "/child",
+		ToSize: toSize,
 	}
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, req, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
+	}
+
 	gotr := f.RecordedSetattr()
 	if gotr == (fuse.SetattrRequest{}) {
 		t.Fatalf("no recorded SetattrRequest")
@@ -1750,12 +1764,9 @@ func testFtruncate(t *testing.T, toSize int64) {
 	t.Logf("Got request: %#v", gotr)
 }
 
-func TestFtruncate42(t *testing.T) {
-	testFtruncate(t, 42)
-}
-
-func TestFtruncate0(t *testing.T) {
-	testFtruncate(t, 0)
+func TestFtruncate(t *testing.T) {
+	t.Run("42", func(t *testing.T) { testFtruncate(t, 42) })
+	t.Run("0", func(t *testing.T) { testFtruncate(t, 0) })
 }
 
 // Test opening existing file truncates
