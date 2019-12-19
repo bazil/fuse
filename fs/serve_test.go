@@ -2820,25 +2820,23 @@ func (f customErrNode) Lookup(ctx context.Context, name string) (fs.Node, error)
 
 func TestCustomErrno(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{customErrNode{}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := statErrHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	_, err = os.Stat(mnt.Dir + "/trigger")
-	if err == nil {
-		t.Fatalf("expected error")
+	req := statErrRequest{
+		Path:      mnt.Dir + "/child",
+		WantErrno: syscall.ENAMETOOLONG,
 	}
-
-	switch err2 := err.(type) {
-	case *os.PathError:
-		if err2.Err == syscall.ENAMETOOLONG {
-			break
-		}
-		t.Errorf("unexpected inner error: %#v", err2)
-	default:
-		t.Errorf("unexpected error: %v", err)
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, req, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 }
 
