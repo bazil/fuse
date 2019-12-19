@@ -1191,18 +1191,40 @@ func (f *link1) Link(ctx context.Context, r *fuse.LinkRequest, old fs.Node) (fs.
 	return fstestutil.File{}, nil
 }
 
+type linkRequest struct {
+	OldName string
+	NewName string
+}
+
+func doLink(ctx context.Context, req linkRequest) (*struct{}, error) {
+	if err := os.Link(req.OldName, req.NewName); err != nil {
+		return nil, err
+	}
+	return &struct{}{}, nil
+}
+
+var linkHelper = helpers.Register("link", httpjson.ServePOST(doLink))
+
 func TestLink(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	f := &link1{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := linkHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	err = os.Link(mnt.Dir+"/old", mnt.Dir+"/new")
-	if err != nil {
-		t.Fatalf("Link: %v", err)
+	req := linkRequest{
+		OldName: mnt.Dir + "/old",
+		NewName: mnt.Dir + "/new",
+	}
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, req, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 
 	got := f.RecordedLink()
