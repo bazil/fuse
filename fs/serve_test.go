@@ -1104,30 +1104,68 @@ func (f *symlink1) Symlink(ctx context.Context, req *fuse.SymlinkRequest) (fs.No
 	return symlink1link{target: req.Target}, nil
 }
 
+type symlinkHelp struct{}
+
+func (i *symlinkHelp) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	switch req.URL.Path {
+	case "/symlink":
+		httpjson.ServePOST(i.doSymlink).ServeHTTP(w, req)
+	case "/readlink":
+		httpjson.ServePOST(i.doReadlink).ServeHTTP(w, req)
+	default:
+		http.NotFound(w, req)
+	}
+}
+
+type symlinkRequest struct {
+	Target string
+	Path   string
+}
+
+func (i *symlinkHelp) doSymlink(ctx context.Context, req symlinkRequest) (*struct{}, error) {
+	if err := os.Symlink(req.Target, req.Path); err != nil {
+		return nil, err
+	}
+	return &struct{}{}, nil
+}
+
+func (i *symlinkHelp) doReadlink(ctx context.Context, path string) (string, error) {
+	return os.Readlink(path)
+}
+
+var symlinkHelper = helpers.Register("symlink", &symlinkHelp{})
+
 func TestSymlink(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	f := &symlink1{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := symlinkHelper.Spawn(ctx, t)
+	defer control.Close()
 
 	const target = "/some-target"
-
-	err = os.Symlink(target, mnt.Dir+"/symlink.file")
-	if err != nil {
-		t.Fatalf("os.Symlink: %v", err)
+	path := mnt.Dir + "/symlink.file"
+	req := symlinkRequest{
+		Target: target,
+		Path:   path,
 	}
-
+	var nothing struct{}
+	if err := control.JSON("/symlink").Call(ctx, req, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
+	}
 	want := fuse.SymlinkRequest{NewName: "symlink.file", Target: target}
 	if g, e := f.RecordedSymlink(), want; g != e {
 		t.Errorf("symlink saw %+v, want %+v", g, e)
 	}
 
-	gotName, err := os.Readlink(mnt.Dir + "/symlink.file")
-	if err != nil {
-		t.Fatalf("os.Readlink: %v", err)
+	var gotName string
+	if err := control.JSON("/readlink").Call(ctx, path, &gotName); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 	if gotName != target {
 		t.Errorf("os.Readlink = %q; want %q", gotName, target)
