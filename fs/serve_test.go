@@ -2565,21 +2565,25 @@ func (f *listxattrTooSmall) Listxattr(ctx context.Context, req *fuse.ListxattrRe
 
 func TestListxattrTooSmall(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	f := &listxattrTooSmall{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := listxattrHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	buf := make([]byte, 3)
-	_, err = syscallx.Listxattr(mnt.Dir+"/child", buf)
-	if err == nil {
-		t.Error("Listxattr = nil; want some error")
+	req := listxattrRequest{
+		Path:      mnt.Dir + "/child",
+		Size:      3,
+		WantErrno: syscall.ERANGE,
 	}
-	if err != syscall.ERANGE {
-		t.Errorf("unexpected error: %v", err)
-		return
+	var res listxattrResult
+	if err := control.JSON("/").Call(ctx, req, &res); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 }
 
