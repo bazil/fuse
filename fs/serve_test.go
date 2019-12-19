@@ -2631,6 +2631,22 @@ type setxattr struct {
 	record.Setxattrs
 }
 
+type setxattrRequest struct {
+	Path  string
+	Name  string
+	Data  []byte
+	Flags int
+}
+
+func doSetxattr(ctx context.Context, req setxattrRequest) (*struct{}, error) {
+	if err := syscallx.Setxattr(req.Path, req.Name, req.Data, req.Flags); err != nil {
+		return nil, err
+	}
+	return &struct{}{}, nil
+}
+
+var setxattrHelper = helpers.Register("setxattr", httpjson.ServePOST(doSetxattr))
+
 func testSetxattr(t *testing.T, size int) {
 	const linux_XATTR_NAME_MAX = 64 * 1024
 	if size > linux_XATTR_NAME_MAX && runtime.GOOS == "linux" {
@@ -2638,19 +2654,28 @@ func testSetxattr(t *testing.T, size int) {
 	}
 
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	f := &setxattr{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := setxattrHelper.Spawn(ctx, t)
+	defer control.Close()
 
 	const g = "hello, world"
 	greeting := strings.Repeat(g, size/len(g)+1)[:size]
-	err = syscallx.Setxattr(mnt.Dir+"/child", "greeting", []byte(greeting), 0)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-		return
+	req := setxattrRequest{
+		Path:  mnt.Dir + "/child",
+		Name:  "greeting",
+		Data:  []byte(greeting),
+		Flags: 0,
+	}
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, req, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 
 	// fuse.SetxattrRequest contains a byte slice and thus cannot be
@@ -2671,15 +2696,9 @@ func testSetxattr(t *testing.T, size int) {
 }
 
 func TestSetxattr(t *testing.T) {
-	testSetxattr(t, 20)
-}
-
-func TestSetxattr64kB(t *testing.T) {
-	testSetxattr(t, 64*1024)
-}
-
-func TestSetxattr16MB(t *testing.T) {
-	testSetxattr(t, 16*1024*1024)
+	t.Run("20", func(t *testing.T) { testSetxattr(t, 20) })
+	t.Run("64kB", func(t *testing.T) { testSetxattr(t, 64*1024) })
+	t.Run("16MB", func(t *testing.T) { testSetxattr(t, 16*1024*1024) })
 }
 
 // Test Removexattr
