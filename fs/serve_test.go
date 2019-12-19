@@ -1833,31 +1833,42 @@ func (d *readDirAll) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	}, nil
 }
 
+func doReaddir(ctx context.Context, path string) ([]string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	// go Readdir is just Readdirnames + Lstat, there's no point in
+	// testing that here; we have no consumption API for the real
+	// dirent data
+	names, err := f.Readdirnames(100)
+	if err != nil {
+		return nil, err
+	}
+	return names, nil
+}
+
+var readdirHelper = helpers.Register("readdir", httpjson.ServePOST(doReaddir))
+
 func TestReadDirAll(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	f := &readDirAll{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := readdirHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	fil, err := os.Open(mnt.Dir)
-	if err != nil {
-		t.Error(err)
-		return
+	var names []string
+	if err := control.JSON("/").Call(ctx, mnt.Dir, &names); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
-	defer fil.Close()
-
-	// go Readdir is just Readdirnames + Lstat, there's no point in
-	// testing that here; we have no consumption API for the real
-	// dirent data
-	names, err := fil.Readdirnames(100)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
 	t.Logf("Got readdir: %q", names)
 
 	if len(names) != 3 ||
