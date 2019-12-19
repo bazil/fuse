@@ -2760,27 +2760,39 @@ func (f defaultErrno) Lookup(ctx context.Context, name string) (fs.Node, error) 
 	return nil, errors.New("bork")
 }
 
+type statErrRequest struct {
+	Path      string
+	WantErrno syscall.Errno
+}
+
+func doStatErr(ctx context.Context, req statErrRequest) (*struct{}, error) {
+	if _, err := os.Stat(req.Path); !errors.Is(err, req.WantErrno) {
+		return nil, fmt.Errorf("unexpected error: %v", err)
+	}
+	return &struct{}{}, nil
+}
+
+var statErrHelper = helpers.Register("statErr", httpjson.ServePOST(doStatErr))
+
 func TestDefaultErrno(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{defaultErrno{}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := statErrHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	_, err = os.Stat(mnt.Dir + "/trigger")
-	if err == nil {
-		t.Fatalf("expected error")
+	req := statErrRequest{
+		Path:      mnt.Dir + "/child",
+		WantErrno: syscall.EIO,
 	}
-
-	switch err2 := err.(type) {
-	case *os.PathError:
-		if err2.Err == syscall.EIO {
-			break
-		}
-		t.Errorf("unexpected inner error: Err=%v %#v", err2.Err, err2)
-	default:
-		t.Errorf("unexpected error: %v", err)
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, req, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 }
 
