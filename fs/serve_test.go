@@ -2708,19 +2708,40 @@ type removexattr struct {
 	record.Removexattrs
 }
 
+type removexattrRequest struct {
+	Path string
+	Name string
+}
+
+func doRemovexattr(ctx context.Context, req removexattrRequest) (*struct{}, error) {
+	if err := syscallx.Removexattr(req.Path, req.Name); err != nil {
+		return nil, err
+	}
+	return &struct{}{}, nil
+}
+
+var removexattrHelper = helpers.Register("removexattr", httpjson.ServePOST(doRemovexattr))
+
 func TestRemovexattr(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	f := &removexattr{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := removexattrHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	err = syscallx.Removexattr(mnt.Dir+"/child", "greeting")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-		return
+	req := removexattrRequest{
+		Path: mnt.Dir + "/child",
+		Name: "greeting",
+	}
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, req, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 
 	want := fuse.RemovexattrRequest{Name: "greeting"}
