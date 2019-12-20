@@ -3063,21 +3063,22 @@ func (f attrUnlinked) Attr(ctx context.Context, a *fuse.Attr) error {
 
 func TestAttrUnlinked(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": attrUnlinked{}}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := statHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	fi, err := os.Stat(mnt.Dir + "/child")
-	if err != nil {
-		t.Fatalf("Stat failed with %v", err)
+	var got statResult
+	if err := control.JSON("/").Call(ctx, mnt.Dir+"/child", &got); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
-	switch stat := fi.Sys().(type) {
-	case *syscall.Stat_t:
-		if stat.Nlink != 0 {
-			t.Errorf("wrong link count: %v", stat.Nlink)
-		}
+	if g, e := got.Nlink, uint64(0); g != e {
+		t.Errorf("wrong link count: %v != %v", g, e)
 	}
 }
 
