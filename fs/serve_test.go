@@ -52,7 +52,6 @@ func init() {
 
 // symlink can be embedded in a struct to make it look like a symlink.
 type symlink struct {
-	target string
 }
 
 func (f symlink) Attr(ctx context.Context, a *fuse.Attr) error {
