@@ -3745,15 +3745,25 @@ func (goexitFile) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.Op
 
 func TestGoexit(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	mnt, err := fstestutil.MountedT(t,
 		fstestutil.SimpleFS{&fstestutil.ChildMap{"child": goexitFile{}}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := openErrHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	_, err = ioutil.ReadFile(mnt.Dir + "/child")
-	if nerr, ok := err.(*os.PathError); !ok || nerr.Err != syscall.EIO {
-		t.Fatalf("wrong error from exiting handler: %T: %v", err, err)
+	req := openRequest{
+		Path:      mnt.Dir + "/child",
+		Flags:     os.O_RDONLY,
+		Perm:      0,
+		WantErrno: syscall.EIO,
+	}
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, req, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 }
