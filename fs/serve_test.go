@@ -3498,6 +3498,8 @@ func TestInvalidateNodeDataRangeMiss(t *testing.T) {
 	// This test may see false positive failures when run under
 	// extreme memory pressure.
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	a := &invalidateDataPartial{
 		t: t,
 	}
@@ -3506,21 +3508,25 @@ func TestInvalidateNodeDataRangeMiss(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
-
 	if !mnt.Conn.Protocol().HasInvalidate() {
 		t.Skip("Old FUSE protocol")
 	}
+	control := manyReadsHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	f, err := os.Open(mnt.Dir + "/child")
-	if err != nil {
-		t.Fatal(err)
+	var nothing struct{}
+	if err := control.JSON("/open").Call(ctx, mnt.Dir+"/child", &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
-	defer f.Close()
 
-	buf := make([]byte, 4)
 	for i := 0; i < 10; i++ {
-		if _, err := f.ReadAt(buf, 0); err != nil {
-			t.Fatalf("readat error: %v", err)
+		req := readAtRequest{
+			Offset: 0,
+			Length: 4,
+		}
+		var got []byte
+		if err := control.JSON("/readAt").Call(ctx, req, &got); err != nil {
+			t.Fatalf("calling helper: %v", err)
 		}
 	}
 	if g, e := a.read.Count(), uint32(1); g != e {
@@ -3533,8 +3539,13 @@ func TestInvalidateNodeDataRangeMiss(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		if _, err := f.ReadAt(buf, 0); err != nil {
-			t.Fatalf("readat error: %v", err)
+		req := readAtRequest{
+			Offset: 0,
+			Length: 4,
+		}
+		var got []byte
+		if err := control.JSON("/readAt").Call(ctx, req, &got); err != nil {
+			t.Fatalf("calling helper: %v", err)
 		}
 	}
 	// The page invalidated is not the page we're reading, so it
