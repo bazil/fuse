@@ -3644,6 +3644,8 @@ func TestInvalidateEntry(t *testing.T) {
 	// This test may see false positive failures when run under
 	// extreme memory pressure.
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	a := &invalidateEntryRoot{
 		t: t,
 	}
@@ -3652,14 +3654,16 @@ func TestInvalidateEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
-
 	if !mnt.Conn.Protocol().HasInvalidate() {
 		t.Skip("Old FUSE protocol")
 	}
+	control := statHelper.Spawn(ctx, t)
+	defer control.Close()
 
 	for i := 0; i < 10; i++ {
-		if _, err := os.Stat(mnt.Dir + "/child"); err != nil {
-			t.Fatalf("stat error: %v", err)
+		var got statResult
+		if err := control.JSON("/").Call(ctx, mnt.Dir+"/child", &got); err != nil {
+			t.Fatalf("calling helper: %v", err)
 		}
 	}
 	if g, e := a.lookup.Count(), uint32(1); g != e {
@@ -3672,8 +3676,9 @@ func TestInvalidateEntry(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		if _, err := os.Stat(mnt.Dir + "/child"); err != nil {
-			t.Fatalf("stat error: %v", err)
+		var got statResult
+		if err := control.JSON("/").Call(ctx, mnt.Dir+"/child", &got); err != nil {
+			t.Fatalf("calling helper: %v", err)
 		}
 	}
 	if g, e := a.lookup.Count(), uint32(2); g != e {
