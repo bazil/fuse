@@ -246,6 +246,8 @@ func (createrDir) Create(ctx context.Context, req *fuse.CreateRequest, resp *fus
 
 func TestMountOptionReadOnly(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	mnt, err := fstestutil.MountedT(t,
 		fstestutil.SimpleFS{createrDir{}},
@@ -256,19 +258,19 @@ func TestMountOptionReadOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := openErrHelper.Spawn(ctx, t)
+	defer control.Close()
 
 	// This will be prevented by kernel-level access checking when
 	// ReadOnly is used.
-	f, err := os.Create(mnt.Dir + "/child")
-	if err == nil {
-		f.Close()
-		t.Fatal("expected an error")
+	req := openRequest{
+		Path:      mnt.Dir + "/child",
+		Flags:     os.O_WRONLY | os.O_CREATE,
+		Perm:      0,
+		WantErrno: syscall.EROFS,
 	}
-	perr, ok := err.(*os.PathError)
-	if !ok {
-		t.Fatalf("expected PathError, got %T: %v", err, err)
-	}
-	if perr.Err != syscall.EROFS {
-		t.Fatalf("expected EROFS, got %T: %v", err, err)
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, req, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 }
