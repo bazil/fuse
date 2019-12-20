@@ -1384,8 +1384,6 @@ func (a *Attr) attr(out *attr, proto Protocol) {
 	if proto.GE(Protocol{7, 9}) {
 		out.Blksize = a.BlockSize
 	}
-
-	return
 }
 
 // A GetattrRequest asks for the metadata for the file denoted by r.Node.
