@@ -3222,10 +3222,73 @@ func (i *invalidateData) Read(ctx context.Context, req *fuse.ReadRequest, resp *
 	return nil
 }
 
+type fstatHelp struct {
+	mu   sync.Mutex
+	file *os.File
+}
+
+func (f *fstatHelp) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	switch req.URL.Path {
+	case "/open":
+		httpjson.ServePOST(f.doOpen).ServeHTTP(w, req)
+	case "/fstat":
+		httpjson.ServePOST(f.doFstat).ServeHTTP(w, req)
+	case "/close":
+		httpjson.ServePOST(f.doClose).ServeHTTP(w, req)
+	default:
+		http.NotFound(w, req)
+	}
+}
+
+func (f *fstatHelp) doOpen(ctx context.Context, path string) (*struct{}, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	fil, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	f.file = fil
+	return &struct{}{}, nil
+}
+
+func (f *fstatHelp) doFstat(ctx context.Context, _ struct{}) (*statResult, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	fi, err := f.file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	r := &statResult{
+		Mode: fi.Mode(),
+	}
+	switch fstat := fi.Sys().(type) {
+	case *syscall.Stat_t:
+		r.Ino = fstat.Ino
+		r.Nlink = fstat.Nlink
+		r.UID = fstat.Uid
+		r.GID = fstat.Gid
+		// convert fstat.Blksize  because it's int64 on Linux but
+		// int32 on Darwin.
+		r.Blksize = int64(fstat.Blksize)
+	}
+	return r, nil
+}
+
+func (f *fstatHelp) doClose(ctx context.Context, _ struct{}) (*struct{}, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.file.Close()
+	return &struct{}{}, nil
+}
+
+var fstatHelper = helpers.Register("fstat", &fstatHelp{})
+
 func TestInvalidateNodeDataInvalidatesAttr(t *testing.T) {
 	// This test may see false positive failures when run under
 	// extreme memory pressure.
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	a := &invalidateData{
 		t: t,
 	}
@@ -3235,16 +3298,16 @@ func TestInvalidateNodeDataInvalidatesAttr(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
-
 	if !mnt.Conn.Protocol().HasInvalidate() {
 		t.Skip("Old FUSE protocol")
 	}
+	control := fstatHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	f, err := os.Open(mnt.Dir + "/child")
-	if err != nil {
-		t.Fatal(err)
+	var nothing struct{}
+	if err := control.JSON("/open").Call(ctx, mnt.Dir+"/child", &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
-	defer f.Close()
 
 	attrBefore := a.attr.Count()
 	if g, min := attrBefore, uint32(1); g < min {
@@ -3260,8 +3323,9 @@ func TestInvalidateNodeDataInvalidatesAttr(t *testing.T) {
 	// on OSXFUSE 3.0.6, the Attr has already triggered here, so don't
 	// check the count at this point
 
-	if _, err := f.Stat(); err != nil {
-		t.Errorf("stat error: %v", err)
+	var got statResult
+	if err := control.JSON("/fstat").Call(ctx, struct{}{}, &got); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 	if g, prev := a.attr.Count(), attrBefore; g <= prev {
 		t.Errorf("did not see Attr call after invalidate: %d <= %d", g, prev)
