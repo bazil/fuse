@@ -3707,6 +3707,8 @@ func (contextFile) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.O
 
 func TestContext(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	const input = "kilroy was here"
 	mnt, err := fstestutil.MountedT(t,
 		fstestutil.SimpleFS{&fstestutil.ChildMap{"child": contextFile{}}},
@@ -3719,12 +3721,14 @@ func TestContext(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := readHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	data, err := ioutil.ReadFile(mnt.Dir + "/child")
-	if err != nil {
-		t.Fatalf("cannot read context file: %v", err)
+	var got readResult
+	if err := control.JSON("/").Call(ctx, mnt.Dir+"/child", &got); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
-	if g, e := string(data), input; g != e {
+	if g, e := string(got.Data), input; g != e {
 		t.Errorf("read wrong data: %q != %q", g, e)
 	}
 }
