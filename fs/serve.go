@@ -431,8 +431,6 @@ func Serve(c *fuse.Conn, fs FS) error {
 	return server.Serve(fs)
 }
 
-type nothing struct{}
-
 type serveRequest struct {
 	Request fuse.Request
 	cancel  func()
