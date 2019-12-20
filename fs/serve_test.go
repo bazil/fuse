@@ -3332,10 +3332,67 @@ func TestInvalidateNodeDataInvalidatesAttr(t *testing.T) {
 	}
 }
 
+type manyReadsHelp struct {
+	mu   sync.Mutex
+	file *os.File
+}
+
+func (m *manyReadsHelp) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	switch req.URL.Path {
+	case "/open":
+		httpjson.ServePOST(m.doOpen).ServeHTTP(w, req)
+	case "/readAt":
+		httpjson.ServePOST(m.doReadAt).ServeHTTP(w, req)
+	case "/close":
+		httpjson.ServePOST(m.doClose).ServeHTTP(w, req)
+	default:
+		http.NotFound(w, req)
+	}
+}
+
+func (m *manyReadsHelp) doOpen(ctx context.Context, path string) (*struct{}, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	fil, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	m.file = fil
+	return &struct{}{}, nil
+}
+
+type readAtRequest struct {
+	Offset int64
+	Length int
+}
+
+func (m *manyReadsHelp) doReadAt(ctx context.Context, req readAtRequest) ([]byte, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	buf := make([]byte, req.Length)
+	n, err := m.file.ReadAt(buf, req.Offset)
+	if err != nil && err != io.EOF {
+		return nil, err
+	}
+	buf = buf[:n]
+	return buf, nil
+}
+
+func (m *manyReadsHelp) doClose(ctx context.Context, _ struct{}) (*struct{}, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.file.Close()
+	return &struct{}{}, nil
+}
+
+var manyReadsHelper = helpers.Register("manyReads", &manyReadsHelp{})
+
 func TestInvalidateNodeDataInvalidatesData(t *testing.T) {
 	// This test may see false positive failures when run under
 	// extreme memory pressure.
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	a := &invalidateData{
 		t: t,
 	}
@@ -3345,25 +3402,28 @@ func TestInvalidateNodeDataInvalidatesData(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
-
 	if !mnt.Conn.Protocol().HasInvalidate() {
 		t.Skip("Old FUSE protocol")
 	}
+	control := manyReadsHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	f, err := os.Open(mnt.Dir + "/child")
-	if err != nil {
-		t.Fatal(err)
+	var nothing struct{}
+	if err := control.JSON("/open").Call(ctx, mnt.Dir+"/child", &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
-	defer f.Close()
 
 	{
-		buf := make([]byte, 100)
 		for i := 0; i < 10; i++ {
-			n, err := f.ReadAt(buf, 0)
-			if err != nil && err != io.EOF {
-				t.Fatalf("readat error: %v", err)
+			req := readAtRequest{
+				Offset: 0,
+				Length: 100,
 			}
-			if g, e := string(buf[:n]), invalidateDataContent1; g != e {
+			var got []byte
+			if err := control.JSON("/readAt").Call(ctx, req, &got); err != nil {
+				t.Fatalf("calling helper: %v", err)
+			}
+			if g, e := string(got), invalidateDataContent1; g != e {
 				t.Errorf("wrong content: %q != %q", g, e)
 			}
 		}
@@ -3387,13 +3447,16 @@ func TestInvalidateNodeDataInvalidatesData(t *testing.T) {
 		// (Linux will always do Getattr if you cross what it believes
 		// the EOF to be)
 		const bufSize = len(invalidateDataContent2) - 3
-		buf := make([]byte, bufSize)
 		for i := 0; i < 10; i++ {
-			n, err := f.ReadAt(buf, 0)
-			if err != nil && err != io.EOF {
-				t.Fatalf("readat error: %v", err)
+			req := readAtRequest{
+				Offset: 0,
+				Length: bufSize,
 			}
-			if g, e := string(buf[:n]), invalidateDataContent2[:bufSize]; g != e {
+			var got []byte
+			if err := control.JSON("/readAt").Call(ctx, req, &got); err != nil {
+				t.Fatalf("calling helper: %v", err)
+			}
+			if g, e := string(got), invalidateDataContent2[:bufSize]; g != e {
 				t.Errorf("wrong content: %q != %q", g, e)
 			}
 		}
