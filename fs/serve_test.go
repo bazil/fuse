@@ -2022,7 +2022,7 @@ func (r *readdirRewindHelp) doRewindReaddirClose(ctx context.Context, _ struct{}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	defer r.file.Close()
-	if _, err := r.file.Seek(0, os.SEEK_SET); err != nil {
+	if _, err := r.file.Seek(0, io.SeekStart); err != nil {
 		return nil, err
 	}
 	names, err := r.file.Readdirnames(100)
@@ -2217,7 +2217,7 @@ func doOpenNonseekable(ctx context.Context, path string) (*struct{}, error) {
 	}
 	defer f.Close()
 
-	if _, err := f.Seek(0, os.SEEK_SET); !errors.Is(err, syscall.ESPIPE) {
+	if _, err := f.Seek(0, io.SeekStart); !errors.Is(err, syscall.ESPIPE) {
 		return nil, fmt.Errorf("wrong error: %v", err)
 	}
 	return &struct{}{}, nil
