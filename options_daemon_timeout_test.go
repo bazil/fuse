@@ -37,6 +37,8 @@ func TestMountOptionDaemonTimeout(t *testing.T) {
 		t.Skip("skipping time-based test in short mode")
 	}
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	mnt, err := fstestutil.MountedT(t,
 		fstestutil.SimpleFS{slowCreaterDir{}},
@@ -47,18 +49,19 @@ func TestMountOptionDaemonTimeout(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := openErrHelper.Spawn(ctx, t)
+	defer control.Close()
 
 	// This should fail by the kernel timing out the request.
-	f, err := os.Create(mnt.Dir + "/child")
-	if err == nil {
-		f.Close()
-		t.Fatal("expected an error")
+	req := openRequest{
+		Path:  mnt.Dir + "/child",
+		Flags: os.O_WRONLY | os.O_CREATE,
+		Perm:  0,
+		// TODO confirm against reality
+		WantErrno: syscall.EIO,
 	}
-	perr, ok := err.(*os.PathError)
-	if !ok {
-		t.Fatalf("expected PathError, got %T: %v", err, err)
-	}
-	if perr.Err == syscall.ENAMETOOLONG {
-		t.Fatalf("expected other than ENAMETOOLONG, got %T: %v", err, err)
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, req, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 }
