@@ -2,15 +2,17 @@ package bench_test
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
-	"path"
 	"testing"
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
 	"bazil.org/fuse/fs/fstestutil"
+	"bazil.org/fuse/fs/fstestutil/spawntest"
+	"bazil.org/fuse/fs/fstestutil/spawntest/httpjson"
 )
 
 type benchConfig struct {
@@ -97,21 +99,55 @@ func (benchFile) Fsync(ctx context.Context, req *fuse.FsyncRequest) error {
 	return nil
 }
 
-func benchmark(b *testing.B, fn func(b *testing.B, mnt string), conf *benchConfig) {
-	filesys := benchFS{
-		conf: conf,
-	}
-	mnt, err := fstestutil.Mounted(filesys, nil,
-		fuse.MaxReadahead(64*1024*1024),
-		fuse.AsyncRead(),
-		fuse.WritebackCache(),
-	)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer mnt.Close()
+type benchReadWriteRequest struct {
+	Path string
+	Size int64
+	N    int
+}
 
-	fn(b, mnt.Dir)
+func benchmark(helper *spawntest.Helper, conf *benchConfig, size int64) func(*testing.B) {
+	fn := func(b *testing.B) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		filesys := benchFS{
+			conf: conf,
+		}
+		mnt, err := fstestutil.Mounted(filesys, nil,
+			fuse.MaxReadahead(64*1024*1024),
+			fuse.AsyncRead(),
+			fuse.WritebackCache(),
+		)
+		if err != nil {
+			b.Fatal(err)
+		}
+		defer mnt.Close()
+		control := helper.Spawn(ctx, b)
+		defer control.Close()
+
+		name := mnt.Dir + "/bench"
+		req := benchReadWriteRequest{
+			Path: name,
+			Size: size,
+			N:    b.N,
+		}
+		var nothing struct{}
+		b.SetBytes(size)
+		b.ResetTimer()
+
+		if err := control.JSON("/").Call(ctx, req, &nothing); err != nil {
+			b.Fatalf("calling helper: %v", err)
+		}
+	}
+	return fn
+}
+
+func benchmarkSizes(helper *spawntest.Helper, conf *benchConfig) func(*testing.B) {
+	fn := func(b *testing.B) {
+		b.Run("100", benchmark(helper, conf, 100))
+		b.Run("10MB", benchmark(helper, conf, 10*1024*1024))
+		b.Run("100MB", benchmark(helper, conf, 100*1024*1024))
+	}
+	return fn
 }
 
 type zero struct{}
@@ -122,147 +158,81 @@ func (zero) Read(p []byte) (n int, err error) {
 
 var Zero io.Reader = zero{}
 
-func doWrites(size int64) func(b *testing.B, mnt string) {
-	return func(b *testing.B, mnt string) {
-		p := path.Join(mnt, "bench")
+func doBenchWrite(ctx context.Context, req benchReadWriteRequest) (*struct{}, error) {
+	f, err := os.Create(req.Path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
 
-		f, err := os.Create(p)
-		if err != nil {
-			b.Fatalf("create: %v", err)
-		}
-		defer f.Close()
-
-		b.ResetTimer()
-		b.SetBytes(size)
-
-		for i := 0; i < b.N; i++ {
-			_, err = io.CopyN(f, Zero, size)
-			if err != nil {
-				b.Fatalf("write: %v", err)
-			}
+	for i := 0; i < req.N; i++ {
+		if _, err := io.CopyN(f, Zero, req.Size); err != nil {
+			return nil, err
 		}
 	}
+	return &struct{}{}, nil
 }
 
-func BenchmarkWrite100(b *testing.B) {
-	benchmark(b, doWrites(100), &benchConfig{})
-}
+var benchWriteHelper = helpers.Register("benchWrite", httpjson.ServePOST(doBenchWrite))
 
-func BenchmarkWrite10MB(b *testing.B) {
-	benchmark(b, doWrites(10*1024*1024), &benchConfig{})
-}
-
-func BenchmarkWrite100MB(b *testing.B) {
-	benchmark(b, doWrites(100*1024*1024), &benchConfig{})
-}
-
-func BenchmarkDirectWrite100(b *testing.B) {
-	benchmark(b, doWrites(100), &benchConfig{
+func BenchmarkWrite(b *testing.B) {
+	b.Run("pagecache", benchmarkSizes(benchWriteHelper, &benchConfig{}))
+	b.Run("direct", benchmarkSizes(benchWriteHelper, &benchConfig{
 		directIO: true,
-	})
+	}))
 }
 
-func BenchmarkDirectWrite10MB(b *testing.B) {
-	benchmark(b, doWrites(10*1024*1024), &benchConfig{
-		directIO: true,
-	})
-}
+func doBenchWriteSync(ctx context.Context, req benchReadWriteRequest) (*struct{}, error) {
+	f, err := os.Create(req.Path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
 
-func BenchmarkDirectWrite100MB(b *testing.B) {
-	benchmark(b, doWrites(100*1024*1024), &benchConfig{
-		directIO: true,
-	})
-}
-
-func doWritesSync(size int64) func(b *testing.B, mnt string) {
-	return func(b *testing.B, mnt string) {
-		p := path.Join(mnt, "bench")
-
-		f, err := os.Create(p)
-		if err != nil {
-			b.Fatalf("create: %v", err)
+	for i := 0; i < req.N; i++ {
+		if _, err := io.CopyN(f, Zero, req.Size); err != nil {
+			return nil, err
 		}
-		defer f.Close()
-
-		b.ResetTimer()
-		b.SetBytes(size)
-
-		for i := 0; i < b.N; i++ {
-			_, err = io.CopyN(f, Zero, size)
-			if err != nil {
-				b.Fatalf("write: %v", err)
-			}
-
-			if err := f.Sync(); err != nil {
-				b.Fatalf("sync: %v", err)
-			}
+		if err := f.Sync(); err != nil {
+			return nil, err
 		}
 	}
+	return &struct{}{}, nil
 }
 
-func BenchmarkWriteSync100(b *testing.B) {
-	benchmark(b, doWritesSync(100), &benchConfig{})
+var benchWriteSyncHelper = helpers.Register("benchWriteSync", httpjson.ServePOST(doBenchWriteSync))
+
+func BenchmarkWriteSync(b *testing.B) {
+	b.Run("pagecache", benchmarkSizes(benchWriteSyncHelper, &benchConfig{}))
+	b.Run("direct", benchmarkSizes(benchWriteSyncHelper, &benchConfig{
+		directIO: true,
+	}))
 }
 
-func BenchmarkWriteSync10MB(b *testing.B) {
-	benchmark(b, doWritesSync(10*1024*1024), &benchConfig{})
-}
+func doBenchRead(ctx context.Context, req benchReadWriteRequest) (*struct{}, error) {
+	f, err := os.Create(req.Path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
 
-func BenchmarkWriteSync100MB(b *testing.B) {
-	benchmark(b, doWritesSync(100*1024*1024), &benchConfig{})
-}
-
-func doReads(size int64) func(b *testing.B, mnt string) {
-	return func(b *testing.B, mnt string) {
-		p := path.Join(mnt, "bench")
-
-		f, err := os.Open(p)
+	for i := 0; i < req.N; i++ {
+		n, err := io.CopyN(ioutil.Discard, f, req.Size)
 		if err != nil {
-			b.Fatalf("close: %v", err)
+			return nil, err
 		}
-		defer f.Close()
-
-		b.ResetTimer()
-		b.SetBytes(size)
-
-		for i := 0; i < b.N; i++ {
-			n, err := io.CopyN(ioutil.Discard, f, size)
-			if err != nil {
-				b.Fatalf("read: %v", err)
-			}
-			if n != size {
-				b.Errorf("unexpected size: %d != %d", n, size)
-			}
+		if n != req.Size {
+			return nil, fmt.Errorf("unexpected size: %d != %d", n, req.Size)
 		}
 	}
+	return &struct{}{}, nil
 }
 
-func BenchmarkRead100(b *testing.B) {
-	benchmark(b, doReads(100), &benchConfig{})
-}
+var benchReadHelper = helpers.Register("benchRead", httpjson.ServePOST(doBenchRead))
 
-func BenchmarkRead10MB(b *testing.B) {
-	benchmark(b, doReads(10*1024*1024), &benchConfig{})
-}
-
-func BenchmarkRead100MB(b *testing.B) {
-	benchmark(b, doReads(100*1024*1024), &benchConfig{})
-}
-
-func BenchmarkDirectRead100(b *testing.B) {
-	benchmark(b, doReads(100), &benchConfig{
+func BenchmarkRead(b *testing.B) {
+	b.Run("pagecache", benchmarkSizes(benchReadHelper, &benchConfig{}))
+	b.Run("direct", benchmarkSizes(benchReadHelper, &benchConfig{
 		directIO: true,
-	})
-}
-
-func BenchmarkDirectRead10MB(b *testing.B) {
-	benchmark(b, doReads(10*1024*1024), &benchConfig{
-		directIO: true,
-	})
-}
-
-func BenchmarkDirectRead100MB(b *testing.B) {
-	benchmark(b, doReads(100*1024*1024), &benchConfig{
-		directIO: true,
-	})
+	}))
 }
