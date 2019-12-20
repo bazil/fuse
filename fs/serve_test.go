@@ -3095,15 +3095,23 @@ func (attrBad) Attr(ctx context.Context, attr *fuse.Attr) error {
 
 func TestAttrBad(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": attrBad{}}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := statErrHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	_, err = os.Stat(mnt.Dir + "/child")
-	if nerr, ok := err.(*os.PathError); !ok || nerr.Err != syscall.ENAMETOOLONG {
-		t.Fatalf("wrong error: %v", err)
+	req := statErrRequest{
+		Path:      mnt.Dir + "/child",
+		WantErrno: syscall.ENAMETOOLONG,
+	}
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, req, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 }
 
