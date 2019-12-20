@@ -3019,29 +3019,24 @@ func (f *directWrite) Open(ctx context.Context, req *fuse.OpenRequest, resp *fus
 
 func TestDirectWrite(t *testing.T) {
 	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	w := &directWrite{}
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": w}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
+	control := writeFileHelper.Spawn(ctx, t)
+	defer control.Close()
 
-	f, err := os.OpenFile(mnt.Dir+"/child", os.O_RDWR, 0666)
-	if err != nil {
-		t.Fatalf("Create: %v", err)
+	var nothing struct{}
+	req := writeFileRequest{
+		Path: mnt.Dir + "/child",
+		Data: []byte(hi),
 	}
-	defer f.Close()
-	n, err := f.Write([]byte(hi))
-	if err != nil {
-		t.Fatalf("Write: %v", err)
-	}
-	if n != len(hi) {
-		t.Fatalf("short write; n=%d; hi=%d", n, len(hi))
-	}
-
-	err = f.Close()
-	if err != nil {
-		t.Fatalf("Close: %v", err)
+	if err := control.JSON("/").Call(ctx, req, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
 	}
 
 	if got := string(w.RecordedWriteData()); got != hi {
