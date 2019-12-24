@@ -67,6 +67,9 @@ type FSInodeGenerator interface {
 	//
 	// Implementing this is useful to e.g. constrain the range of
 	// inode values used for dynamic inodes.
+	//
+	// Non-zero return values should be greater than 1, as that is
+	// always used for the root inode.
 	GenerateInode(parentInode uint64, name string) uint64
 }
 
