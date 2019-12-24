@@ -1551,11 +1551,12 @@ func GenerateDynamicInode(parent uint64, name string) uint64 {
 	var inode uint64
 	for {
 		inode = h.Sum64()
-		if inode != 0 {
+		if inode > 1 {
 			break
 		}
-		// there's a tiny probability that result is zero; change the
-		// input a little and try again
+		// there's a tiny probability that result is zero or the
+		// hardcoded root inode 1; change the input a little and try
+		// again
 		_, _ = h.Write([]byte{'x'})
 	}
 	return inode
