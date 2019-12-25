@@ -1114,11 +1114,11 @@ func TestCreateWriteRemove(t *testing.T) {
 // is a Node that is a symlink to target
 type symlink1link struct {
 	symlink
-	target string
+	fs *symlink1
 }
 
 func (f symlink1link) Readlink(ctx context.Context, req *fuse.ReadlinkRequest) (string, error) {
-	return f.target, nil
+	return f.fs.RecordedSymlink().Target, nil
 }
 
 type symlink1 struct {
@@ -1126,9 +1126,25 @@ type symlink1 struct {
 	record.Symlinks
 }
 
+var _ fs.NodeStringLookuper = (*symlink1)(nil)
+
+func (f *symlink1) Lookup(ctx context.Context, name string) (fs.Node, error) {
+	if name != "symlink.file" {
+		return nil, fuse.ENOENT
+	}
+	if f.RecordedSymlink() == (fuse.SymlinkRequest{}) {
+		return nil, fuse.ENOENT
+	}
+	return symlink1link{fs: f}, nil
+}
+
 func (f *symlink1) Symlink(ctx context.Context, req *fuse.SymlinkRequest) (fs.Node, error) {
+	if f.RecordedSymlink() != (fuse.SymlinkRequest{}) {
+		log.Print("this test is not prepared to handle multiple symlinks")
+		return nil, fuse.Errno(syscall.ENAMETOOLONG)
+	}
 	f.Symlinks.Symlink(ctx, req)
-	return symlink1link{target: req.Target}, nil
+	return symlink1link{fs: f}, nil
 }
 
 type symlinkHelp struct{}
