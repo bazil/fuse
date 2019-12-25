@@ -2180,7 +2180,7 @@ func TestChmod(t *testing.T) {
 
 	got := f.RecordedSetattr()
 	if g, e := got.Mode, os.FileMode(0764); g != e {
-		t.Errorf("wrong mode: %v != %v", g, e)
+		t.Errorf("wrong mode: %o %v != %o %v", g, g, e, e)
 	}
 }
 
