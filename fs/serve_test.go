@@ -555,6 +555,10 @@ func TestReadFileFlags(t *testing.T) {
 		// means they added the feature, and we want to notice that!
 		want = fuse.OpenReadOnly
 	}
+	if runtime.GOOS == "freebsd" {
+		// FreeBSD doesn't pass append to FUSE?
+		want ^= fuse.OpenAppend
+	}
 	if g, e := got, want; g != e {
 		t.Errorf("read saw file flags %+v, want %+v", g, e)
 	}
@@ -632,6 +636,10 @@ func TestWriteFileFlags(t *testing.T) {
 		// If this test starts failing in the future, that probably
 		// means they added the feature, and we want to notice that!
 		want = fuse.OpenWriteOnly
+	}
+	if runtime.GOOS == "freebsd" {
+		// FreeBSD doesn't pass append to FUSE?
+		want &^= fuse.OpenAppend
 	}
 	if g, e := got, want; g != e {
 		t.Errorf("write saw file flags %+v, want %+v", g, e)
@@ -1012,6 +1020,11 @@ func TestCreate(t *testing.T) {
 
 		// https://github.com/osxfuse/osxfuse/issues/225
 		want.Umask = 0
+	}
+	if runtime.GOOS == "freebsd" {
+		// FreeBSD doesn't pass truncate to FUSE?; as this is a
+		// Create, that's acceptable
+		want.Flags &^= fuse.OpenTruncate
 	}
 	got := f.f.RecordedCreate()
 	if runtime.GOOS == "linux" {
@@ -2208,6 +2221,10 @@ func TestOpen(t *testing.T) {
 		// Linux <3.7 accidentally leaks O_CLOEXEC through to FUSE;
 		// avoid spurious test failures
 		got.Flags &^= fuse.OpenFlags(syscall.O_CLOEXEC)
+	}
+	if runtime.GOOS == "freebsd" {
+		// FreeBSD doesn't pass append to FUSE?
+		want.Flags &^= fuse.OpenAppend
 	}
 
 	if g, e := got, want; g != e {
