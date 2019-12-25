@@ -4,12 +4,39 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"syscall"
 	"testing"
 
 	"bazil.org/fuse/fs/fstestutil"
 	"golang.org/x/sys/unix"
 )
+
+func platformStatfs(st *syscall.Statfs_t) *statfsResult {
+	return &statfsResult{
+		Blocks:  st.Blocks,
+		Bfree:   st.Bfree,
+		Bavail:  st.Bavail,
+		Files:   st.Files,
+		Ffree:   st.Ffree,
+		Bsize:   int64(st.Bsize),
+		Namelen: 0,
+		Frsize:  0,
+	}
+}
+
+func platformStat(fi os.FileInfo) *statResult {
+	r := &statResult{
+		Mode: fi.Mode(),
+	}
+	st := fi.Sys().(*syscall.Stat_t)
+	r.Ino = st.Ino
+	r.Nlink = uint64(st.Nlink)
+	r.UID = st.Uid
+	r.GID = st.Gid
+	r.Blksize = int64(st.Blksize)
+	return r
+}
 
 type exchangeData struct {
 	fstestutil.File

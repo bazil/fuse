@@ -195,82 +195,47 @@ func (f testStatFS) Statfs(ctx context.Context, req *fuse.StatfsRequest, resp *f
 	return nil
 }
 
-func doStatfs(ctx context.Context, dir string) (*struct{}, error) {
-	// Perform an operation that forces the OS X mount to be ready, so
-	// we know the Statfs handler will really be called. OS X insists
-	// on volumes answering Statfs calls very early (before FUSE
-	// handshake), so OSXFUSE gives made-up answers for a few brief moments
-	// during the mount process.
-	if _, err := os.Stat(dir + "/does-not-exist"); !os.IsNotExist(err) {
+type statfsResult struct {
+	Blocks  uint64
+	Bfree   uint64
+	Bavail  uint64
+	Files   uint64
+	Ffree   uint64
+	Bsize   int64
+	Namelen int64
+	Frsize  int64
+}
+
+func prepStatfs(dir string) error {
+	if runtime.GOOS == "darwin" {
+		// Perform an operation that forces the OS X mount to be ready, so
+		// we know the Statfs handler will really be called. OS X insists
+		// on volumes answering Statfs calls very early (before FUSE
+		// handshake), so OSXFUSE gives made-up answers for a few brief moments
+		// during the mount process.
+		if _, err := os.Stat(dir + "/does-not-exist"); !os.IsNotExist(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func doStatfs(ctx context.Context, dir string) (*statfsResult, error) {
+	if err := prepStatfs(dir); err != nil {
 		return nil, err
 	}
-
-	success := true
-	badf := func(fmt string, args ...interface{}) {
-		success = false
-		log.Printf(fmt, args...)
+	var st syscall.Statfs_t
+	if err := syscall.Statfs(dir, &st); err != nil {
+		return nil, fmt.Errorf("Statfs failed: %v", err)
 	}
-	{
-		var st syscall.Statfs_t
-		if err := syscall.Statfs(dir, &st); err != nil {
-			return nil, fmt.Errorf("Statfs failed: %v", err)
-		}
-		log.Printf("Statfs got: %#v", st)
-		if g, e := st.Blocks, uint64(42); g != e {
-			badf("got Blocks = %d; want %d", g, e)
-		}
-		if g, e := st.Bfree, uint64(10); g != e {
-			badf("got Bfree = %d; want %d", g, e)
-		}
-		if g, e := st.Bavail, uint64(3); g != e {
-			badf("got Bavail = %d; want %d", g, e)
-		}
-		if g, e := st.Files, uint64(13); g != e {
-			badf("got Files = %d; want %d", g, e)
-		}
-		if g, e := st.Ffree, uint64(11); g != e {
-			badf("got Ffree = %d; want %d", g, e)
-		}
-		if g, e := st.Bsize, int64(1000); g != e {
-			badf("got Bsize = %d; want %d", g, e)
-		}
-		if g, e := st.Namelen, int64(34); g != e {
-			badf("got Namelen = %d; want %d", g, e)
-		}
-		if g, e := st.Frsize, int64(7); g != e {
-			badf("got Frsize = %d; want %d", g, e)
-		}
-	}
-
-	{
-		var st syscall.Statfs_t
-		f, err := os.Open(dir)
-		if err != nil {
-			return nil, fmt.Errorf("Open for fstatfs failed: %v", err)
-		}
-		defer f.Close()
-		err = syscall.Fstatfs(int(f.Fd()), &st)
-		if err != nil {
-			return nil, fmt.Errorf("Fstatfs failed: %v", err)
-		}
-		log.Printf("Fstatfs got: %#v", st)
-		if g, e := st.Blocks, uint64(42); g != e {
-			badf("got Blocks = %d; want %d", g, e)
-		}
-		if g, e := st.Files, uint64(13); g != e {
-			badf("got Files = %d; want %d", g, e)
-		}
-	}
-
-	if !success {
-		return nil, errors.New("bad statfs")
-	}
-	return &struct{}{}, nil
+	log.Printf("Statfs got: %#v", st)
+	r := platformStatfs(&st)
+	return r, nil
 }
 
 var statfsHelper = helpers.Register("statfs", httpjson.ServePOST(doStatfs))
 
-func TestStatfs(t *testing.T) {
+func testStatfs(t *testing.T, helper *spawntest.Helper) {
 	maybeParallel(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -280,12 +245,74 @@ func TestStatfs(t *testing.T) {
 	}
 	defer mnt.Close()
 
-	control := statfsHelper.Spawn(ctx, t)
+	control := helper.Spawn(ctx, t)
 	defer control.Close()
-	var nothing struct{}
-	if err := control.JSON("/").Call(ctx, mnt.Dir, &nothing); err != nil {
+	var got statfsResult
+	if err := control.JSON("/").Call(ctx, mnt.Dir, &got); err != nil {
 		t.Fatalf("calling helper: %v", err)
 	}
+
+	if g, e := got.Blocks, uint64(42); g != e {
+		t.Errorf("got Blocks = %d; want %d", g, e)
+	}
+	if g, e := got.Bfree, uint64(10); g != e {
+		t.Errorf("got Bfree = %d; want %d", g, e)
+	}
+	if g, e := got.Bavail, uint64(3); g != e {
+		t.Errorf("got Bavail = %d; want %d", g, e)
+	}
+	if g, e := got.Files, uint64(13); g != e {
+		t.Errorf("got Files = %d; want %d", g, e)
+	}
+	if g, e := got.Ffree, uint64(11); g != e {
+		t.Errorf("got Ffree = %d; want %d", g, e)
+	}
+	switch runtime.GOOS {
+	case "freebsd":
+		// freebsd gives 65536 here regardless of the fuse fs
+		if got.Bsize != 65536 {
+			t.Errorf("freebsd now implements statfs Bsize, please fix tests")
+		}
+	default:
+		if g, e := got.Bsize, int64(1000); g != e {
+			t.Errorf("got Bsize = %d; want %d", g, e)
+		}
+	}
+	if g, e := got.Namelen, int64(34); g != e {
+		t.Errorf("got Namelen = %d; want %d", g, e)
+	}
+	if g, e := got.Frsize, int64(7); g != e {
+		t.Errorf("got Frsize = %d; want %d", g, e)
+	}
+}
+
+func TestStatfs(t *testing.T) {
+	testStatfs(t, statfsHelper)
+}
+
+func doFstatfs(ctx context.Context, dir string) (*statfsResult, error) {
+	if err := prepStatfs(dir); err != nil {
+		return nil, err
+	}
+	f, err := os.Open(dir)
+	if err != nil {
+		return nil, fmt.Errorf("Open for fstatfs failed: %v", err)
+	}
+	defer f.Close()
+	var st syscall.Statfs_t
+	err = syscall.Fstatfs(int(f.Fd()), &st)
+	if err != nil {
+		return nil, fmt.Errorf("Fstatfs failed: %v", err)
+	}
+	log.Printf("Fstatfs got: %#v", st)
+	r := platformStatfs(&st)
+	return r, nil
+}
+
+var fstatfsHelper = helpers.Register("fstatfs", httpjson.ServePOST(doFstatfs))
+
+func TestFstatfs(t *testing.T) {
+	testStatfs(t, fstatfsHelper)
 }
 
 // Test Stat of root.
@@ -318,19 +345,7 @@ func doStat(ctx context.Context, path string) (*statResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	r := &statResult{
-		Mode: fi.Mode(),
-	}
-	switch stat := fi.Sys().(type) {
-	case *syscall.Stat_t:
-		r.Ino = stat.Ino
-		r.Nlink = stat.Nlink
-		r.UID = stat.Uid
-		r.GID = stat.Gid
-		// convert stat.Blksize  because it's int64 on Linux but
-		// int32 on Darwin.
-		r.Blksize = int64(stat.Blksize)
-	}
+	r := platformStat(fi)
 	return r, nil
 }
 
@@ -3257,19 +3272,7 @@ func (f *fstatHelp) doFstat(ctx context.Context, _ struct{}) (*statResult, error
 	if err != nil {
 		return nil, err
 	}
-	r := &statResult{
-		Mode: fi.Mode(),
-	}
-	switch fstat := fi.Sys().(type) {
-	case *syscall.Stat_t:
-		r.Ino = fstat.Ino
-		r.Nlink = fstat.Nlink
-		r.UID = fstat.Uid
-		r.GID = fstat.Gid
-		// convert fstat.Blksize  because it's int64 on Linux but
-		// int32 on Darwin.
-		r.Blksize = int64(fstat.Blksize)
-	}
+	r := platformStat(fi)
 	return r, nil
 }
 
