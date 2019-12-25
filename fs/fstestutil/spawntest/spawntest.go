@@ -70,6 +70,9 @@ type helperFlag struct {
 var _ flag.Value = helperFlag{}
 
 func (hf helperFlag) String() string {
+	if hf.r == nil {
+		return ""
+	}
 	return hf.r.runName
 }
 
