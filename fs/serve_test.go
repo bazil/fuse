@@ -2179,8 +2179,17 @@ func TestChmod(t *testing.T) {
 	}
 
 	got := f.RecordedSetattr()
-	if g, e := got.Mode, os.FileMode(0764); g != e {
+	if g, e := got.Mode.Perm(), os.FileMode(0764); g != e {
 		t.Errorf("wrong mode: %o %v != %o %v", g, g, e, e)
+	}
+	ftype := got.Mode & os.ModeType
+	switch {
+	case runtime.GOOS == "freebsd" && ftype == os.ModeIrregular:
+		// acceptable but unfortunate
+	default:
+		if !ftype.IsRegular() {
+			t.Errorf("mode is not regular: %o %v", got.Mode, got.Mode)
+		}
 	}
 }
 
