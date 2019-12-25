@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"bazil.org/fuse/fs/fstestutil"
+	"bazil.org/fuse/fs/fstestutil/spawntest/httpjson"
 	"golang.org/x/sys/unix"
 )
 
@@ -58,6 +59,8 @@ func doExchange(ctx context.Context, req exchangedataRequest) (*struct{}, error)
 	return &struct{}{}, nil
 }
 
+var exchangeHelper = helpers.Register("exchange", httpjson.ServePOST(doExchange))
+
 func TestExchangeDataNotSupported(t *testing.T) {
 	maybeParallel(t)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -70,7 +73,7 @@ func TestExchangeDataNotSupported(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
-	control := linkHelper.Spawn(ctx, t)
+	control := exchangeHelper.Spawn(ctx, t)
 	defer control.Close()
 
 	req := exchangedataRequest{
