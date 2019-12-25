@@ -2438,7 +2438,7 @@ func TestGetxattr(t *testing.T) {
 
 	req := getxattrRequest{
 		Path: mnt.Dir + "/child",
-		Name: "not-there",
+		Name: "user.dummyxattr",
 		Size: 8192,
 	}
 	var res getxattrResult
@@ -2449,7 +2449,7 @@ func TestGetxattr(t *testing.T) {
 		t.Errorf("wrong getxattr content: %#v != %#v", g, e)
 	}
 	seen := f.RecordedGetxattr()
-	if g, e := seen.Name, "not-there"; g != e {
+	if g, e := seen.Name, "user.dummyxattr"; g != e {
 		t.Errorf("wrong getxattr name: %#v != %#v", g, e)
 	}
 }
@@ -2480,7 +2480,7 @@ func TestGetxattrTooSmall(t *testing.T) {
 
 	req := getxattrRequest{
 		Path:      mnt.Dir + "/child",
-		Name:      "whatever",
+		Name:      "user.dummyxattr",
 		Size:      3,
 		WantErrno: syscall.ERANGE,
 	}
@@ -2516,7 +2516,7 @@ func TestGetxattrSize(t *testing.T) {
 
 	req := getxattrRequest{
 		Path: mnt.Dir + "/child",
-		Name: "whatever",
+		Name: "user.dummyxattr",
 		Size: 0,
 	}
 	var res getxattrResult
@@ -2537,7 +2537,7 @@ type listxattr struct {
 
 func (f *listxattr) Listxattr(ctx context.Context, req *fuse.ListxattrRequest, resp *fuse.ListxattrResponse) error {
 	f.Listxattrs.Listxattr(ctx, req, resp)
-	resp.Append("one", "two")
+	resp.Append("user.one", "user.two")
 	return nil
 }
 
@@ -2572,8 +2572,29 @@ func doListxattr(ctx context.Context, req listxattrRequest) (*listxattrResult, e
 		}
 		return r, nil
 	}
+	buf = buf[:n]
+
+	if runtime.GOOS == "freebsd" {
+		// Normalize FreeBSD listxattr syscall response to the same
+		// zero-terminated format as others. This is just the
+		// client-side syscall; the FUSE interaction still uses the
+		// nil-terminated strings with namespace prefixes.
+		//
+		// Length-prefixed, no namespace (you have to query per
+		// namespace on FreeBSD).
+		var out []byte
+		for len(buf) > 0 {
+			size := int(buf[0])
+			out = append(out, []byte("user.")...)
+			out = append(out, buf[1:1+size]...)
+			out = append(out, '\x00')
+			buf = buf[1+size:]
+		}
+		buf = out
+	}
+
 	r := &listxattrResult{
-		Data: buf[:n],
+		Data: buf,
 	}
 	return r, nil
 }
@@ -2601,12 +2622,20 @@ func TestListxattr(t *testing.T) {
 	if err := control.JSON("/").Call(ctx, req, &res); err != nil {
 		t.Fatalf("calling helper: %v", err)
 	}
-	if g, e := string(res.Data), "one\x00two\x00"; g != e {
+	if g, e := string(res.Data), "user.one\x00user.two\x00"; g != e {
 		t.Errorf("wrong listxattr content: %#v != %#v", g, e)
 	}
 
 	want := fuse.ListxattrRequest{
 		Size: 8192,
+	}
+	if runtime.GOOS == "freebsd" {
+		// FreeBSD seems to always probe the size for you, even when
+		// userspace passed a large enough buffer. This means two (or
+		// more, if the size keeps growing!) Listxattr FUSE requests,
+		// with the last one likely having the perfect size (except
+		// when the size changed downward between the calls). Blargh.
+		want.Size = uint32(len("user.one\x00user.two\x00"))
 	}
 	if g, e := f.RecordedListxattr(), want; g != e {
 		t.Fatalf("listxattr saw %+v, want %+v", g, e)
@@ -2625,6 +2654,9 @@ func (f *listxattrTooSmall) Listxattr(ctx context.Context, req *fuse.ListxattrRe
 }
 
 func TestListxattrTooSmall(t *testing.T) {
+	if runtime.GOOS == "freebsd" {
+		t.Skip("FreeBSD xattr list format is different and the kernel has intermediate buffer; can't drive FUSE requests directly from userspace")
+	}
 	maybeParallel(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -2660,6 +2692,9 @@ func (f *listxattrSize) Listxattr(ctx context.Context, req *fuse.ListxattrReques
 }
 
 func TestListxattrSize(t *testing.T) {
+	if runtime.GOOS == "freebsd" {
+		t.Skip("FreeBSD xattr list format is different and the kernel has intermediate buffer; can't drive FUSE requests directly from userspace")
+	}
 	maybeParallel(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -2713,6 +2748,11 @@ func testSetxattr(t *testing.T, size int) {
 	if size > linux_XATTR_NAME_MAX && runtime.GOOS == "linux" {
 		t.Skip("large xattrs are not supported by linux")
 	}
+	if runtime.GOOS == "freebsd" && size > 135106 {
+		// no idea what that magic number is but it seems like a very
+		// repeatable exact cutoff for me
+		t.Skip("FreeBSD setxattr seems to hang on large values")
+	}
 
 	maybeParallel(t)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -2730,7 +2770,7 @@ func testSetxattr(t *testing.T, size int) {
 	greeting := strings.Repeat(g, size/len(g)+1)[:size]
 	req := setxattrRequest{
 		Path:  mnt.Dir + "/child",
-		Name:  "greeting",
+		Name:  "user.greeting",
 		Data:  []byte(greeting),
 		Flags: 0,
 	}
@@ -2743,7 +2783,7 @@ func testSetxattr(t *testing.T, size int) {
 	// directly compared
 	got := f.RecordedSetxattr()
 
-	if g, e := got.Name, "greeting"; g != e {
+	if g, e := got.Name, "user.greeting"; g != e {
 		t.Errorf("Setxattr incorrect name: %q != %q", g, e)
 	}
 
@@ -2798,14 +2838,14 @@ func TestRemovexattr(t *testing.T) {
 
 	req := removexattrRequest{
 		Path: mnt.Dir + "/child",
-		Name: "greeting",
+		Name: "user.greeting",
 	}
 	var nothing struct{}
 	if err := control.JSON("/").Call(ctx, req, &nothing); err != nil {
 		t.Fatalf("calling helper: %v", err)
 	}
 
-	want := fuse.RemovexattrRequest{Name: "greeting"}
+	want := fuse.RemovexattrRequest{Name: "user.greeting"}
 	if g, e := f.RecordedRemovexattr(), want; g != e {
 		t.Errorf("removexattr saw %v, want %v", g, e)
 	}
