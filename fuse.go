@@ -1010,7 +1010,12 @@ loop:
 		}
 
 	case opBmap:
-		panic("opBmap")
+		// bmap asks to map a byte offset within a file to a single
+		// uint64. On Linux, it triggers only with blkdev fuse mounts,
+		// that claim to be backed by an actual block device. FreeBSD
+		// seems to send it for just any fuse mount, whether there's a
+		// block device involved or not.
+		goto unrecognized
 
 	case opDestroy:
 		req = &DestroyRequest{
