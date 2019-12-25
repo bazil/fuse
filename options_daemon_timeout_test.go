@@ -54,11 +54,10 @@ func TestMountOptionDaemonTimeout(t *testing.T) {
 
 	// This should fail by the kernel timing out the request.
 	req := openRequest{
-		Path:  mnt.Dir + "/child",
-		Flags: os.O_WRONLY | os.O_CREATE,
-		Perm:  0,
-		// TODO confirm against reality
-		WantErrno: syscall.EIO,
+		Path:      mnt.Dir + "/child",
+		Flags:     os.O_WRONLY | os.O_CREATE,
+		Perm:      0,
+		WantErrno: syscall.ENOTCONN,
 	}
 	var nothing struct{}
 	if err := control.JSON("/").Call(ctx, req, &nothing); err != nil {
