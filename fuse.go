@@ -495,9 +495,15 @@ func fileMode(unixMode uint32) os.FileMode {
 		mode |= os.ModeSymlink
 	case syscall.S_IFSOCK:
 		mode |= os.ModeSocket
+	case 0:
+		// apparently there's plenty of times when the FUSE request
+		// does not contain the file type
+		mode |= os.ModeIrregular
 	default:
-		// no idea
-		mode |= os.ModeDevice
+		// not just unavailable in the kernel codepath; known to
+		// kernel but unrecognized by us
+		Debug(fmt.Sprintf("unrecognized file mode type: %04o", unixMode))
+		mode |= os.ModeIrregular
 	}
 	if unixMode&syscall.S_ISUID != 0 {
 		mode |= os.ModeSetuid
@@ -1984,9 +1990,14 @@ type SetattrRequest struct {
 	Size   uint64
 	Atime  time.Time
 	Mtime  time.Time
-	Mode   os.FileMode
-	Uid    uint32
-	Gid    uint32
+	// Mode is the file mode to set (when valid).
+	//
+	// The type of the node (as in os.ModeType, os.ModeDir etc) is not
+	// guaranteed to be sent by the kernel, in which case
+	// os.ModeIrregular will be set.
+	Mode os.FileMode
+	Uid  uint32
+	Gid  uint32
 
 	// OS X only
 	Bkuptime time.Time
