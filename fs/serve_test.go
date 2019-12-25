@@ -1588,8 +1588,8 @@ func (i *interruptHelp) doReport(ctx context.Context, _ struct{}) (*interruptRes
 var interruptHelper = helpers.Register("interrupt", &interruptHelp{})
 
 func TestInterrupt(t *testing.T) {
-	if runtime.GOOS == "freebsd" {
-		t.Skip("don't know how to trigger EINTR from read syscall 'on FreeBSD")
+	if runtime.GOOS == "freebsd" || runtime.GOOS == "darwin" {
+		t.Skip("don't know how to trigger EINTR from read syscall on FreeBSD or macOS")
 	}
 	maybeParallel(t)
 	ctx, cancel := context.WithCancel(context.Background())
