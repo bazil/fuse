@@ -1468,7 +1468,7 @@ type GetxattrResponse struct {
 }
 
 func (r *GetxattrResponse) String() string {
-	return fmt.Sprintf("Getxattr %x", r.Xattr)
+	return fmt.Sprintf("Getxattr %q", r.Xattr)
 }
 
 // A ListxattrRequest asks to list the extended attributes associated with r.Node.
@@ -1504,7 +1504,7 @@ type ListxattrResponse struct {
 }
 
 func (r *ListxattrResponse) String() string {
-	return fmt.Sprintf("Listxattr %x", r.Xattr)
+	return fmt.Sprintf("Listxattr %q", r.Xattr)
 }
 
 // Append adds an extended attribute name to the response.
@@ -1569,7 +1569,7 @@ func trunc(b []byte, max int) ([]byte, string) {
 
 func (r *SetxattrRequest) String() string {
 	xattr, tail := trunc(r.Xattr, 16)
-	return fmt.Sprintf("Setxattr [%s] %q %x%s fl=%v @%#x", &r.Header, r.Name, xattr, tail, r.Flags, r.Position)
+	return fmt.Sprintf("Setxattr [%s] %q %q%s fl=%v @%#x", &r.Header, r.Name, xattr, tail, r.Flags, r.Position)
 }
 
 // Respond replies to the request, indicating that the extended attribute was set.
