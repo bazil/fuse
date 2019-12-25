@@ -2253,7 +2253,7 @@ func TestOpen(t *testing.T) {
 	}
 
 	if g, e := got, want; g != e {
-		t.Errorf("open saw %v, want %v", g, e)
+		t.Errorf("open saw %+v, want %+v", g, e)
 		return
 	}
 }
