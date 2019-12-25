@@ -1,6 +1,6 @@
 // Test for adjustable timeout between a FUSE request and the daemon's response.
 //
-// +build darwin freebsd
+// +build darwin
 
 package fuse_test
 
@@ -30,7 +30,7 @@ func (c slowCreaterDir) Create(ctx context.Context, req *fuse.CreateRequest, res
 }
 
 func TestMountOptionDaemonTimeout(t *testing.T) {
-	if runtime.GOOS != "darwin" && runtime.GOOS != "freebsd" {
+	if runtime.GOOS != "darwin" {
 		return
 	}
 	if testing.Short() {
