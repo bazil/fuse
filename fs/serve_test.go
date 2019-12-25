@@ -3587,6 +3587,9 @@ func (i *invalidateDataPartial) Read(ctx context.Context, req *fuse.ReadRequest,
 }
 
 func TestInvalidateNodeDataRangeMiss(t *testing.T) {
+	if runtime.GOOS == "freebsd" {
+		t.Skip("FreeBSD seems to always invalidate whole file")
+	}
 	// This test may see false positive failures when run under
 	// extreme memory pressure.
 	maybeParallel(t)
