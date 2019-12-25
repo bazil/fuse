@@ -2286,6 +2286,11 @@ func TestOpenNonSeekable(t *testing.T) {
 	if runtime.GOOS == "darwin" {
 		t.Skip("OSXFUSE shares one read and one write handle for all clients, does not support open modes")
 	}
+	if runtime.GOOS == "freebsd" {
+		// behavior observed: seek calls succeed, but file offset does
+		// not change
+		t.Skip("FreeBSD seems to ignore OpenNonSeekable")
+	}
 
 	maybeParallel(t)
 	ctx, cancel := context.WithCancel(context.Background())
