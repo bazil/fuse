@@ -20,7 +20,7 @@ func platformStatfs(st *syscall.Statfs_t) *statfsResult {
 		Bavail:  st.Bavail,
 		Files:   st.Files,
 		Ffree:   st.Ffree,
-		Bsize:   int64(st.Bsize),
+		Bsize:   int64(st.Iosize),
 		Namelen: 0,
 		Frsize:  0,
 	}

@@ -273,16 +273,35 @@ func testStatfs(t *testing.T, helper *spawntest.Helper) {
 		if got.Bsize != 65536 {
 			t.Errorf("freebsd now implements statfs Bsize, please fix tests")
 		}
+	case "darwin":
+		// darwin gives 4096 here regardless of the fuse fs
+		if got.Bsize != 4096 {
+			t.Errorf("darwin now implements statfs Bsize, please fix tests")
+		}
 	default:
 		if g, e := got.Bsize, int64(1000); g != e {
 			t.Errorf("got Bsize = %d; want %d", g, e)
 		}
 	}
-	if g, e := got.Namelen, int64(34); g != e {
-		t.Errorf("got Namelen = %d; want %d", g, e)
+	switch runtime.GOOS {
+	case "darwin":
+		if g, e := got.Namelen, int64(0); g != e {
+			t.Errorf("darwin now implements Namelen, please fix tests")
+		}
+	default:
+		if g, e := got.Namelen, int64(34); g != e {
+			t.Errorf("got Namelen = %d; want %d", g, e)
+		}
 	}
-	if g, e := got.Frsize, int64(7); g != e {
-		t.Errorf("got Frsize = %d; want %d", g, e)
+	switch runtime.GOOS {
+	case "darwin":
+		if g, e := got.Frsize, int64(0); g != e {
+			t.Errorf("darwin now implements Frsize, please fix tests")
+		}
+	default:
+		if g, e := got.Frsize, int64(7); g != e {
+			t.Errorf("got Frsize = %d; want %d", g, e)
+		}
 	}
 }
 
