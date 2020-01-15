@@ -547,12 +547,8 @@ func (c *Conn) Protocol() Protocol {
 	return c.proto
 }
 
-// ReadRequest returns the next FUSE request from the kernel.
-//
-// Caller must call either Request.Respond or Request.RespondError in
-// a reasonable time. Caller must not retain Request after that call.
-func (c *Conn) ReadRequest() (Request, error) {
-	m := getMessage(c)
+// readRawData read raw data from connection
+func (c *Conn) readRawData(m *message) (int, error) {
 loop:
 	c.rio.RLock()
 	n, err := syscall.Read(c.fd(), m.buf)
@@ -563,14 +559,28 @@ loop:
 		goto loop
 	}
 	if err != nil && err != syscall.ENODEV {
+		return n, err
+	}
+	if n <= 0 {
+		return n, io.EOF
+	}
+	m.buf = m.buf[:n]
+
+	return n, nil
+}
+
+// ReadRequest returns the next FUSE request from the kernel.
+//
+// Caller must call either Request.Respond or Request.RespondError in
+// a reasonable time. Caller must not retain Request after that call.
+func (c *Conn) ReadRequest() (Request, error) {
+	m := getMessage(c)
+
+	n, err := c.readRawData(m)
+	if err != nil {
 		putMessage(m)
 		return nil, err
 	}
-	if n <= 0 {
-		putMessage(m)
-		return nil, io.EOF
-	}
-	m.buf = m.buf[:n]
 
 	if n < inHeaderSize {
 		putMessage(m)
