@@ -139,7 +139,24 @@ func TestMountOptionSubtype(t *testing.T) {
 
 // TODO test LocalVolume
 
-// TODO test AllowOther; hard because needs system-level authorization
+func TestMountOptionAllowOther(t *testing.T) {
+	// This test needs user_allow_other in /etc/fuse.conf. I'm not too
+	// keen on adding a check for that here, as it's just an internal
+	// detail of a completely different program; the next version
+	// might read a different file.
+	maybeParallel(t)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}}, nil,
+		fuse.AllowOther(),
+	)
+	if err != nil {
+		t.Fatalf("mount error: %v", err)
+	}
+	defer mnt.Close()
+	// we're not going to bother testing that other users actually can
+	// access the fs, that's quite fiddly and system specific -- we'd
+	// need to run as root and switch to some other account for the
+	// client.
+}
 
 func TestMountOptionAllowOtherThenAllowRoot(t *testing.T) {
 	maybeParallel(t)
