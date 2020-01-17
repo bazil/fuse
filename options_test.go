@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"os"
 	"runtime"
 	"syscall"
@@ -190,7 +191,7 @@ func doOpenErr(ctx context.Context, req openRequest) (*struct{}, error) {
 		f.Close()
 	}
 	if !errors.Is(err, req.WantErrno) {
-		return nil, err
+		return nil, fmt.Errorf("wrong error: %v", err)
 	}
 	return &struct{}{}, nil
 }

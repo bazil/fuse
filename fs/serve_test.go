@@ -1330,7 +1330,7 @@ type renameRequest struct {
 
 func doRename(ctx context.Context, req renameRequest) (*struct{}, error) {
 	if err := os.Rename(req.OldName, req.NewName); !errors.Is(err, req.WantErrno) {
-		return nil, err
+		return nil, fmt.Errorf("wrong error: %v", err)
 	}
 	return &struct{}{}, nil
 }
@@ -1671,7 +1671,7 @@ func doOpenErr(ctx context.Context, req openRequest) (*struct{}, error) {
 		f.Close()
 	}
 	if !errors.Is(err, req.WantErrno) {
-		return nil, err
+		return nil, fmt.Errorf("wrong error: %v", err)
 	}
 	return &struct{}{}, nil
 }
@@ -2890,7 +2890,7 @@ type statErrRequest struct {
 
 func doStatErr(ctx context.Context, req statErrRequest) (*struct{}, error) {
 	if _, err := os.Stat(req.Path); !errors.Is(err, req.WantErrno) {
-		return nil, fmt.Errorf("unexpected error: %v", err)
+		return nil, fmt.Errorf("wrong error: %v", err)
 	}
 	return &struct{}{}, nil
 }
