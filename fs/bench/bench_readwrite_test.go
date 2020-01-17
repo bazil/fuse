@@ -24,14 +24,14 @@ type benchFS struct {
 	conf *benchConfig
 }
 
-var _ = fs.FS(benchFS{})
+var _ fs.FS = (*benchFS)(nil)
 
-func (f benchFS) Root() (fs.Node, error) {
-	return benchDir{conf: f.conf}, nil
+func (f *benchFS) Root() (fs.Node, error) {
+	return benchDir{fs: f}, nil
 }
 
 type benchDir struct {
-	conf *benchConfig
+	fs *benchFS
 }
 
 var _ = fs.Node(benchDir{})
@@ -47,7 +47,7 @@ func (benchDir) Attr(ctx context.Context, a *fuse.Attr) error {
 
 func (d benchDir) Lookup(ctx context.Context, name string) (fs.Node, error) {
 	if name == "bench" {
-		return benchFile{conf: d.conf}, nil
+		return benchFile{conf: d.fs.conf}, nil
 	}
 	return nil, syscall.ENOENT
 }
@@ -110,7 +110,7 @@ func benchmark(helper *spawntest.Helper, conf *benchConfig, size int64) func(*te
 	fn := func(b *testing.B) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		filesys := benchFS{
+		filesys := &benchFS{
 			conf: conf,
 		}
 		mnt, err := fstestutil.Mounted(filesys, nil,
