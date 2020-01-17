@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"bazil.org/fuse"
@@ -823,17 +824,12 @@ func (c *Server) serve(r fuse.Request) {
 			Request: logResponseHeader{ID: hdr.ID},
 		}
 		if err, ok := resp.(error); ok {
-			msg.Error = err.Error()
-			if ferr, ok := err.(fuse.ErrorNumber); ok {
-				errno := ferr.Errno()
-				msg.Errno = errno.ErrnoName()
-				if errno == err {
-					// it's just a fuse.Errno with no extra detail;
-					// skip the textual message for log readability
-					msg.Error = ""
-				}
-			} else {
-				msg.Errno = fuse.DefaultErrno.ErrnoName()
+			errno := fuse.ToErrno(err)
+			msg.Errno = errno.ErrnoName()
+			if errno != err && syscall.Errno(errno) != err {
+				// if it's more than just a fuse.Errno or a
+				// syscall.Errno, log extra detail
+				msg.Error = err.Error()
 			}
 		} else {
 			msg.Out = resp

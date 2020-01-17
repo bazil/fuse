@@ -348,13 +348,14 @@ const (
 const DefaultErrno = EIO
 
 var errnoNames = map[Errno]string{
-	ENOSYS: "ENOSYS",
-	ESTALE: "ESTALE",
-	ENOENT: "ENOENT",
-	EIO:    "EIO",
-	EPERM:  "EPERM",
-	EINTR:  "EINTR",
-	EEXIST: "EEXIST",
+	ENOSYS:                      "ENOSYS",
+	ESTALE:                      "ESTALE",
+	ENOENT:                      "ENOENT",
+	EIO:                         "EIO",
+	EPERM:                       "EPERM",
+	EINTR:                       "EINTR",
+	EEXIST:                      "EEXIST",
+	Errno(syscall.ENAMETOOLONG): "ENAMETOOLONG",
 }
 
 // Errno implements Error and ErrorNumber using a syscall.Errno.
@@ -390,11 +391,28 @@ func (e Errno) MarshalText() ([]byte, error) {
 	return []byte(s), nil
 }
 
-func (h *Header) RespondError(err error) {
-	errno := DefaultErrno
-	if ferr, ok := err.(ErrorNumber); ok {
-		errno = ferr.Errno()
+// ToErrno converts arbitrary errors to Errno.
+//
+// If the underlying type of err is syscall.Errno, it is used
+// directly. No unwrapping is done, to prevent wrong errors from
+// leaking via e.g. *os.PathError.
+//
+// If err unwraps to implement ErrorNumber, that is used.
+//
+// Finally, returns DefaultErrno.
+func ToErrno(err error) Errno {
+	if err, ok := err.(syscall.Errno); ok {
+		return Errno(err)
 	}
+	var errnum ErrorNumber
+	if errors.As(err, &errnum) {
+		return Errno(errnum.Errno())
+	}
+	return DefaultErrno
+}
+
+func (h *Header) RespondError(err error) {
+	errno := ToErrno(err)
 	// FUSE uses negative errors!
 	// TODO: File bug report against OSXFUSE: positive error causes kernel panic.
 	buf := newBuffer(0)

@@ -2963,6 +2963,38 @@ func TestCustomErrno(t *testing.T) {
 	}
 }
 
+// Test returning syscall.Errno
+
+type syscallErrNode struct {
+	fstestutil.Dir
+}
+
+func (f syscallErrNode) Lookup(ctx context.Context, name string) (fs.Node, error) {
+	return nil, syscall.ENAMETOOLONG
+}
+
+func TestSyscallErrno(t *testing.T) {
+	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{syscallErrNode{}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+	control := statErrHelper.Spawn(ctx, t)
+	defer control.Close()
+
+	req := statErrRequest{
+		Path:      mnt.Dir + "/child",
+		WantErrno: syscall.ENAMETOOLONG,
+	}
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, req, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
+	}
+}
+
 // Test Mmap writing
 
 type inMemoryFile struct {
