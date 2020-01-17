@@ -467,7 +467,6 @@ func (sn *serveNode) attr(ctx context.Context, attr *fuse.Attr) error {
 type serveHandle struct {
 	handle   Handle
 	readData []byte
-	nodeID   fuse.NodeID
 }
 
 // NodeRef is deprecated. It remains here to decrease code churn on
@@ -501,9 +500,9 @@ func (c *Server) saveNode(inode uint64, node Node) (id fuse.NodeID, gen uint64) 
 	return id, sn.generation
 }
 
-func (c *Server) saveHandle(handle Handle, nodeID fuse.NodeID) (id fuse.HandleID) {
+func (c *Server) saveHandle(handle Handle) (id fuse.HandleID) {
 	c.meta.Lock()
-	shandle := &serveHandle{handle: handle, nodeID: nodeID}
+	shandle := &serveHandle{handle: handle}
 	if n := len(c.freeHandle); n > 0 {
 		id = c.freeHandle[n-1]
 		c.freeHandle = c.freeHandle[:n-1]
@@ -1088,7 +1087,7 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 		} else {
 			h2 = node
 		}
-		s.Handle = c.saveHandle(h2, r.Hdr().Node)
+		s.Handle = c.saveHandle(h2)
 		done(s)
 		r.Respond(s)
 		return nil
@@ -1108,7 +1107,7 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 		if err := c.saveLookup(ctx, &s.LookupResponse, snode, r.Name, n2); err != nil {
 			return err
 		}
-		s.Handle = c.saveHandle(h2, r.Hdr().Node)
+		s.Handle = c.saveHandle(h2)
 		done(s)
 		r.Respond(s)
 		return nil
