@@ -217,7 +217,7 @@ type NodeMknoder interface {
 	Mknod(ctx context.Context, req *fuse.MknodRequest) (Node, error)
 }
 
-// TODO this should be on Handle not Node
+// NodeFsyncer is deprecated. Use HandleFsyncer instead.
 type NodeFsyncer interface {
 	Fsync(ctx context.Context, req *fuse.FsyncRequest) error
 }
@@ -280,6 +280,32 @@ type HandleFlusher interface {
 	// Because there can be multiple file descriptors referring to a
 	// single opened file, Flush can be called multiple times.
 	Flush(ctx context.Context, req *fuse.FlushRequest) error
+}
+
+type HandleFsyncer interface {
+	Fsync(ctx context.Context, req *fuse.FsyncRequest) error
+}
+
+type HandleGetattrer interface {
+	// Getattr obtains the standard metadata related to an open file handle.
+	// It should store that metadata in resp.
+	//
+	// If this method is not implemented, it will defer to NodeGetattrer.
+	Getattr(ctx context.Context, req *fuse.GetattrRequest, resp *fuse.GetattrResponse) error
+}
+
+type HandleSetattrer interface {
+	// Setattr sets the standard metadata related to an open file handle.
+	//
+	// If this method is not implemented, it will defer to NodeSetattrer.
+	//
+	// Note, this is also used to communicate changes in the size of
+	// the file, outside of Writes.
+	//
+	// req.Valid is a bitmask of what fields are actually being set.
+	// For example, the method should not change the mode of the file
+	// unless req.Valid.Mode() is true.
+	Setattr(ctx context.Context, req *fuse.SetattrRequest, resp *fuse.SetattrResponse) error
 }
 
 type HandleReadAller interface {
@@ -918,6 +944,24 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 	// Node operations.
 	case *fuse.GetattrRequest:
 		s := &fuse.GetattrResponse{}
+
+		// If the handle is valid, try Getattr on the handle before falling back to the node.
+		if r.Flags&fuse.GetattrFh == fuse.GetattrFh {
+			shandle := c.getHandle(r.Handle)
+			if shandle == nil {
+				return fuse.ESTALE
+			}
+
+			if h, ok := shandle.handle.(HandleGetattrer); ok {
+				if err := h.Getattr(ctx, r, s); err != nil {
+					return err
+				}
+				done(s)
+				r.Respond(s)
+				return nil
+			}
+		}
+
 		if n, ok := node.(NodeGetattrer); ok {
 			if err := n.Getattr(ctx, r, s); err != nil {
 				return err
@@ -933,7 +977,24 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 
 	case *fuse.SetattrRequest:
 		s := &fuse.SetattrResponse{}
-		if n, ok := node.(NodeSetattrer); ok {
+		var set bool
+
+		// If the handle is valid, try Setattr on the handle before falling back to the node.
+		if r.Valid.Handle() {
+			shandle := c.getHandle(r.Handle)
+			if shandle == nil {
+				return fuse.ESTALE
+			}
+
+			if h, ok := shandle.handle.(HandleSetattrer); ok {
+				if err := h.Setattr(ctx, r, s); err != nil {
+					return err
+				}
+				set = true
+			}
+		}
+
+		if n, ok := node.(NodeSetattrer); ok && !set {
 			if err := n.Setattr(ctx, r, s); err != nil {
 				return err
 			}
@@ -1351,14 +1412,25 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 		return nil
 
 	case *fuse.FsyncRequest:
-		n, ok := node.(NodeFsyncer)
-		if !ok {
+		shandle := c.getHandle(r.Handle)
+		if shandle == nil {
+			return fuse.ESTALE
+		}
+		handle := shandle.handle
+
+		var err error
+		if h, ok := handle.(HandleFsyncer); ok {
+			err = h.Fsync(ctx, r)
+		} else if n, ok := node.(NodeFsyncer); ok {
+			err = n.Fsync(ctx, r)
+		} else {
 			return fuse.EIO
 		}
-		err := n.Fsync(ctx, r)
+
 		if err != nil {
 			return err
 		}
+
 		done(nil)
 		r.Respond()
 		return nil
