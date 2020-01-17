@@ -1329,7 +1329,11 @@ type renameRequest struct {
 }
 
 func doRename(ctx context.Context, req renameRequest) (*struct{}, error) {
-	if err := os.Rename(req.OldName, req.NewName); !errors.Is(err, req.WantErrno) {
+	var want error
+	if req.WantErrno > 0 {
+		want = req.WantErrno
+	}
+	if err := os.Rename(req.OldName, req.NewName); !errors.Is(err, want) {
 		return nil, fmt.Errorf("wrong error: %v", err)
 	}
 	return &struct{}{}, nil
