@@ -107,6 +107,7 @@ func MountedFunc(fn func(*Mount) fs.FS, conf *fs.Config, options ...fuse.MountOp
 		if err != nil {
 			return nil, err
 		}
+		//lint:ignore ST1005 uppercase because it's an idenfier
 		return nil, errors.New("Serve exited early")
 	}
 }
