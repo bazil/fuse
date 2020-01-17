@@ -202,6 +202,9 @@ func TestMountOptionDefaultPermissions(t *testing.T) {
 	if runtime.GOOS == "freebsd" {
 		t.Skip("FreeBSD does not support DefaultPermissions")
 	}
+	if os.Getuid() == 0 {
+		t.Skip("root cannot be denied by DefaultPermissions")
+	}
 	maybeParallel(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
