@@ -158,36 +158,6 @@ func TestMountOptionAllowOther(t *testing.T) {
 	// client.
 }
 
-func TestMountOptionAllowOtherThenAllowRoot(t *testing.T) {
-	maybeParallel(t)
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}}, nil,
-		fuse.AllowOther(),
-		fuse.AllowRoot(),
-	)
-	if err == nil {
-		mnt.Close()
-	}
-	if g, e := err, fuse.ErrCannotCombineAllowOtherAndAllowRoot; g != e {
-		t.Fatalf("wrong error: %v != %v", g, e)
-	}
-}
-
-// TODO test AllowRoot; hard because needs system-level authorization
-
-func TestMountOptionAllowRootThenAllowOther(t *testing.T) {
-	maybeParallel(t)
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}}, nil,
-		fuse.AllowRoot(),
-		fuse.AllowOther(),
-	)
-	if err == nil {
-		mnt.Close()
-	}
-	if g, e := err, fuse.ErrCannotCombineAllowOtherAndAllowRoot; g != e {
-		t.Fatalf("wrong error: %v != %v", g, e)
-	}
-}
-
 type unwritableFile struct{}
 
 func (f unwritableFile) Attr(ctx context.Context, a *fuse.Attr) error {
