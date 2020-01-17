@@ -323,6 +323,8 @@ type ErrorNumber interface {
 	Errno() Errno
 }
 
+// Deprecated: Return a syscall.Errno directly. See ToErrno for exact
+// rules.
 const (
 	// ENOSYS indicates that the call is not supported.
 	ENOSYS = Errno(syscall.ENOSYS)
