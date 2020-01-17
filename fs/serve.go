@@ -756,7 +756,7 @@ func (e handleNotReaderError) Error() string {
 var _ fuse.ErrorNumber = handleNotReaderError{}
 
 func (e handleNotReaderError) Errno() fuse.Errno {
-	return fuse.ENOTSUP
+	return fuse.Errno(syscall.ENOTSUP)
 }
 
 func initLookupResponse(s *fuse.LookupResponse) {
@@ -788,10 +788,11 @@ func (c *Server) serve(r fuse.Request) {
 		}
 		if snode == nil {
 			c.meta.Unlock()
+			err := syscall.ESTALE
 			c.debug(response{
 				Op:      opName(r),
 				Request: logResponseHeader{ID: hdr.ID},
-				Error:   fuse.ESTALE.ErrnoName(),
+				Error:   fuse.Errno(err).ErrnoName(),
 				// this is the only place that sets both Error and
 				// Out; not sure if i want to do that; might get rid
 				// of len(c.node) things altogether
@@ -799,7 +800,7 @@ func (c *Server) serve(r fuse.Request) {
 					MaxNode: fuse.NodeID(len(c.node)),
 				},
 			})
-			r.RespondError(fuse.ESTALE)
+			r.RespondError(err)
 			return
 		}
 		node = snode.node
@@ -882,7 +883,7 @@ func (c *Server) serve(r fuse.Request) {
 				//
 				// Decent write-up on role of EINTR:
 				// http://250bpm.com/blog:12
-				err = fuse.EINTR
+				err = syscall.EINTR
 			default:
 				// nothing
 			}
@@ -902,7 +903,7 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 		// Note: To FUSE, ENOSYS means "this server never implements this request."
 		// It would be inappropriate to return ENOSYS for other operations in this
 		// switch that might only be unavailable in some contexts, not all.
-		return fuse.ENOSYS
+		return syscall.ENOSYS
 
 	case *fuse.StatfsRequest:
 		s := &fuse.StatfsResponse{}
@@ -951,7 +952,7 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 		initLookupResponse(&s.LookupResponse)
 		n, ok := node.(NodeSymlinker)
 		if !ok {
-			return fuse.EIO // XXX or EPERM like Mkdir?
+			return syscall.EIO // XXX or EPERM like Mkdir?
 		}
 		n2, err := n.Symlink(ctx, r)
 		if err != nil {
@@ -967,7 +968,7 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 	case *fuse.ReadlinkRequest:
 		n, ok := node.(NodeReadlinker)
 		if !ok {
-			return fuse.EIO /// XXX or EPERM?
+			return syscall.EIO /// XXX or EPERM?
 		}
 		target, err := n.Readlink(ctx, r)
 		if err != nil {
@@ -980,7 +981,7 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 	case *fuse.LinkRequest:
 		n, ok := node.(NodeLinker)
 		if !ok {
-			return fuse.EIO /// XXX or EPERM?
+			return syscall.EIO /// XXX or EPERM?
 		}
 		c.meta.Lock()
 		var oldNode *serveNode
@@ -993,7 +994,7 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 				Request: r.Hdr(),
 				In:      r,
 			})
-			return fuse.EIO
+			return syscall.EIO
 		}
 		n2, err := n.Link(ctx, r, oldNode.node)
 		if err != nil {
@@ -1011,7 +1012,7 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 	case *fuse.RemoveRequest:
 		n, ok := node.(NodeRemover)
 		if !ok {
-			return fuse.EIO /// XXX or EPERM?
+			return syscall.EIO /// XXX or EPERM?
 		}
 		err := n.Remove(ctx, r)
 		if err != nil {
@@ -1041,7 +1042,7 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 		} else if n, ok := node.(NodeRequestLookuper); ok {
 			n2, err = n.Lookup(ctx, r, s)
 		} else {
-			return fuse.ENOENT
+			return syscall.ENOENT
 		}
 		if err != nil {
 			return err
@@ -1058,7 +1059,7 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 		initLookupResponse(&s.LookupResponse)
 		n, ok := node.(NodeMkdirer)
 		if !ok {
-			return fuse.EPERM
+			return syscall.EPERM
 		}
 		n2, err := n.Mkdir(ctx, r)
 		if err != nil {
@@ -1092,7 +1093,7 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 		n, ok := node.(NodeCreater)
 		if !ok {
 			// If we send back ENOSYS, FUSE will try mknod+open.
-			return fuse.EPERM
+			return syscall.EPERM
 		}
 		s := &fuse.CreateResponse{OpenResponse: fuse.OpenResponse{}}
 		initLookupResponse(&s.LookupResponse)
@@ -1111,7 +1112,7 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 	case *fuse.GetxattrRequest:
 		n, ok := node.(NodeGetxattrer)
 		if !ok {
-			return fuse.ENOTSUP
+			return syscall.ENOTSUP
 		}
 		s := &fuse.GetxattrResponse{}
 		err := n.Getxattr(ctx, r, s)
@@ -1119,7 +1120,7 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 			return err
 		}
 		if r.Size != 0 && uint64(len(s.Xattr)) > uint64(r.Size) {
-			return fuse.ERANGE
+			return syscall.ERANGE
 		}
 		done(s)
 		r.Respond(s)
@@ -1128,7 +1129,7 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 	case *fuse.ListxattrRequest:
 		n, ok := node.(NodeListxattrer)
 		if !ok {
-			return fuse.ENOTSUP
+			return syscall.ENOTSUP
 		}
 		s := &fuse.ListxattrResponse{}
 		err := n.Listxattr(ctx, r, s)
@@ -1136,7 +1137,7 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 			return err
 		}
 		if r.Size != 0 && uint64(len(s.Xattr)) > uint64(r.Size) {
-			return fuse.ERANGE
+			return syscall.ERANGE
 		}
 		done(s)
 		r.Respond(s)
@@ -1145,7 +1146,7 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 	case *fuse.SetxattrRequest:
 		n, ok := node.(NodeSetxattrer)
 		if !ok {
-			return fuse.ENOTSUP
+			return syscall.ENOTSUP
 		}
 		err := n.Setxattr(ctx, r)
 		if err != nil {
@@ -1158,7 +1159,7 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 	case *fuse.RemovexattrRequest:
 		n, ok := node.(NodeRemovexattrer)
 		if !ok {
-			return fuse.ENOTSUP
+			return syscall.ENOTSUP
 		}
 		err := n.Removexattr(ctx, r)
 		if err != nil {
@@ -1184,7 +1185,7 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 	case *fuse.ReadRequest:
 		shandle := c.getHandle(r.Handle)
 		if shandle == nil {
-			return fuse.ESTALE
+			return syscall.ESTALE
 		}
 		handle := shandle.handle
 
@@ -1249,7 +1250,7 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 	case *fuse.WriteRequest:
 		shandle := c.getHandle(r.Handle)
 		if shandle == nil {
-			return fuse.ESTALE
+			return syscall.ESTALE
 		}
 
 		s := &fuse.WriteResponse{}
@@ -1261,12 +1262,12 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 			r.Respond(s)
 			return nil
 		}
-		return fuse.EIO
+		return syscall.EIO
 
 	case *fuse.FlushRequest:
 		shandle := c.getHandle(r.Handle)
 		if shandle == nil {
-			return fuse.ESTALE
+			return syscall.ESTALE
 		}
 		handle := shandle.handle
 
@@ -1282,7 +1283,7 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 	case *fuse.ReleaseRequest:
 		shandle := c.getHandle(r.Handle)
 		if shandle == nil {
-			return fuse.ESTALE
+			return syscall.ESTALE
 		}
 		handle := shandle.handle
 
@@ -1318,11 +1319,11 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 				Request: r.Hdr(),
 				In:      r,
 			})
-			return fuse.EIO
+			return syscall.EIO
 		}
 		n, ok := node.(NodeRenamer)
 		if !ok {
-			return fuse.EIO // XXX or EPERM like Mkdir?
+			return syscall.EIO // XXX or EPERM like Mkdir?
 		}
 		err := n.Rename(ctx, r, newDirNode.node)
 		if err != nil {
@@ -1335,7 +1336,7 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 	case *fuse.MknodRequest:
 		n, ok := node.(NodeMknoder)
 		if !ok {
-			return fuse.EIO
+			return syscall.EIO
 		}
 		n2, err := n.Mknod(ctx, r)
 		if err != nil {
@@ -1353,7 +1354,7 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 	case *fuse.FsyncRequest:
 		n, ok := node.(NodeFsyncer)
 		if !ok {
-			return fuse.EIO
+			return syscall.EIO
 		}
 		err := n.Fsync(ctx, r)
 		if err != nil {

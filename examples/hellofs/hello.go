@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"syscall"
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
@@ -73,7 +74,7 @@ func (Dir) Lookup(ctx context.Context, name string) (fs.Node, error) {
 	if name == "hello" {
 		return File{}, nil
 	}
-	return nil, fuse.ENOENT
+	return nil, syscall.ENOENT
 }
 
 var dirDirs = []fuse.Dirent{

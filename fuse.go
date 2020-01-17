@@ -79,7 +79,7 @@
 // is cancelled and no longer needed, the context will be cancelled.
 // Blocking operations should select on a receive from ctx.Done() and attempt to
 // abort the operation early if the receive succeeds (meaning the channel is closed).
-// To indicate that the operation failed because it was aborted, return fuse.EINTR.
+// To indicate that the operation failed because it was aborted, return syscall.EINTR.
 //
 // If an operation does not block for an indefinite amount of time, supporting
 // cancellation is not necessary.

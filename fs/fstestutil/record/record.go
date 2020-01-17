@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
+	"syscall"
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
@@ -167,7 +168,7 @@ var _ = fs.NodeMkdirer(&Mkdirs{})
 func (r *Mkdirs) Mkdir(ctx context.Context, req *fuse.MkdirRequest) (fs.Node, error) {
 	tmp := *req
 	r.rec.RecordRequest(&tmp)
-	return nil, fuse.EIO
+	return nil, syscall.EIO
 }
 
 // RecordedMkdir returns information about the Mkdir request.
@@ -192,7 +193,7 @@ var _ = fs.NodeSymlinker(&Symlinks{})
 func (r *Symlinks) Symlink(ctx context.Context, req *fuse.SymlinkRequest) (fs.Node, error) {
 	tmp := *req
 	r.rec.RecordRequest(&tmp)
-	return nil, fuse.EIO
+	return nil, syscall.EIO
 }
 
 // RecordedSymlink returns information about the Symlink request.
@@ -217,7 +218,7 @@ var _ = fs.NodeLinker(&Links{})
 func (r *Links) Link(ctx context.Context, req *fuse.LinkRequest, old fs.Node) (fs.Node, error) {
 	tmp := *req
 	r.rec.RecordRequest(&tmp)
-	return nil, fuse.EIO
+	return nil, syscall.EIO
 }
 
 // RecordedLink returns information about the Link request.
@@ -242,7 +243,7 @@ var _ = fs.NodeMknoder(&Mknods{})
 func (r *Mknods) Mknod(ctx context.Context, req *fuse.MknodRequest) (fs.Node, error) {
 	tmp := *req
 	r.rec.RecordRequest(&tmp)
-	return nil, fuse.EIO
+	return nil, syscall.EIO
 }
 
 // RecordedMknod returns information about the Mknod request.
@@ -267,7 +268,7 @@ var _ = fs.NodeOpener(&Opens{})
 func (r *Opens) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
 	tmp := *req
 	r.rec.RecordRequest(&tmp)
-	return nil, fuse.EIO
+	return nil, syscall.EIO
 }
 
 // RecordedOpen returns information about the Open request.
@@ -395,7 +396,7 @@ var _ = fs.NodeCreater(&Creates{})
 func (r *Creates) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse.CreateResponse) (fs.Node, fs.Handle, error) {
 	tmp := *req
 	r.rec.RecordRequest(&tmp)
-	return nil, nil, fuse.EIO
+	return nil, nil, syscall.EIO
 }
 
 // RecordedCreate returns information about the Create request.

@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"syscall"
 	"testing"
 
 	"bazil.org/fuse"
@@ -48,7 +49,7 @@ func (d benchDir) Lookup(ctx context.Context, name string) (fs.Node, error) {
 	if name == "bench" {
 		return benchFile{conf: d.conf}, nil
 	}
-	return nil, fuse.ENOENT
+	return nil, syscall.ENOENT
 }
 
 func (benchDir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {

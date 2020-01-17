@@ -985,7 +985,7 @@ type create1 struct {
 func (f *create1) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse.CreateResponse) (fs.Node, fs.Handle, error) {
 	if req.Name != "foo" {
 		log.Printf("ERROR create1.Create unexpected name: %q\n", req.Name)
-		return nil, nil, fuse.EPERM
+		return nil, nil, syscall.EPERM
 	}
 
 	_, _, _ = f.f.Creates.Create(ctx, req, resp)
@@ -1073,7 +1073,7 @@ type create3 struct {
 func (f *create3) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse.CreateResponse) (fs.Node, fs.Handle, error) {
 	if req.Name != "foo" {
 		log.Printf("ERROR create3.Create unexpected name: %q\n", req.Name)
-		return nil, nil, fuse.EPERM
+		return nil, nil, syscall.EPERM
 	}
 	f.fooCreated.Mark()
 	return &f.f, &f.f, nil
@@ -1083,7 +1083,7 @@ func (f *create3) Lookup(ctx context.Context, name string) (fs.Node, error) {
 	if f.fooCreated.Recorded() && !f.fooRemoved.Recorded() && name == "foo" {
 		return &f.f, nil
 	}
-	return nil, fuse.ENOENT
+	return nil, syscall.ENOENT
 }
 
 func (f *create3) Remove(ctx context.Context, r *fuse.RemoveRequest) error {
@@ -1092,7 +1092,7 @@ func (f *create3) Remove(ctx context.Context, r *fuse.RemoveRequest) error {
 		f.fooRemoved.Mark()
 		return nil
 	}
-	return fuse.ENOENT
+	return syscall.ENOENT
 }
 
 func doCreateWriteRemove(ctx context.Context, path string) (*struct{}, error) {
@@ -1149,10 +1149,10 @@ var _ fs.NodeStringLookuper = (*symlink1)(nil)
 
 func (f *symlink1) Lookup(ctx context.Context, name string) (fs.Node, error) {
 	if name != "symlink.file" {
-		return nil, fuse.ENOENT
+		return nil, syscall.ENOENT
 	}
 	if f.RecordedSymlink() == (fuse.SymlinkRequest{}) {
-		return nil, fuse.ENOENT
+		return nil, syscall.ENOENT
 	}
 	return symlink1link{fs: f}, nil
 }
@@ -1245,7 +1245,7 @@ func (f *link1) Lookup(ctx context.Context, name string) (fs.Node, error) {
 	if name == "old" {
 		return fstestutil.File{}, nil
 	}
-	return nil, fuse.ENOENT
+	return nil, syscall.ENOENT
 }
 
 func (f *link1) Link(ctx context.Context, r *fuse.LinkRequest, old fs.Node) (fs.Node, error) {
@@ -1311,7 +1311,7 @@ func (f *rename1) Lookup(ctx context.Context, name string) (fs.Node, error) {
 	if name == "old" {
 		return fstestutil.File{}, nil
 	}
-	return nil, fuse.ENOENT
+	return nil, syscall.ENOENT
 }
 
 func (f *rename1) Rename(ctx context.Context, r *fuse.RenameRequest, newDir fs.Node) error {
@@ -1319,7 +1319,7 @@ func (f *rename1) Rename(ctx context.Context, r *fuse.RenameRequest, newDir fs.N
 		f.renamed.Inc()
 		return nil
 	}
-	return fuse.EIO
+	return syscall.EIO
 }
 
 type renameRequest struct {
@@ -2158,7 +2158,7 @@ type chmod struct {
 func (f *chmod) Setattr(ctx context.Context, req *fuse.SetattrRequest, resp *fuse.SetattrResponse) error {
 	if !req.Valid.Mode() {
 		log.Printf("setattr not a chmod: %v", req.Valid)
-		return fuse.EIO
+		return syscall.EIO
 	}
 	f.Setattrs.Setattr(ctx, req, resp)
 	return nil
@@ -3779,7 +3779,7 @@ var _ fs.NodeStringLookuper = (*invalidateEntryRoot)(nil)
 
 func (i *invalidateEntryRoot) Lookup(ctx context.Context, name string) (fs.Node, error) {
 	if name != "child" {
-		return nil, fuse.ENOENT
+		return nil, syscall.ENOENT
 	}
 	i.lookup.Inc()
 	i.t.Logf("Lookup called, #%d", i.lookup.Count())
@@ -3841,11 +3841,11 @@ var contextFileSentinel int
 func (contextFile) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
 	v := ctx.Value(&contextFileSentinel)
 	if v == nil {
-		return nil, fuse.ESTALE
+		return nil, syscall.ESTALE
 	}
 	data, ok := v.(string)
 	if !ok {
-		return nil, fuse.EIO
+		return nil, syscall.EIO
 	}
 	resp.Flags |= fuse.OpenDirectIO
 	return fs.DataHandle([]byte(data)), nil

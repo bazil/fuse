@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"syscall"
 	"testing"
 
 	"bazil.org/fuse"
@@ -19,7 +20,7 @@ type benchLookupDir struct {
 var _ fs.NodeRequestLookuper = (*benchLookupDir)(nil)
 
 func (f *benchLookupDir) Lookup(ctx context.Context, req *fuse.LookupRequest, resp *fuse.LookupResponse) (fs.Node, error) {
-	return nil, fuse.ENOENT
+	return nil, syscall.ENOENT
 }
 
 type benchLookupRequest struct {

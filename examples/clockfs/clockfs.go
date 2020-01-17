@@ -111,7 +111,7 @@ func (d *Dir) Lookup(ctx context.Context, name string) (fs.Node, error) {
 	if name == "clock" {
 		return d.fs.clockFile, nil
 	}
-	return nil, fuse.ENOENT
+	return nil, syscall.ENOENT
 }
 
 var dirDirs = []fuse.Dirent{

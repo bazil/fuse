@@ -3,6 +3,7 @@ package fstestutil
 import (
 	"context"
 	"os"
+	"syscall"
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
@@ -49,7 +50,7 @@ func (f *ChildMap) Attr(ctx context.Context, a *fuse.Attr) error {
 func (f *ChildMap) Lookup(ctx context.Context, name string) (fs.Node, error) {
 	child, ok := (*f)[name]
 	if !ok {
-		return nil, fuse.ENOENT
+		return nil, syscall.ENOENT
 	}
 	return child, nil
 }
