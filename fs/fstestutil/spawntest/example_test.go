@@ -65,3 +65,7 @@ func name_me_TestMain(m *testing.M) {
 }
 
 func Example() {}
+
+// Quiet linters. See https://github.com/dominikh/go-tools/issues/675
+var _ = name_me_TestAdd
+var _ = name_me_TestMain
