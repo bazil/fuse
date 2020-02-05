@@ -55,9 +55,41 @@ func isBoringFusermountError(err error) bool {
 	return false
 }
 
+func mountdev(dir string, conf *mountConfig) (*os.File, error) {
+	f, err := os.OpenFile("/dev/fuse", os.O_RDWR, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	// no known use for conf in the system call *yet*. It took a while to find
+	// out what combination of strings would get past EINVAL.
+	data := fmt.Sprintf("fd=%d,rootmode=40000,user_id=0,group_id=0", f.Fd())
+	mp := conf.options["fsname"]
+	st := conf.options["subtype"]
+	t := "fuse"
+	if st != "" {
+		t += "." + st
+	}
+	err = syscall.Mount(mp, dir, t, syscall.MS_NOSUID|syscall.MS_NODEV, data)
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
+}
+
 func mount(dir string, conf *mountConfig, ready chan<- struct{}, errp *error) (fusefd *os.File, err error) {
 	// linux mount is never delayed
 	close(ready)
+
+	// if os.Getuid == 0, try mountdev. That could fail for all sorts of reasons,
+	// and if it does, just keep on this other path.
+	if os.Getuid() == 0 {
+		f, err := mountdev(dir, conf)
+		if err == nil {
+			return f, err
+		}
+		log.Printf("mount: mountdev failed with %v, trying fusermount", err)
+	}
 
 	fds, err := syscall.Socketpair(syscall.AF_FILE, syscall.SOCK_STREAM, 0)
 	if err != nil {
