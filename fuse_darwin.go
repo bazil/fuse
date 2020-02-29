@@ -1,5 +1,8 @@
 package fuse
 
+// Max pages per fuse message.
+const maxPages = 32
+
 // Maximum file write size we are prepared to receive from the kernel.
 //
 // This value has to be >=16MB or OSXFUSE (3.4.0 observed) will
