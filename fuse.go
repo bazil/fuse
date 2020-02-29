@@ -232,10 +232,17 @@ func initMount(c *Conn, conf *mountConfig) error {
 	}
 	c.proto = proto
 
+	timeGran := uint32(1)
+	if conf.timeGran > 0 {
+		timeGran = conf.timeGran
+	}
+
 	s := &InitResponse{
 		Library:      proto,
 		MaxReadahead: conf.maxReadahead,
 		MaxWrite:     maxWrite,
+		TimeGran:     timeGran,
+		MaxPages:     maxPages,
 		Flags:        InitBigWrites | conf.initFlags,
 	}
 	r.Respond(s)
@@ -1249,10 +1256,14 @@ type InitResponse struct {
 	// Maximum size of a single write operation.
 	// Linux enforces a minimum of 4 KiB.
 	MaxWrite uint32
+	// Filesystem timestamp granularity in nanoseconds.
+	TimeGran uint32
+	// Max pages of a single FUSE message.
+	MaxPages uint16
 }
 
 func (r *InitResponse) String() string {
-	return fmt.Sprintf("Init %v ra=%d fl=%v w=%d", r.Library, r.MaxReadahead, r.Flags, r.MaxWrite)
+	return fmt.Sprintf("Init %v ra=%d fl=%v w=%d tg=%d pg=%d", r.Library, r.MaxReadahead, r.Flags, r.MaxWrite, r.TimeGran, r.MaxPages)
 }
 
 // Respond replies to the request with the given response.
@@ -1264,13 +1275,24 @@ func (r *InitRequest) Respond(resp *InitResponse) {
 	out.MaxReadahead = resp.MaxReadahead
 	out.Flags = uint32(resp.Flags)
 	out.MaxWrite = resp.MaxWrite
+	out.TimeGran = resp.TimeGran
+
+	if r.Kernel.GE(Protocol{7, 28}) {
+		out.Flags |= uint32(InitMaxPages)
+		out.MaxPages = resp.MaxPages
+	}
 
 	// MaxWrite larger than our receive buffer would just lead to
 	// errors on large writes.
 	if out.MaxWrite > maxWrite {
 		out.MaxWrite = maxWrite
 	}
-	r.respond(buf)
+	if r.Kernel.GE(Protocol{7, 23}) {
+		r.respond(buf)
+	} else {
+		// Trucate header struct for older protocol versions.
+		r.respond(buf[:24])
+	}
 }
 
 // A StatfsRequest requests information about the mounted file system.

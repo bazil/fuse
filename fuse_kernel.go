@@ -46,7 +46,7 @@ const (
 	protoVersionMinMajor = 7
 	protoVersionMinMinor = 8
 	protoVersionMaxMajor = 7
-	protoVersionMaxMinor = 12
+	protoVersionMaxMinor = 28
 )
 
 const (
@@ -273,6 +273,12 @@ const (
 	InitAsyncDIO        InitFlags = 1 << 15
 	InitWritebackCache  InitFlags = 1 << 16
 	InitNoOpenSupport   InitFlags = 1 << 17
+	InitParallelDirops  InitFlags = 1 << 18
+	InitHandleKillpriv  InitFlags = 1 << 19
+	InitPosixACL        InitFlags = 1 << 20
+	InitAbortError      InitFlags = 1 << 21
+	InitMaxPages        InitFlags = 1 << 22
+	InitCacheSymlinks   InitFlags = 1 << 23
 
 	InitCaseSensitive InitFlags = 1 << 29 // OS X only
 	InitVolRename     InitFlags = 1 << 30 // OS X only
@@ -303,6 +309,12 @@ var initFlagNames = []flagName{
 	{uint32(InitAsyncDIO), "InitAsyncDIO"},
 	{uint32(InitWritebackCache), "InitWritebackCache"},
 	{uint32(InitNoOpenSupport), "InitNoOpenSupport"},
+	{uint32(InitParallelDirops), "InitParallelDirops"},
+	{uint32(InitHandleKillpriv), "InitHandleKillpriv"},
+	{uint32(InitPosixACL), "InitPosixACL"},
+	{uint32(InitAbortError), "InitAbortError"},
+	{uint32(InitMaxPages), "InitMaxPages"},
+	{uint32(InitCacheSymlinks), "InitCacheSymlinks"},
 
 	{uint32(InitCaseSensitive), "InitCaseSensitive"},
 	{uint32(InitVolRename), "InitVolRename"},
@@ -706,8 +718,13 @@ type initOut struct {
 	Minor        uint32
 	MaxReadahead uint32
 	Flags        uint32
-	Unused       uint32
+	_            uint16
+	_            uint16
 	MaxWrite     uint32
+	TimeGran     uint32
+	MaxPages     uint16
+	_            uint16
+	_            [8]uint32
 }
 
 type interruptIn struct {

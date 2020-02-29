@@ -14,6 +14,7 @@ func dummyOption(conf *mountConfig) error {
 type mountConfig struct {
 	options          map[string]string
 	maxReadahead     uint32
+	timeGran         uint32
 	initFlags        InitFlags
 	osxfuseLocations []OSXFUSEPaths
 }
@@ -227,6 +228,16 @@ func AsyncRead() MountOption {
 func WritebackCache() MountOption {
 	return func(conf *mountConfig) error {
 		conf.initFlags |= InitWritebackCache
+		return nil
+	}
+}
+
+// TimeGran sets the granularity of timestamps in nanoseconds.
+//
+// Default is 1 nanosecond, must be power of 10.
+func TimeGran(n uint32) MountOption {
+	return func(conf *mountConfig) error {
+		conf.timeGran = n
 		return nil
 	}
 }
