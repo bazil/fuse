@@ -7,3 +7,6 @@ package fuse
 // 16MB value. See TestSetxattr16MB and
 // https://github.com/bazil/fuse/issues/42
 const maxWrite = 16 * 1024 * 1024
+
+// Default kernel readahead.
+const defaultReadahead = 128 * 1024

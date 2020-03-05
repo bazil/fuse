@@ -4,3 +4,6 @@ package fuse
 //
 // This number is just a guess.
 const maxWrite = 128 * 1024
+
+// Default kernel readahead.
+const defaultReadahead = 128 * 1024
