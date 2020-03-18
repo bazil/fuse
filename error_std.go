@@ -1,3 +1,5 @@
+// +build !windows
+
 package fuse
 
 // There is very little commonality in extended attribute errors
