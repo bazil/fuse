@@ -1,3 +1,5 @@
+// +build !windows
+
 package fstestutil
 
 // MountInfo describes a mounted file system.

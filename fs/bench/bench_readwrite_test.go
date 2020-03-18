@@ -1,3 +1,5 @@
+// +build !windows
+
 package bench_test
 
 import (

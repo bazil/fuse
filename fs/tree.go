@@ -1,3 +1,4 @@
+// +build !windows
 // FUSE directory tree, for servers that wish to use it with the service loop.
 
 package fs
