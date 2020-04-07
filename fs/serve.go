@@ -205,7 +205,7 @@ type NodeForgetter interface {
 	// method calls.
 	//
 	// Forget is not necessarily seen on unmount, as all nodes are
-	// implicitly forgotten as part part of the unmount.
+	// implicitly forgotten as part of the unmount.
 	Forget()
 }
 
