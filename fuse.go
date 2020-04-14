@@ -20,9 +20,7 @@
 // OF ANY KIND CONCERNING THE MERCHANTABILITY OF THIS SOFTWARE OR ITS
 // FITNESS FOR ANY PARTICULAR PURPOSE.
 
-// Package fuse enables writing FUSE file systems on Linux, OS X, and FreeBSD.
-//
-// On OS X, it requires OSXFUSE (http://osxfuse.github.com/).
+// Package fuse enables writing FUSE file systems on Linux and FreeBSD.
 //
 // There are two approaches to writing a FUSE file system.  The first is to speak
 // the low-level message protocol, reading from a Conn using ReadRequest and
@@ -115,11 +113,14 @@ import (
 
 // A Conn represents a connection to a mounted FUSE file system.
 type Conn struct {
-	// Ready is closed when the mount is complete or has failed.
+	// Always closed, mount is ready when Mount returns.
+	//
+	// Deprecated: Not used, OS X remnant.
 	Ready <-chan struct{}
 
-	// MountError stores any error from the mount process. Only valid
-	// after Ready is closed.
+	// Use error returned from Mount.
+	//
+	// Deprecated: Not used, OS X remnant.
 	MountError error
 
 	// File handle for kernel communication. Only safe to access if
@@ -149,11 +150,6 @@ func (e *MountpointDoesNotExistError) Error() string {
 //
 // After a successful return, caller must call Close to free
 // resources.
-//
-// Even on successful return, the new mount is not guaranteed to be
-// visible until after Conn.Ready is closed. See Conn.MountError for
-// possible errors. Incoming requests on Conn must be served to make
-// progress.
 func Mount(dir string, options ...MountOption) (*Conn, error) {
 	conf := mountConfig{
 		options: make(map[string]string),
@@ -164,11 +160,12 @@ func Mount(dir string, options ...MountOption) (*Conn, error) {
 		}
 	}
 
-	ready := make(chan struct{}, 1)
+	ready := make(chan struct{})
+	close(ready)
 	c := &Conn{
 		Ready: ready,
 	}
-	f, err := mount(dir, &conf, ready, &c.MountError)
+	f, err := mount(dir, &conf)
 	if err != nil {
 		return nil, err
 	}
@@ -176,13 +173,7 @@ func Mount(dir string, options ...MountOption) (*Conn, error) {
 
 	if err := initMount(c, &conf); err != nil {
 		c.Close()
-		if err == ErrClosedWithoutInit {
-			// see if we can provide a better error
-			<-c.Ready
-			if err := c.MountError; err != nil {
-				return nil, err
-			}
-		}
+		_ = Unmount(dir)
 		return nil, err
 	}
 
@@ -416,7 +407,6 @@ func ToErrno(err error) Errno {
 func (h *Header) RespondError(err error) {
 	errno := ToErrno(err)
 	// FUSE uses negative errors!
-	// TODO: File bug report against OSXFUSE: positive error causes kernel panic.
 	buf := newBuffer(0)
 	hOut := (*outHeader)(unsafe.Pointer(&buf[0]))
 	hOut.Error = -int32(errno)
@@ -573,15 +563,9 @@ func (c *Conn) Protocol() Protocol {
 // a reasonable time. Caller must not retain Request after that call.
 func (c *Conn) ReadRequest() (Request, error) {
 	m := getMessage(c)
-loop:
 	c.rio.RLock()
 	n, err := syscall.Read(c.fd(), m.buf)
 	c.rio.RUnlock()
-	if err == syscall.EINTR {
-		// OSXFUSE sends EINTR to userspace when a request interrupt
-		// completed before it got sent to userspace?
-		goto loop
-	}
 	if err != nil && err != syscall.ENODEV {
 		putMessage(m)
 		return nil, err
@@ -600,11 +584,6 @@ loop:
 	// FreeBSD FUSE sends a short length in the header
 	// for FUSE_INIT even though the actual read length is correct.
 	if n == inHeaderSize+initInSize && m.hdr.Opcode == opInit && m.hdr.Len < uint32(n) {
-		m.hdr.Len = uint32(n)
-	}
-
-	// OSXFUSE sometimes sends the wrong m.hdr.Len in a FUSE_WRITE message.
-	if m.hdr.Len < uint32(n) && m.hdr.Len >= uint32(unsafe.Sizeof(writeIn{})) && m.hdr.Opcode == opWrite {
 		m.hdr.Len = uint32(n)
 	}
 
@@ -671,18 +650,15 @@ loop:
 			goto corrupt
 		}
 		req = &SetattrRequest{
-			Header:   m.Header(),
-			Valid:    SetattrValid(in.Valid),
-			Handle:   HandleID(in.Fh),
-			Size:     in.Size,
-			Atime:    time.Unix(int64(in.Atime), int64(in.AtimeNsec)),
-			Mtime:    time.Unix(int64(in.Mtime), int64(in.MtimeNsec)),
-			Mode:     fileMode(in.Mode),
-			Uid:      in.Uid,
-			Gid:      in.Gid,
-			Bkuptime: in.BkupTime(),
-			Chgtime:  in.Chgtime(),
-			Flags:    in.Flags(),
+			Header: m.Header(),
+			Valid:  SetattrValid(in.Valid),
+			Handle: HandleID(in.Fh),
+			Size:   in.Size,
+			Atime:  time.Unix(int64(in.Atime), int64(in.AtimeNsec)),
+			Mtime:  time.Unix(int64(in.Mtime), int64(in.MtimeNsec)),
+			Mode:   fileMode(in.Mode),
+			Uid:    in.Uid,
+			Gid:    in.Gid,
 		}
 
 	case opReadlink:
@@ -910,11 +886,10 @@ loop:
 		}
 		xattr = xattr[:in.Size]
 		req = &SetxattrRequest{
-			Header:   m.Header(),
-			Flags:    in.Flags,
-			Position: in.position(),
-			Name:     string(name[:i]),
-			Xattr:    xattr,
+			Header: m.Header(),
+			Flags:  in.Flags,
+			Name:   string(name[:i]),
+			Xattr:  xattr,
 		}
 
 	case opGetxattr:
@@ -928,10 +903,9 @@ loop:
 			goto corrupt
 		}
 		req = &GetxattrRequest{
-			Header:   m.Header(),
-			Name:     string(name[:i]),
-			Size:     in.Size,
-			Position: in.position(),
+			Header: m.Header(),
+			Name:   string(name[:i]),
+			Size:   in.Size,
 		}
 
 	case opListxattr:
@@ -940,9 +914,8 @@ loop:
 			goto corrupt
 		}
 		req = &ListxattrRequest{
-			Header:   m.Header(),
-			Size:     in.Size,
-			Position: in.position(),
+			Header: m.Header(),
+			Size:   in.Size,
 		}
 
 	case opRemovexattr:
@@ -1040,40 +1013,6 @@ loop:
 	case opDestroy:
 		req = &DestroyRequest{
 			Header: m.Header(),
-		}
-
-	// OS X
-	case opSetvolname:
-		panic("opSetvolname")
-	case opGetxtimes:
-		panic("opGetxtimes")
-	case opExchange:
-		in := (*exchangeIn)(m.data())
-		if m.len() < unsafe.Sizeof(*in) {
-			goto corrupt
-		}
-		oldDirNodeID := NodeID(in.Olddir)
-		newDirNodeID := NodeID(in.Newdir)
-		oldNew := m.bytes()[unsafe.Sizeof(*in):]
-		// oldNew should be "oldname\x00newname\x00"
-		if len(oldNew) < 4 {
-			goto corrupt
-		}
-		if oldNew[len(oldNew)-1] != '\x00' {
-			goto corrupt
-		}
-		i := bytes.IndexByte(oldNew, '\x00')
-		if i < 0 {
-			goto corrupt
-		}
-		oldName, newName := string(oldNew[:i]), string(oldNew[i+1:len(oldNew)-1])
-		req = &ExchangeDataRequest{
-			Header:  m.Header(),
-			OldDir:  oldDirNodeID,
-			NewDir:  newDirNodeID,
-			OldName: oldName,
-			NewName: newName,
-			// TODO options
 		}
 	}
 
@@ -1353,14 +1292,17 @@ type Attr struct {
 	Atime     time.Time   // time of last access
 	Mtime     time.Time   // time of last modification
 	Ctime     time.Time   // time of last inode change
-	Crtime    time.Time   // time of creation (OS X only)
 	Mode      os.FileMode // file mode
 	Nlink     uint32      // number of links (usually 1)
 	Uid       uint32      // owner uid
 	Gid       uint32      // group gid
 	Rdev      uint32      // device numbers
-	Flags     uint32      // chflags(2) flags (OS X only)
 	BlockSize uint32      // preferred blocksize for filesystem I/O
+
+	// Deprecated: Not used, OS X remnant.
+	Crtime time.Time
+	// Deprecated: Not used, OS X remnant.
+	Flags uint32
 }
 
 func (a Attr) String() string {
@@ -1381,7 +1323,6 @@ func (a *Attr) attr(out *attr, proto Protocol) {
 	out.Atime, out.AtimeNsec = unix(a.Atime)
 	out.Mtime, out.MtimeNsec = unix(a.Mtime)
 	out.Ctime, out.CtimeNsec = unix(a.Ctime)
-	out.SetCrtime(unix(a.Crtime))
 	out.Mode = uint32(a.Mode) & 0777
 	switch {
 	default:
@@ -1411,7 +1352,6 @@ func (a *Attr) attr(out *attr, proto Protocol) {
 	out.Uid = a.Uid
 	out.Gid = a.Gid
 	out.Rdev = a.Rdev
-	out.SetFlags(a.Flags)
 	if proto.GE(Protocol{7, 9}) {
 		out.Blksize = a.BlockSize
 	}
@@ -1460,17 +1400,14 @@ type GetxattrRequest struct {
 	// Name of the attribute requested.
 	Name string
 
-	// Offset within extended attributes.
-	//
-	// Only valid for OS X, and then only with the resource fork
-	// attribute.
+	// Deprecated: Not used, OS X remnant.
 	Position uint32
 }
 
 var _ = Request(&GetxattrRequest{})
 
 func (r *GetxattrRequest) String() string {
-	return fmt.Sprintf("Getxattr [%s] %q %d @%d", &r.Header, r.Name, r.Size, r.Position)
+	return fmt.Sprintf("Getxattr [%s] %q %d", &r.Header, r.Name, r.Size)
 }
 
 // Respond replies to the request with the given response.
@@ -1498,15 +1435,17 @@ func (r *GetxattrResponse) String() string {
 
 // A ListxattrRequest asks to list the extended attributes associated with r.Node.
 type ListxattrRequest struct {
-	Header   `json:"-"`
-	Size     uint32 // maximum size to return
-	Position uint32 // offset within attribute list
+	Header `json:"-"`
+	Size   uint32 // maximum size to return
+
+	// Deprecated: Not used, OS X remnant.
+	Position uint32
 }
 
 var _ = Request(&ListxattrRequest{})
 
 func (r *ListxattrRequest) String() string {
-	return fmt.Sprintf("Listxattr [%s] %d @%d", &r.Header, r.Size, r.Position)
+	return fmt.Sprintf("Listxattr [%s] %d", &r.Header, r.Size)
 }
 
 // Respond replies to the request with the given response.
@@ -1573,10 +1512,7 @@ type SetxattrRequest struct {
 	// TODO XATTR_REPLACE and not exist -> ENODATA
 	Flags uint32
 
-	// Offset within extended attributes.
-	//
-	// Only valid for OS X, and then only with the resource fork
-	// attribute.
+	// Deprecated: Not used, OS X remnant.
 	Position uint32
 
 	Name  string
@@ -1594,7 +1530,7 @@ func trunc(b []byte, max int) ([]byte, string) {
 
 func (r *SetxattrRequest) String() string {
 	xattr, tail := trunc(r.Xattr, 16)
-	return fmt.Sprintf("Setxattr [%s] %q %q%s fl=%v @%#x", &r.Header, r.Name, xattr, tail, r.Flags, r.Position)
+	return fmt.Sprintf("Setxattr [%s] %q %q%s fl=%v", &r.Header, r.Name, xattr, tail, r.Flags)
 }
 
 // Respond replies to the request, indicating that the extended attribute was set.
@@ -1688,7 +1624,7 @@ type CreateRequest struct {
 	Name   string
 	Flags  OpenFlags
 	Mode   os.FileMode
-	// Umask of the request. Not supported on OS X.
+	// Umask of the request.
 	Umask os.FileMode
 }
 
@@ -1735,7 +1671,7 @@ type MkdirRequest struct {
 	Header `json:"-"`
 	Name   string
 	Mode   os.FileMode
-	// Umask of the request. Not supported on OS X.
+	// Umask of the request.
 	Umask os.FileMode
 }
 
@@ -2024,11 +1960,14 @@ type SetattrRequest struct {
 	Uid  uint32
 	Gid  uint32
 
-	// OS X only
+	// Deprecated: Not used, OS X remnant.
 	Bkuptime time.Time
-	Chgtime  time.Time
-	Crtime   time.Time
-	Flags    uint32 // see chflags(2)
+	// Deprecated: Not used, OS X remnant.
+	Chgtime time.Time
+	// Deprecated: Not used, OS X remnant.
+	Crtime time.Time
+	// Deprecated: Not used, OS X remnant.
+	Flags uint32
 }
 
 var _ = Request(&SetattrRequest{})
@@ -2067,18 +2006,6 @@ func (r *SetattrRequest) String() string {
 	}
 	if r.Valid.LockOwner() {
 		fmt.Fprintf(&buf, " lockowner")
-	}
-	if r.Valid.Crtime() {
-		fmt.Fprintf(&buf, " crtime=%v", r.Crtime)
-	}
-	if r.Valid.Chgtime() {
-		fmt.Fprintf(&buf, " chgtime=%v", r.Chgtime)
-	}
-	if r.Valid.Bkuptime() {
-		fmt.Fprintf(&buf, " bkuptime=%v", r.Bkuptime)
-	}
-	if r.Valid.Flags() {
-		fmt.Fprintf(&buf, " flags=%v", r.Flags)
 	}
 	return buf.String()
 }
@@ -2249,7 +2176,7 @@ type MknodRequest struct {
 	Name   string
 	Mode   os.FileMode
 	Rdev   uint32
-	// Umask of the request. Not supported on OS X.
+	// Umask of the request.
 	Umask os.FileMode
 }
 
@@ -2310,19 +2237,11 @@ func (r *InterruptRequest) String() string {
 	return fmt.Sprintf("Interrupt [%s] ID %v", &r.Header, r.IntrID)
 }
 
-// An ExchangeDataRequest is a request to exchange the contents of two
-// files, while leaving most metadata untouched.
-//
-// This request comes from OS X exchangedata(2) and represents its
-// specific semantics. Crucially, it is very different from Linux
-// renameat(2) RENAME_EXCHANGE.
-//
-// https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man2/exchangedata.2.html
+// Deprecated: Not used, OS X remnant.
 type ExchangeDataRequest struct {
 	Header           `json:"-"`
 	OldDir, NewDir   NodeID
 	OldName, NewName string
-	// TODO options
 }
 
 var _ = Request(&ExchangeDataRequest{})

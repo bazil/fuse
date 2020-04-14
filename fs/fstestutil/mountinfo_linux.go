@@ -27,8 +27,7 @@ var fstabUnescape = strings.NewReplacer(
 var errNotFound = errors.New("mount not found")
 
 func getMountInfo(mnt string) (*MountInfo, error) {
-	// TODO delay a little to minimize an undiagnosed race between
-	// fuse.Conn.Ready and /proc/mounts
+	// TODO delay a little to minimize an undiagnosed race
 	// https://github.com/bazil/fuse/issues/228
 	time.Sleep(10 * time.Millisecond)
 	data, err := ioutil.ReadFile("/proc/mounts")

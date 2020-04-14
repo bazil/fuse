@@ -1,7 +1,6 @@
 package fstestutil
 
 import (
-	"errors"
 	"io/ioutil"
 	"log"
 	"os"
@@ -67,9 +66,6 @@ func (mnt *Mount) Close() {
 // filesystem used is constructed by calling a function, to allow
 // storing fuse.Conn and fs.Server in the FS.
 //
-// It also waits until the filesystem is known to be visible (OS X
-// workaround).
-//
 // After successful return, caller must clean up by calling Close.
 func MountedFunc(fn func(*Mount) fs.FS, conf *fs.Config, options ...fuse.MountOption) (*Mount, error) {
 	dir, err := ioutil.TempDir("", "fusetest")
@@ -96,26 +92,10 @@ func MountedFunc(fn func(*Mount) fs.FS, conf *fs.Config, options ...fuse.MountOp
 		serveErr <- server.Serve(filesys)
 	}()
 
-	select {
-	case <-mnt.Conn.Ready:
-		if err := mnt.Conn.MountError; err != nil {
-			return nil, err
-		}
-		return mnt, nil
-	case err = <-mnt.Error:
-		// Serve quit early
-		if err != nil {
-			return nil, err
-		}
-		//lint:ignore ST1005 uppercase because it's an idenfier
-		return nil, errors.New("Serve exited early")
-	}
+	return mnt, nil
 }
 
 // Mounted mounts the fuse.Server at a temporary directory.
-//
-// It also waits until the filesystem is known to be visible (OS X
-// workaround).
 //
 // After successful return, caller must clean up by calling Close.
 func Mounted(filesys fs.FS, conf *fs.Config, options ...fuse.MountOption) (*Mount, error) {

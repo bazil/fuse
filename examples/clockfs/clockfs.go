@@ -29,8 +29,6 @@ func run(mountpoint string) error {
 		mountpoint,
 		fuse.FSName("clock"),
 		fuse.Subtype("clockfsfs"),
-		fuse.LocalVolume(),
-		fuse.VolumeName("Clock filesystem"),
 	)
 	if err != nil {
 		return err
@@ -56,12 +54,6 @@ func run(mountpoint string) error {
 	// This goroutine never exits. That's fine for this example.
 	go filesys.clockFile.update()
 	if err := srv.Serve(filesys); err != nil {
-		return err
-	}
-
-	// Check if the mount process has an error to report.
-	<-c.Ready
-	if err := c.MountError; err != nil {
 		return err
 	}
 	return nil

@@ -27,7 +27,7 @@ import (
 	"bazil.org/fuse/fs/fstestutil/spawntest"
 	"bazil.org/fuse/fs/fstestutil/spawntest/httpjson"
 	"bazil.org/fuse/fuseutil"
-	"bazil.org/fuse/syscallx"
+	"golang.org/x/sys/unix"
 )
 
 func maybeParallel(t *testing.T) {
@@ -206,24 +206,7 @@ type statfsResult struct {
 	Frsize  int64
 }
 
-func prepStatfs(dir string) error {
-	if runtime.GOOS == "darwin" {
-		// Perform an operation that forces the OS X mount to be ready, so
-		// we know the Statfs handler will really be called. OS X insists
-		// on volumes answering Statfs calls very early (before FUSE
-		// handshake), so OSXFUSE gives made-up answers for a few brief moments
-		// during the mount process.
-		if _, err := os.Stat(dir + "/does-not-exist"); !os.IsNotExist(err) {
-			return err
-		}
-	}
-	return nil
-}
-
 func doStatfs(ctx context.Context, dir string) (*statfsResult, error) {
-	if err := prepStatfs(dir); err != nil {
-		return nil, err
-	}
 	var st syscall.Statfs_t
 	if err := syscall.Statfs(dir, &st); err != nil {
 		return nil, fmt.Errorf("Statfs failed: %v", err)
@@ -273,35 +256,16 @@ func testStatfs(t *testing.T, helper *spawntest.Helper) {
 		if got.Bsize != 65536 {
 			t.Errorf("freebsd now implements statfs Bsize, please fix tests")
 		}
-	case "darwin":
-		// darwin gives 4096 here regardless of the fuse fs
-		if got.Bsize != 4096 {
-			t.Errorf("darwin now implements statfs Bsize, please fix tests")
-		}
 	default:
 		if g, e := got.Bsize, int64(1000); g != e {
 			t.Errorf("got Bsize = %d; want %d", g, e)
 		}
 	}
-	switch runtime.GOOS {
-	case "darwin":
-		if g, e := got.Namelen, int64(0); g != e {
-			t.Errorf("darwin now implements Namelen, please fix tests")
-		}
-	default:
-		if g, e := got.Namelen, int64(34); g != e {
-			t.Errorf("got Namelen = %d; want %d", g, e)
-		}
+	if g, e := got.Namelen, int64(34); g != e {
+		t.Errorf("got Namelen = %d; want %d", g, e)
 	}
-	switch runtime.GOOS {
-	case "darwin":
-		if g, e := got.Frsize, int64(0); g != e {
-			t.Errorf("darwin now implements Frsize, please fix tests")
-		}
-	default:
-		if g, e := got.Frsize, int64(7); g != e {
-			t.Errorf("got Frsize = %d; want %d", g, e)
-		}
+	if g, e := got.Frsize, int64(7); g != e {
+		t.Errorf("got Frsize = %d; want %d", g, e)
 	}
 }
 
@@ -310,9 +274,6 @@ func TestStatfs(t *testing.T) {
 }
 
 func doFstatfs(ctx context.Context, dir string) (*statfsResult, error) {
-	if err := prepStatfs(dir); err != nil {
-		return nil, err
-	}
 	f, err := os.Open(dir)
 	if err != nil {
 		return nil, fmt.Errorf("Open for fstatfs failed: %v", err)
@@ -404,9 +365,7 @@ func TestStatRoot(t *testing.T) {
 		t.Errorf("root has wrong gid: %d", got.GID)
 	}
 	if mnt.Conn.Protocol().HasAttrBlockSize() {
-		// convert got.Blksize too because it's int64 on Linux but
-		// int32 on Darwin.
-		if g, e := int64(got.Blksize), int64(65536); g != e {
+		if g, e := got.Blksize, int64(65536); g != e {
 			t.Errorf("root has wrong blocksize: %d != %d", g, e)
 		}
 	}
@@ -565,15 +524,6 @@ func TestReadFileFlags(t *testing.T) {
 	got := r.fileFlags.Recorded().(fuse.OpenFlags)
 	got &^= fuse.OpenNonblock
 	want := fuse.OpenReadWrite | fuse.OpenAppend
-	if runtime.GOOS == "darwin" {
-		// OSXFUSE shares one read and one write handle for all
-		// clients, so it uses a OpenReadOnly handle for performing
-		// our read.
-		//
-		// If this test starts failing in the future, that probably
-		// means they added the feature, and we want to notice that!
-		want = fuse.OpenReadOnly
-	}
 	if runtime.GOOS == "freebsd" {
 		// FreeBSD doesn't pass append to FUSE?
 		want ^= fuse.OpenAppend
@@ -591,13 +541,6 @@ type writeFlags struct {
 func (r *writeFlags) Attr(ctx context.Context, a *fuse.Attr) error {
 	a.Mode = 0666
 	a.Size = uint64(len(hi))
-	return nil
-}
-
-func (r *writeFlags) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
-	// OSXFUSE 3.0.4 does a read-modify-write cycle even when the
-	// write was for 4096 bytes.
-	fuseutil.HandleRead(req, resp, []byte(hi))
 	return nil
 }
 
@@ -647,15 +590,6 @@ func TestWriteFileFlags(t *testing.T) {
 	got := r.fileFlags.Recorded().(fuse.OpenFlags)
 	got &^= fuse.OpenNonblock
 	want := fuse.OpenReadWrite | fuse.OpenAppend
-	if runtime.GOOS == "darwin" {
-		// OSXFUSE shares one read and one write handle for all
-		// clients, so it uses a OpenWriteOnly handle for performing
-		// our read.
-		//
-		// If this test starts failing in the future, that probably
-		// means they added the feature, and we want to notice that!
-		want = fuse.OpenWriteOnly
-	}
 	if runtime.GOOS == "freebsd" {
 		// FreeBSD doesn't pass append to FUSE?
 		want &^= fuse.OpenAppend
@@ -961,10 +895,6 @@ func TestMkdir(t *testing.T) {
 	if mnt.Conn.Protocol().HasUmask() {
 		want.Umask = 0022
 	}
-	if runtime.GOOS == "darwin" {
-		// https://github.com/osxfuse/osxfuse/issues/225
-		want.Umask = 0
-	}
 	if g, e := f.RecordedMkdir(), want; g != e {
 		t.Errorf("mkdir saw %+v, want %+v", g, e)
 	}
@@ -1031,14 +961,6 @@ func TestCreate(t *testing.T) {
 	}
 	if mnt.Conn.Protocol().HasUmask() {
 		want.Umask = 0022
-	}
-	if runtime.GOOS == "darwin" {
-		// OS X does not pass O_TRUNC here, Linux does; as this is a
-		// Create, that's acceptable
-		want.Flags &^= fuse.OpenTruncate
-
-		// https://github.com/osxfuse/osxfuse/issues/225
-		want.Umask = 0
 	}
 	if runtime.GOOS == "freebsd" {
 		// FreeBSD doesn't pass truncate to FUSE?; as this is a
@@ -1440,10 +1362,6 @@ func TestMknod(t *testing.T) {
 	if mnt.Conn.Protocol().HasUmask() {
 		want.Umask = 0022
 	}
-	if runtime.GOOS == "darwin" {
-		// https://github.com/osxfuse/osxfuse/issues/225
-		want.Umask = 0
-	}
 	if g, e := f.RecordedMknod(), want; g != e {
 		t.Fatalf("mknod saw %+v, want %+v", g, e)
 	}
@@ -1592,8 +1510,8 @@ func (i *interruptHelp) doReport(ctx context.Context, _ struct{}) (*interruptRes
 var interruptHelper = helpers.Register("interrupt", &interruptHelp{})
 
 func TestInterrupt(t *testing.T) {
-	if runtime.GOOS == "freebsd" || runtime.GOOS == "darwin" {
-		t.Skip("don't know how to trigger EINTR from read syscall on FreeBSD or macOS")
+	if runtime.GOOS == "freebsd" {
+		t.Skip("don't know how to trigger EINTR from read syscall on FreeBSD")
 	}
 	maybeParallel(t)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1885,8 +1803,7 @@ func TestTruncateWithOpen(t *testing.T) {
 	if g, e := gotr.Size, uint64(0); g != e {
 		t.Errorf("got Size = %q; want %q", g, e)
 	}
-	// osxfuse sets SetattrHandle here, linux does not
-	if g, e := gotr.Valid&^(fuse.SetattrLockOwner|fuse.SetattrHandle), fuse.SetattrSize; g != e {
+	if g, e := gotr.Valid&^fuse.SetattrLockOwner, fuse.SetattrSize; g != e {
 		t.Errorf("got Valid = %q; want %q", g, e)
 	}
 	t.Logf("Got request: %#v", gotr)
@@ -2258,14 +2175,6 @@ func TestOpen(t *testing.T) {
 	}
 
 	want := fuse.OpenRequest{Dir: false, Flags: fuse.OpenWriteOnly | fuse.OpenAppend}
-	if runtime.GOOS == "darwin" {
-		// osxfuse does not let O_APPEND through at all
-		//
-		// https://code.google.com/p/macfuse/issues/detail?id=233
-		// https://code.google.com/p/macfuse/issues/detail?id=132
-		// https://code.google.com/p/macfuse/issues/detail?id=133
-		want.Flags &^= fuse.OpenAppend
-	}
 	got := f.RecordedOpen()
 
 	if runtime.GOOS == "linux" {
@@ -2309,9 +2218,6 @@ func doOpenNonseekable(ctx context.Context, path string) (*struct{}, error) {
 var openNonseekableHelper = helpers.Register("openNonseekable", httpjson.ServePOST(doOpenNonseekable))
 
 func TestOpenNonSeekable(t *testing.T) {
-	if runtime.GOOS == "darwin" {
-		t.Skip("OSXFUSE shares one read and one write handle for all clients, does not support open modes")
-	}
 	if runtime.GOOS == "freebsd" {
 		// behavior observed: seek calls succeed, but file offset does
 		// not change
@@ -2386,11 +2292,6 @@ func TestFsyncDir(t *testing.T) {
 		// unpredictable
 		Handle: got.Handle,
 	}
-	if runtime.GOOS == "darwin" {
-		// TODO document the meaning of these flags, figure out why
-		// they differ
-		want.Flags = 1
-	}
 	if g, e := got, want; g != e {
 		t.Fatalf("fsyncDir saw %+v, want %+v", g, e)
 	}
@@ -2425,7 +2326,7 @@ type getxattrResult struct {
 
 func doGetxattr(ctx context.Context, req getxattrRequest) (*getxattrResult, error) {
 	buf := make([]byte, req.Size)
-	n, err := syscallx.Getxattr(req.Path, req.Name, buf)
+	n, err := unix.Getxattr(req.Path, req.Name, buf)
 	if req.WantErrno != 0 {
 		if !errors.Is(err, req.WantErrno) {
 			return nil, fmt.Errorf("wrong error: %v", err)
@@ -2582,7 +2483,7 @@ type listxattrResult struct {
 
 func doListxattr(ctx context.Context, req listxattrRequest) (*listxattrResult, error) {
 	buf := make([]byte, req.Size)
-	n, err := syscallx.Listxattr(req.Path, buf)
+	n, err := unix.Listxattr(req.Path, buf)
 	if req.WantErrno != 0 {
 		if !errors.Is(err, req.WantErrno) {
 			return nil, fmt.Errorf("wrong error: %v", err)
@@ -2761,7 +2662,7 @@ type setxattrRequest struct {
 }
 
 func doSetxattr(ctx context.Context, req setxattrRequest) (*struct{}, error) {
-	if err := syscallx.Setxattr(req.Path, req.Name, req.Data, req.Flags); err != nil {
+	if err := unix.Setxattr(req.Path, req.Name, req.Data, req.Flags); err != nil {
 		return nil, err
 	}
 	return &struct{}{}, nil
@@ -2841,7 +2742,7 @@ type removexattrRequest struct {
 }
 
 func doRemovexattr(ctx context.Context, req removexattrRequest) (*struct{}, error) {
-	if err := syscallx.Removexattr(req.Path, req.Name); err != nil {
+	if err := unix.Removexattr(req.Path, req.Name); err != nil {
 		return nil, err
 	}
 	return &struct{}{}, nil
@@ -3061,7 +2962,7 @@ func doMmap(ctx context.Context, dir string) (*struct{}, error) {
 	for i, b := range mmapWrites {
 		data[i] = b
 	}
-	if err := syscallx.Msync(data, syscall.MS_SYNC); err != nil {
+	if err := unix.Msync(data, syscall.MS_SYNC); err != nil {
 		return nil, fmt.Errorf("Msync: %v", err)
 	}
 	if err := syscall.Munmap(data); err != nil {
@@ -3317,19 +3218,11 @@ func TestInvalidateNodeAttr(t *testing.T) {
 			t.Fatalf("calling helper: %v", err)
 		}
 	}
-	// With OSXFUSE 3.0.4, we seem to see typically two Attr calls by
-	// this point; something not populating the in-kernel cache
-	// properly? Cope with it; we care more about seeing a new Attr
-	// call after the invalidation.
-	//
-	// We still enforce a max number here so that we know that the
-	// invalidate actually did something, and it's not just that every
-	// Stat results in an Attr.
 	before := a.attr.Count()
 	if before == 0 {
 		t.Error("no Attr call seen")
 	}
-	if g, e := before, uint32(3); g > e {
+	if g, e := before, uint32(1); g > e {
 		t.Errorf("too many Attr calls seen: %d > %d", g, e)
 	}
 
@@ -3467,15 +3360,16 @@ func TestInvalidateNodeDataInvalidatesAttr(t *testing.T) {
 		t.Fatalf("invalidate error: %v", err)
 	}
 
-	// on OSXFUSE 3.0.6, the Attr has already triggered here, so don't
-	// check the count at this point
+	if g, prev := a.attr.Count(), attrBefore; g != prev {
+		t.Errorf("invalidate caused an Attr call: %d != %d", g, prev)
+	}
 
 	var got statResult
 	if err := control.JSON("/fstat").Call(ctx, struct{}{}, &got); err != nil {
 		t.Fatalf("calling helper: %v", err)
 	}
-	if g, prev := a.attr.Count(), attrBefore; g <= prev {
-		t.Errorf("did not see Attr call after invalidate: %d <= %d", g, prev)
+	if g, prev := a.attr.Count(), attrBefore; g != prev+1 {
+		t.Errorf("none or too many Attr calls after stat: %d != %d+1", g, prev)
 	}
 }
 

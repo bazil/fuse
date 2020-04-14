@@ -81,12 +81,6 @@ func testMountOptionFSNameEvil(t *testing.T, evil string) {
 }
 
 func TestMountOptionFSNameEvilComma(t *testing.T) {
-	if runtime.GOOS == "darwin" {
-		// see TestMountOptionCommaError for a test that enforces we
-		// at least give a nice error, instead of corrupting the mount
-		// options
-		t.Skip("TODO: OS X gets this wrong, commas in mount options cannot be escaped at all")
-	}
 	testMountOptionFSNameEvil(t, ",")
 }
 
@@ -112,9 +106,6 @@ func TestMountOptionFSNameEvilBackslashDouble(t *testing.T) {
 }
 
 func TestMountOptionSubtype(t *testing.T) {
-	if runtime.GOOS == "darwin" {
-		t.Skip("OS X does not support Subtype")
-	}
 	if runtime.GOOS == "freebsd" {
 		t.Skip("FreeBSD does not support Subtype")
 	}
@@ -136,8 +127,6 @@ func TestMountOptionSubtype(t *testing.T) {
 		t.Errorf("wrong Subtype: %q != %q", g, e)
 	}
 }
-
-// TODO test LocalVolume
 
 func TestMountOptionAllowOther(t *testing.T) {
 	// This test needs user_allow_other in /etc/fuse.conf. I'm not too

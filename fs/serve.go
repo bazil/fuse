@@ -256,7 +256,6 @@ func nodeAttr(ctx context.Context, n Node, attr *fuse.Attr) error {
 	attr.Atime = startTime
 	attr.Mtime = startTime
 	attr.Ctime = startTime
-	attr.Crtime = startTime
 	if err := n.Attr(ctx, attr); err != nil {
 		return err
 	}
@@ -763,6 +762,15 @@ func initLookupResponse(s *fuse.LookupResponse) {
 	s.EntryValid = entryValidTime
 }
 
+type logDuplicateRequestID struct {
+	New fuse.Request
+	Old fuse.Request
+}
+
+func (m *logDuplicateRequestID) String() string {
+	return fmt.Sprintf("Duplicate request: new %v, old %v", m.New, m.Old)
+}
+
 func (c *Server) serve(r fuse.Request) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -805,15 +813,13 @@ func (c *Server) serve(r fuse.Request) {
 		}
 		node = snode.node
 	}
-	if c.req[hdr.ID] != nil {
-		// This happens with OSXFUSE.  Assume it's okay and
-		// that we'll never see an interrupt for this one.
-		// Otherwise everything wedges.  TODO: Report to OSXFUSE?
-		//
-		// TODO this might have been because of missing done() calls
-	} else {
-		c.req[hdr.ID] = req
+	if old, found := c.req[hdr.ID]; found {
+		c.debug(logDuplicateRequestID{
+			New: req.Request,
+			Old: old.Request,
+		})
 	}
+	c.req[hdr.ID] = req
 	c.meta.Unlock()
 
 	// Call this before responding.

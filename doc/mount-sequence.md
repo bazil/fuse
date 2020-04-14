@@ -7,24 +7,14 @@ more complex API on us.
 
 ## Successful runs
 
-On Linux, the mount is immediate and file system accesses wait until
-the requests are served.
+The mount is immediate and file system accesses wait until the requests are served.
 
-![Diagram of Linux FUSE mount sequence](mount-linux.seq.png)
-
-On OS X, the mount becomes visible only after `InitRequest` (and maybe
-more) have been served.
-
-![Diagram of OSXFUSE mount sequence](mount-osx.seq.png)
+![Diagram of the mount sequence](mount.seq.png)
 
 
 ## Errors
 
-Let's see what happens if `InitRequest` gets an error response. On
-Linux, the mountpoint is there but all operations will fail:
+Let's see what happens if `InitRequest` gets an error response.
+The mountpoint is temporarily there but all operations will fail:
 
-![Diagram of Linux error handling](mount-linux-error-init.seq.png)
-
-On OS X, the mount never happened:
-
-![Diagram of OS X error handling](mount-osx-error-init.seq.png)
+![Diagram of error handling](mount-error-init.seq.png)

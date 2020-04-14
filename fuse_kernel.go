@@ -53,6 +53,25 @@ const (
 	rootID = 1
 )
 
+type attr struct {
+	Ino       uint64
+	Size      uint64
+	Blocks    uint64
+	Atime     uint64
+	Mtime     uint64
+	Ctime     uint64
+	AtimeNsec uint32
+	MtimeNsec uint32
+	CtimeNsec uint32
+	Mode      uint32
+	Nlink     uint32
+	Uid       uint32
+	Gid       uint32
+	Rdev      uint32
+	Blksize   uint32
+	_         uint32
+}
+
 type kstatfs struct {
 	Blocks  uint64
 	Bfree   uint64
@@ -107,11 +126,14 @@ const (
 	SetattrMtimeNow  SetattrValid = 1 << 8
 	SetattrLockOwner SetattrValid = 1 << 9 // http://www.mail-archive.com/git-commits-head@vger.kernel.org/msg27852.html
 
-	// OS X only
-	SetattrCrtime   SetattrValid = 1 << 28
-	SetattrChgtime  SetattrValid = 1 << 29
+	// Deprecated: Not used, OS X remnant.
+	SetattrCrtime SetattrValid = 1 << 28
+	// Deprecated: Not used, OS X remnant.
+	SetattrChgtime SetattrValid = 1 << 29
+	// Deprecated: Not used, OS X remnant.
 	SetattrBkuptime SetattrValid = 1 << 30
-	SetattrFlags    SetattrValid = 1 << 31
+	// Deprecated: Not used, OS X remnant.
+	SetattrFlags SetattrValid = 1 << 31
 )
 
 func (fl SetattrValid) Mode() bool      { return fl&SetattrMode != 0 }
@@ -124,10 +146,18 @@ func (fl SetattrValid) Handle() bool    { return fl&SetattrHandle != 0 }
 func (fl SetattrValid) AtimeNow() bool  { return fl&SetattrAtimeNow != 0 }
 func (fl SetattrValid) MtimeNow() bool  { return fl&SetattrMtimeNow != 0 }
 func (fl SetattrValid) LockOwner() bool { return fl&SetattrLockOwner != 0 }
-func (fl SetattrValid) Crtime() bool    { return fl&SetattrCrtime != 0 }
-func (fl SetattrValid) Chgtime() bool   { return fl&SetattrChgtime != 0 }
-func (fl SetattrValid) Bkuptime() bool  { return fl&SetattrBkuptime != 0 }
-func (fl SetattrValid) Flags() bool     { return fl&SetattrFlags != 0 }
+
+// Deprecated: Not used, OS X remnant.
+func (fl SetattrValid) Crtime() bool { return false }
+
+// Deprecated: Not used, OS X remnant.
+func (fl SetattrValid) Chgtime() bool { return false }
+
+// Deprecated: Not used, OS X remnant.
+func (fl SetattrValid) Bkuptime() bool { return false }
+
+// Deprecated: Not used, OS X remnant.
+func (fl SetattrValid) Flags() bool { return false }
 
 func (fl SetattrValid) String() string {
 	return flagString(uint32(fl), setattrValidNames)
@@ -144,10 +174,6 @@ var setattrValidNames = []flagName{
 	{uint32(SetattrAtimeNow), "SetattrAtimeNow"},
 	{uint32(SetattrMtimeNow), "SetattrMtimeNow"},
 	{uint32(SetattrLockOwner), "SetattrLockOwner"},
-	{uint32(SetattrCrtime), "SetattrCrtime"},
-	{uint32(SetattrChgtime), "SetattrChgtime"},
-	{uint32(SetattrBkuptime), "SetattrBkuptime"},
-	{uint32(SetattrFlags), "SetattrFlags"},
 }
 
 // Flags that can be seen in OpenRequest.Flags.
@@ -160,7 +186,7 @@ const (
 	OpenReadWrite OpenFlags = syscall.O_RDWR
 
 	// File was opened in append-only mode, all writes will go to end
-	// of file. OS X does not provide this information.
+	// of file. FreeBSD does not provide this information.
 	OpenAppend    OpenFlags = syscall.O_APPEND
 	OpenCreate    OpenFlags = syscall.O_CREAT
 	OpenDirectory OpenFlags = syscall.O_DIRECTORY
@@ -232,10 +258,12 @@ type OpenResponseFlags uint32
 const (
 	OpenDirectIO    OpenResponseFlags = 1 << 0 // bypass page cache for this open file
 	OpenKeepCache   OpenResponseFlags = 1 << 1 // don't invalidate the data cache on open
-	OpenNonSeekable OpenResponseFlags = 1 << 2 // mark the file as non-seekable (not supported on OS X or FreeBSD)
+	OpenNonSeekable OpenResponseFlags = 1 << 2 // mark the file as non-seekable (not supported on FreeBSD)
 
-	OpenPurgeAttr OpenResponseFlags = 1 << 30 // OS X
-	OpenPurgeUBC  OpenResponseFlags = 1 << 31 // OS X
+	// Deprecated: Not used, OS X remnant.
+	OpenPurgeAttr OpenResponseFlags = 1 << 30
+	// Deprecated: Not used, OS X remnant.
+	OpenPurgeUBC OpenResponseFlags = 1 << 31
 )
 
 func (fl OpenResponseFlags) String() string {
@@ -246,8 +274,6 @@ var openResponseFlagNames = []flagName{
 	{uint32(OpenDirectIO), "OpenDirectIO"},
 	{uint32(OpenKeepCache), "OpenKeepCache"},
 	{uint32(OpenNonSeekable), "OpenNonSeekable"},
-	{uint32(OpenPurgeAttr), "OpenPurgeAttr"},
-	{uint32(OpenPurgeUBC), "OpenPurgeUBC"},
 }
 
 // The InitFlags are used in the Init exchange.
@@ -260,7 +286,7 @@ const (
 	InitAtomicTrunc   InitFlags = 1 << 3
 	InitExportSupport InitFlags = 1 << 4
 	InitBigWrites     InitFlags = 1 << 5
-	// Do not mask file access modes with umask. Not supported on OS X.
+	// Do not mask file access modes with umask.
 	InitDontMask        InitFlags = 1 << 6
 	InitSpliceWrite     InitFlags = 1 << 7
 	InitSpliceMove      InitFlags = 1 << 8
@@ -274,9 +300,12 @@ const (
 	InitWritebackCache  InitFlags = 1 << 16
 	InitNoOpenSupport   InitFlags = 1 << 17
 
-	InitCaseSensitive InitFlags = 1 << 29 // OS X only
-	InitVolRename     InitFlags = 1 << 30 // OS X only
-	InitXtimes        InitFlags = 1 << 31 // OS X only
+	// Deprecated: Not used, OS X remnant.
+	InitCaseSensitive InitFlags = 1 << 29
+	// Deprecated: Not used, OS X remnant.
+	InitVolRename InitFlags = 1 << 30
+	// Deprecated: Not used, OS X remnant.
+	InitXtimes InitFlags = 1 << 31
 )
 
 type flagName struct {
@@ -303,10 +332,6 @@ var initFlagNames = []flagName{
 	{uint32(InitAsyncDIO), "InitAsyncDIO"},
 	{uint32(InitWritebackCache), "InitWritebackCache"},
 	{uint32(InitNoOpenSupport), "InitNoOpenSupport"},
-
-	{uint32(InitCaseSensitive), "InitCaseSensitive"},
-	{uint32(InitVolRename), "InitVolRename"},
-	{uint32(InitXtimes), "InitXtimes"},
 }
 
 func (fl InitFlags) String() string {
@@ -387,11 +412,6 @@ const (
 	opDestroy     = 38
 	opIoctl       = 39 // Linux?
 	opPoll        = 40 // Linux?
-
-	// OS X
-	opSetvolname = 61
-	opGetxtimes  = 62
-	opExchange   = 63
 )
 
 type entryOut struct {
@@ -439,14 +459,6 @@ func attrOutSize(p Protocol) uintptr {
 	}
 }
 
-// OS X
-type getxtimesOut struct {
-	Bkuptime     uint64
-	Crtime       uint64
-	BkuptimeNsec uint32
-	CrtimeNsec   uint32
-}
-
 type mknodIn struct {
 	Mode  uint32
 	Rdev  uint32
@@ -484,24 +496,16 @@ type renameIn struct {
 	// "oldname\x00newname\x00" follows
 }
 
-// OS X
-type exchangeIn struct {
-	Olddir  uint64
-	Newdir  uint64
-	Options uint64
-	// "oldname\x00newname\x00" follows
-}
-
 type linkIn struct {
 	Oldnodeid uint64
 }
 
-type setattrInCommon struct {
+type setattrIn struct {
 	Valid     uint32
 	_         uint32
 	Fh        uint64
 	Size      uint64
-	LockOwner uint64 // unused on OS X?
+	LockOwner uint64
 	Atime     uint64
 	Mtime     uint64
 	Unused2   uint64
@@ -643,22 +647,14 @@ type fsyncIn struct {
 	_          uint32
 }
 
-type setxattrInCommon struct {
+type setxattrIn struct {
 	Size  uint32
 	Flags uint32
 }
 
-func (setxattrInCommon) position() uint32 {
-	return 0
-}
-
-type getxattrInCommon struct {
+type getxattrIn struct {
 	Size uint32
 	_    uint32
-}
-
-func (getxattrInCommon) position() uint32 {
-	return 0
 }
 
 type getxattrOut struct {
