@@ -125,15 +125,6 @@ const (
 	SetattrAtimeNow  SetattrValid = 1 << 7
 	SetattrMtimeNow  SetattrValid = 1 << 8
 	SetattrLockOwner SetattrValid = 1 << 9 // http://www.mail-archive.com/git-commits-head@vger.kernel.org/msg27852.html
-
-	// Deprecated: Not used, OS X remnant.
-	SetattrCrtime SetattrValid = 1 << 28
-	// Deprecated: Not used, OS X remnant.
-	SetattrChgtime SetattrValid = 1 << 29
-	// Deprecated: Not used, OS X remnant.
-	SetattrBkuptime SetattrValid = 1 << 30
-	// Deprecated: Not used, OS X remnant.
-	SetattrFlags SetattrValid = 1 << 31
 )
 
 func (fl SetattrValid) Mode() bool      { return fl&SetattrMode != 0 }
@@ -146,18 +137,6 @@ func (fl SetattrValid) Handle() bool    { return fl&SetattrHandle != 0 }
 func (fl SetattrValid) AtimeNow() bool  { return fl&SetattrAtimeNow != 0 }
 func (fl SetattrValid) MtimeNow() bool  { return fl&SetattrMtimeNow != 0 }
 func (fl SetattrValid) LockOwner() bool { return fl&SetattrLockOwner != 0 }
-
-// Deprecated: Not used, OS X remnant.
-func (fl SetattrValid) Crtime() bool { return false }
-
-// Deprecated: Not used, OS X remnant.
-func (fl SetattrValid) Chgtime() bool { return false }
-
-// Deprecated: Not used, OS X remnant.
-func (fl SetattrValid) Bkuptime() bool { return false }
-
-// Deprecated: Not used, OS X remnant.
-func (fl SetattrValid) Flags() bool { return false }
 
 func (fl SetattrValid) String() string {
 	return flagString(uint32(fl), setattrValidNames)
@@ -259,11 +238,6 @@ const (
 	OpenDirectIO    OpenResponseFlags = 1 << 0 // bypass page cache for this open file
 	OpenKeepCache   OpenResponseFlags = 1 << 1 // don't invalidate the data cache on open
 	OpenNonSeekable OpenResponseFlags = 1 << 2 // mark the file as non-seekable (not supported on FreeBSD)
-
-	// Deprecated: Not used, OS X remnant.
-	OpenPurgeAttr OpenResponseFlags = 1 << 30
-	// Deprecated: Not used, OS X remnant.
-	OpenPurgeUBC OpenResponseFlags = 1 << 31
 )
 
 func (fl OpenResponseFlags) String() string {
@@ -299,13 +273,6 @@ const (
 	InitAsyncDIO        InitFlags = 1 << 15
 	InitWritebackCache  InitFlags = 1 << 16
 	InitNoOpenSupport   InitFlags = 1 << 17
-
-	// Deprecated: Not used, OS X remnant.
-	InitCaseSensitive InitFlags = 1 << 29
-	// Deprecated: Not used, OS X remnant.
-	InitVolRename InitFlags = 1 << 30
-	// Deprecated: Not used, OS X remnant.
-	InitXtimes InitFlags = 1 << 31
 )
 
 type flagName struct {
