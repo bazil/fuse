@@ -3178,7 +3178,6 @@ func TestAttrBad(t *testing.T) {
 // Test kernel cache invalidation
 
 type invalidateAttr struct {
-	fs.NodeRef
 	t    testing.TB
 	attr record.Counter
 }
@@ -3243,7 +3242,6 @@ func TestInvalidateNodeAttr(t *testing.T) {
 }
 
 type invalidateData struct {
-	fs.NodeRef
 	t    testing.TB
 	attr record.Counter
 	read record.Counter
@@ -3508,7 +3506,6 @@ func TestInvalidateNodeDataInvalidatesData(t *testing.T) {
 }
 
 type invalidateDataPartial struct {
-	fs.NodeRef
 	t    testing.TB
 	attr record.Counter
 	read record.Counter
@@ -3661,7 +3658,6 @@ func TestInvalidateNodeDataRangeHit(t *testing.T) {
 }
 
 type invalidateEntryRoot struct {
-	fs.NodeRef
 	t      testing.TB
 	lookup record.Counter
 }

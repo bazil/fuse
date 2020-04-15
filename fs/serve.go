@@ -469,12 +469,6 @@ type serveHandle struct {
 	readData []byte
 }
 
-// NodeRef is deprecated. It remains here to decrease code churn on
-// FUSE library users. You may remove it from your program now;
-// returning the same Node values are now recognized automatically,
-// without needing NodeRef.
-type NodeRef struct{}
-
 func (c *Server) saveNode(inode uint64, node Node) (id fuse.NodeID, gen uint64) {
 	c.meta.Lock()
 	defer c.meta.Unlock()
