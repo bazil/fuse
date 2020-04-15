@@ -273,3 +273,31 @@ func TestMountOptionReadOnly(t *testing.T) {
 		t.Fatalf("calling helper: %v", err)
 	}
 }
+
+func TestMountOptionMaxBackground(t *testing.T) {
+	maybeParallel(t)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}}, nil,
+		fuse.MaxBackground(4),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	// TODO figure out our connection id and read
+	// /sys/fs/fuse/connections/NUM/max_background
+}
+
+func TestMountOptionCongestionThreshold(t *testing.T) {
+	maybeParallel(t)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}}, nil,
+		fuse.CongestionThreshold(3),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	// TODO figure out our connection id and read
+	// /sys/fs/fuse/connections/NUM/max_background
+}

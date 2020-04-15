@@ -46,7 +46,7 @@ const (
 	protoVersionMinMajor = 7
 	protoVersionMinMinor = 8
 	protoVersionMaxMajor = 7
-	protoVersionMaxMinor = 12
+	protoVersionMaxMinor = 13
 )
 
 const (
@@ -696,12 +696,13 @@ type initIn struct {
 const initInSize = int(unsafe.Sizeof(initIn{}))
 
 type initOut struct {
-	Major        uint32
-	Minor        uint32
-	MaxReadahead uint32
-	Flags        uint32
-	Unused       uint32
-	MaxWrite     uint32
+	Major               uint32
+	Minor               uint32
+	MaxReadahead        uint32
+	Flags               uint32
+	MaxBackground       uint16
+	CongestionThreshold uint16
+	MaxWrite            uint32
 }
 
 type interruptIn struct {

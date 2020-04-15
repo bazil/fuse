@@ -11,9 +11,11 @@ func dummyOption(conf *mountConfig) error {
 // mountConfig holds the configuration for a mount operation.
 // Use it by passing MountOption values to Mount.
 type mountConfig struct {
-	options      map[string]string
-	maxReadahead uint32
-	initFlags    InitFlags
+	options             map[string]string
+	maxReadahead        uint32
+	initFlags           InitFlags
+	maxBackground       uint16
+	congestionThreshold uint16
 }
 
 func escapeComma(s string) string {
@@ -230,6 +232,34 @@ func OSXFUSELocations(paths ...OSXFUSEPaths) MountOption {
 func AllowNonEmptyMount() MountOption {
 	return func(conf *mountConfig) error {
 		conf.options["nonempty"] = ""
+		return nil
+	}
+}
+
+// MaxBackground sets the maximum number of FUSE requests the kernel
+// will submit in the background. Background requests are used when an
+// immediate answer is not needed. This may help with request latency.
+//
+// On Linux, this can be adjusted on the fly with
+// /sys/fs/fuse/connections/CONN/max_background
+func MaxBackground(n uint16) MountOption {
+	return func(conf *mountConfig) error {
+		conf.maxBackground = n
+		return nil
+	}
+}
+
+// CongestionThreshold sets the number of outstanding background FUSE
+// requests beyond which the kernel considers the filesystem
+// congested. This may help with request latency.
+//
+// On Linux, this can be adjusted on the fly with
+// /sys/fs/fuse/connections/CONN/congestion_threshold
+func CongestionThreshold(n uint16) MountOption {
+	// TODO to test this, we'd have to figure out our connection id
+	// and read /sys
+	return func(conf *mountConfig) error {
+		conf.congestionThreshold = n
 		return nil
 	}
 }

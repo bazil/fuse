@@ -224,10 +224,12 @@ func initMount(c *Conn, conf *mountConfig) error {
 	c.proto = proto
 
 	s := &initResponse{
-		Library:      proto,
-		MaxReadahead: conf.maxReadahead,
-		MaxWrite:     maxWrite,
-		Flags:        InitBigWrites | conf.initFlags,
+		Library:             proto,
+		MaxReadahead:        conf.maxReadahead,
+		Flags:               InitBigWrites | conf.initFlags,
+		MaxBackground:       conf.maxBackground,
+		CongestionThreshold: conf.congestionThreshold,
+		MaxWrite:            maxWrite,
 	}
 	r.Respond(s)
 	return nil
@@ -1184,13 +1186,17 @@ type initResponse struct {
 	// greater than initRequest.MaxReadahead.
 	MaxReadahead uint32
 	Flags        InitFlags
+	// Maximum number of outstanding background requests
+	MaxBackground uint16
+	// Number of background requests at which congestion starts
+	CongestionThreshold uint16
 	// Maximum size of a single write operation.
 	// Linux enforces a minimum of 4 KiB.
 	MaxWrite uint32
 }
 
 func (r *initResponse) String() string {
-	return fmt.Sprintf("Init %v ra=%d fl=%v w=%d", r.Library, r.MaxReadahead, r.Flags, r.MaxWrite)
+	return fmt.Sprintf("Init %v ra=%d fl=%v maxbg=%d cg=%d w=%d", r.Library, r.MaxReadahead, r.Flags, r.MaxBackground, r.CongestionThreshold, r.MaxWrite)
 }
 
 // Respond replies to the request with the given response.
@@ -1201,6 +1207,8 @@ func (r *initRequest) Respond(resp *initResponse) {
 	out.Minor = resp.Library.Minor
 	out.MaxReadahead = resp.MaxReadahead
 	out.Flags = uint32(resp.Flags)
+	out.MaxBackground = resp.MaxBackground
+	out.CongestionThreshold = resp.CongestionThreshold
 	out.MaxWrite = resp.MaxWrite
 
 	// MaxWrite larger than our receive buffer would just lead to
