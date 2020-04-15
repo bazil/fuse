@@ -554,10 +554,10 @@ type releaseIn struct {
 }
 
 type flushIn struct {
-	Fh         uint64
-	FlushFlags uint32
-	_          uint32
-	LockOwner  uint64
+	Fh        uint64
+	_         uint32
+	_         uint32
+	LockOwner uint64
 }
 
 type readIn struct {

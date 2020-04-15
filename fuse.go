@@ -937,7 +937,6 @@ func (c *Conn) ReadRequest() (Request, error) {
 		req = &FlushRequest{
 			Header:    m.Header(),
 			Handle:    HandleID(in.Fh),
-			Flags:     in.FlushFlags,
 			LockOwner: in.LockOwner,
 		}
 
@@ -2035,8 +2034,9 @@ func (r *SetattrResponse) String() string {
 // to storage, as when a file descriptor is being closed.  A single opened Handle
 // may receive multiple FlushRequests over its lifetime.
 type FlushRequest struct {
-	Header    `json:"-"`
-	Handle    HandleID
+	Header `json:"-"`
+	Handle HandleID
+	// Deprecated: Unused since 2006.
 	Flags     uint32
 	LockOwner uint64
 }
