@@ -113,15 +113,13 @@ func (fl GetattrFlags) String() string {
 type SetattrValid uint32
 
 const (
-	SetattrMode   SetattrValid = 1 << 0
-	SetattrUid    SetattrValid = 1 << 1
-	SetattrGid    SetattrValid = 1 << 2
-	SetattrSize   SetattrValid = 1 << 3
-	SetattrAtime  SetattrValid = 1 << 4
-	SetattrMtime  SetattrValid = 1 << 5
-	SetattrHandle SetattrValid = 1 << 6
-
-	// Linux only(?)
+	SetattrMode      SetattrValid = 1 << 0
+	SetattrUid       SetattrValid = 1 << 1
+	SetattrGid       SetattrValid = 1 << 2
+	SetattrSize      SetattrValid = 1 << 3
+	SetattrAtime     SetattrValid = 1 << 4
+	SetattrMtime     SetattrValid = 1 << 5
+	SetattrHandle    SetattrValid = 1 << 6
 	SetattrAtimeNow  SetattrValid = 1 << 7
 	SetattrMtimeNow  SetattrValid = 1 << 8
 	SetattrLockOwner SetattrValid = 1 << 9 // http://www.mail-archive.com/git-commits-head@vger.kernel.org/msg27852.html
@@ -410,8 +408,8 @@ const (
 	opInterrupt   = 36
 	opBmap        = 37
 	opDestroy     = 38
-	opIoctl       = 39 // Linux?
-	opPoll        = 40 // Linux?
+	opIoctl       = 39
+	opPoll        = 40
 )
 
 type entryOut struct {
