@@ -72,6 +72,9 @@ func MountedFunc(fn func(*Mount) fs.FS, conf *fs.Config, options ...fuse.MountOp
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		_ = os.Remove(dir)
+	}()
 	c, err := fuse.Mount(dir, options...)
 	if err != nil {
 		return nil, err
