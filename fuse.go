@@ -1104,10 +1104,10 @@ var (
 	ErrNotCached = notCachedError{}
 )
 
-// sendInvalidate sends an invalidate notification to kernel.
+// sendNotify sends a notification to kernel.
 //
 // A returned ENOENT is translated to a friendlier error.
-func (c *Conn) sendInvalidate(msg []byte) error {
+func (c *Conn) sendNotify(msg []byte) error {
 	switch err := c.writeToKernel(msg); err {
 	case syscall.ENOENT:
 		return ErrNotCached
@@ -1133,7 +1133,7 @@ func (c *Conn) InvalidateNode(nodeID NodeID, off int64, size int64) error {
 	out.Ino = uint64(nodeID)
 	out.Off = off
 	out.Len = size
-	return c.sendInvalidate(buf)
+	return c.sendNotify(buf)
 }
 
 // InvalidateEntry invalidates the kernel cache of the directory entry
@@ -1161,7 +1161,7 @@ func (c *Conn) InvalidateEntry(parent NodeID, name string) error {
 	out.Namelen = uint32(len(name))
 	buf = append(buf, name...)
 	buf = append(buf, '\x00')
-	return c.sendInvalidate(buf)
+	return c.sendNotify(buf)
 }
 
 // An initRequest is the first request sent on a FUSE file system.
