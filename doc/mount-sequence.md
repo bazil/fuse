@@ -14,7 +14,7 @@ The mount is immediate and file system accesses wait until the requests are serv
 
 ## Errors
 
-Let's see what happens if `InitRequest` gets an error response.
+Let's see what happens if `initRequest` gets an error response.
 The mountpoint is temporarily there but all operations will fail:
 
 ![Diagram of error handling](mount-error-init.seq.png)

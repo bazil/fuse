@@ -19,7 +19,7 @@ seqdiag {
   fusermount <-- kernel [label="mount(2) returns"];
   fuse <<-- fusermount [diagonal, label="exit, receive /dev/fuse fd"];
 
-  fuse => kernel [label="read /dev/fuse fd: InitRequest"];
+  fuse => kernel [label="read /dev/fuse fd: initRequest"];
   fuse -> kernel [label="write /dev/fuse fd", color=red];
   kernel -> kernel [label="set connection\nstate to error", color=red];
   fuse <-- kernel;
