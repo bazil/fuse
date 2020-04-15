@@ -744,7 +744,6 @@ type dirent struct {
 	Off     uint64
 	Namelen uint32
 	Type    uint32
-	Name    [0]byte
 }
 
 const direntSize = 8 + 8 + 4 + 4
