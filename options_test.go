@@ -1,6 +1,7 @@
 package fuse_test
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"flag"
@@ -128,11 +129,29 @@ func TestMountOptionSubtype(t *testing.T) {
 	}
 }
 
+func etcFuseHasAllowOther(t testing.TB) bool {
+	// sucks to go poking around in other programs' config files.
+	f, err := os.Open("/etc/fuse.conf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		if scanner.Text() == "user_allow_other" {
+			return true
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		t.Fatalf("reading /etc/fuse.conf: %v", err)
+	}
+	return false
+}
+
 func TestMountOptionAllowOther(t *testing.T) {
-	// This test needs user_allow_other in /etc/fuse.conf. I'm not too
-	// keen on adding a check for that here, as it's just an internal
-	// detail of a completely different program; the next version
-	// might read a different file.
+	if !etcFuseHasAllowOther(t) {
+		t.Skip("need user_allow_other in /etc/fuse.conf")
+	}
 	maybeParallel(t)
 	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}}, nil,
 		fuse.AllowOther(),
