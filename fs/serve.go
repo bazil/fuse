@@ -1522,6 +1522,49 @@ func (s *Server) InvalidateEntry(parent Node, name string) error {
 	return err
 }
 
+type notifyStoreDetail struct {
+	Off  uint64
+	Size uint64
+}
+
+func (i notifyStoreDetail) String() string {
+	return fmt.Sprintf("Off:%d Size:%d", i.Off, i.Size)
+}
+
+// NotifyStore puts data into the kernel page cache.
+//
+// Returns fuse.ErrNotCached if the kernel is not currently caching
+// the node.
+func (s *Server) NotifyStore(node Node, offset uint64, data []byte) error {
+	s.meta.Lock()
+	id, ok := s.nodeRef[node]
+	if ok {
+		snode := s.node[id]
+		snode.wg.Add(1)
+		defer snode.wg.Done()
+	}
+	s.meta.Unlock()
+	if !ok {
+		// This is what the kernel would have said, if we had been
+		// able to send this message; it's not cached.
+		return fuse.ErrNotCached
+	}
+	// Delay logging until after we can record the error too. We
+	// consider a /dev/fuse write to be instantaneous enough to not
+	// need separate before and after messages.
+	err := s.conn.NotifyStore(id, offset, data)
+	s.debug(notification{
+		Op:   "NotifyStore",
+		Node: id,
+		Out: notifyStoreDetail{
+			Off:  offset,
+			Size: uint64(len(data)),
+		},
+		Err: errstr(err),
+	})
+	return err
+}
+
 // DataHandle returns a read-only Handle that satisfies reads
 // using the given data.
 func DataHandle(data []byte) Handle {

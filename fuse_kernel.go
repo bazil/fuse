@@ -44,9 +44,9 @@ import (
 // The FUSE version implemented by the package.
 const (
 	protoVersionMinMajor = 7
-	protoVersionMinMinor = 8
+	protoVersionMinMinor = 15
 	protoVersionMaxMajor = 7
-	protoVersionMaxMinor = 14
+	protoVersionMaxMinor = 15
 )
 
 const (
@@ -751,6 +751,8 @@ const (
 	notifyCodePoll       int32 = 1
 	notifyCodeInvalInode int32 = 2
 	notifyCodeInvalEntry int32 = 3
+	notifyCodeStore      int32 = 4
+	notifyCodeRetrieve   int32 = 5
 )
 
 type notifyInvalInodeOut struct {
@@ -763,4 +765,11 @@ type notifyInvalEntryOut struct {
 	Parent  uint64
 	Namelen uint32
 	_       uint32
+}
+
+type notifyStoreOut struct {
+	Nodeid uint64
+	Offset uint64
+	Size   uint32
+	_      uint32
 }

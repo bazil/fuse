@@ -3726,6 +3726,87 @@ func TestInvalidateEntry(t *testing.T) {
 	}
 }
 
+type cachedFile struct {
+	fstestutil.File
+}
+
+var _ fs.NodeOpener = cachedFile{}
+
+func (f cachedFile) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
+	resp.Flags |= fuse.OpenKeepCache
+	return f, nil
+}
+
+type readErrRequest struct {
+	Path      string
+	WantErrno syscall.Errno
+}
+
+func doReadErr(ctx context.Context, req readErrRequest) (*struct{}, error) {
+	f, err := os.Open(req.Path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	data := make([]byte, 4096)
+	if _, err := f.Read(data); !errors.Is(err, req.WantErrno) {
+		return nil, fmt.Errorf("wrong error: %v", err)
+	}
+	return &struct{}{}, nil
+}
+
+var readErrHelper = helpers.Register("readErr", httpjson.ServePOST(doReadErr))
+
+func TestNotifyStore(t *testing.T) {
+	// This test may see false positive failures when run under
+	// extreme memory pressure.
+	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	child := cachedFile{}
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": child}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+	control := readHelper.Spawn(ctx, t)
+	defer control.Close()
+
+	// prove that read doesn't work, and make sure node is cached
+	{
+		control := readErrHelper.Spawn(ctx, t)
+		defer control.Close()
+		req := readErrRequest{
+			Path:      mnt.Dir + "/child",
+			WantErrno: syscall.EOPNOTSUPP,
+		}
+		var nothing struct{}
+		if err := control.JSON("/").Call(ctx, req, &nothing); err != nil {
+			t.Fatalf("calling helper: %v", err)
+		}
+	}
+
+	greeting := strings.Repeat("testing store\n", 500)
+	if l := len(greeting); l < syscall.Getpagesize() {
+		t.Fatalf("must fill at least one page to avoid second Read: len=%d", l)
+	}
+	t.Logf("storing...")
+	if err := mnt.Server.NotifyStore(child, 0, []byte(greeting)); err != nil {
+		t.Fatalf("store error: %v", err)
+	}
+
+	var got readResult
+	if err := control.JSON("/").Call(ctx, mnt.Dir+"/child", &got); err != nil {
+		t.Fatalf("calling helper: %v", err)
+	}
+	// we have just read data without implementing Read!
+
+	// doRead caps result at 4 kiB
+	if g, e := string(got.Data), greeting[:4096]; g != e {
+		t.Errorf("readAll = %q, want %q", g, e)
+	}
+}
+
 type contextFile struct {
 	fstestutil.File
 }

@@ -1164,6 +1164,19 @@ func (c *Conn) InvalidateEntry(parent NodeID, name string) error {
 	return c.sendNotify(buf)
 }
 
+func (c *Conn) NotifyStore(nodeID NodeID, offset uint64, data []byte) error {
+	buf := newBuffer(unsafe.Sizeof(notifyStoreOut{}) + uintptr(len(data)))
+	h := (*outHeader)(unsafe.Pointer(&buf[0]))
+	// h.Unique is 0
+	h.Error = notifyCodeStore
+	out := (*notifyStoreOut)(buf.alloc(unsafe.Sizeof(notifyStoreOut{})))
+	out.Nodeid = uint64(nodeID)
+	out.Offset = offset
+	out.Size = uint32(len(data))
+	buf = append(buf, data...)
+	return c.sendNotify(buf)
+}
+
 // An initRequest is the first request sent on a FUSE file system.
 type initRequest struct {
 	Header `json:"-"`
