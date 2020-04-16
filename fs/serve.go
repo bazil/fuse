@@ -591,9 +591,7 @@ func (c *Server) getHandle(id fuse.HandleID) (shandle *serveHandle) {
 }
 
 type request struct {
-	Op      string
-	Request *fuse.Header
-	In      interface{} `json:",omitempty"`
+	In interface{} `json:",omitempty"`
 }
 
 func (r request) String() string {
@@ -839,9 +837,7 @@ func (c *Server) serve(r fuse.Request) {
 		// as soon as we have decoded them to the right types
 	default:
 		c.debug(request{
-			Op:      opName(r),
-			Request: r.Hdr(),
-			In:      r,
+			In: r,
 		})
 	}
 	var node Node
