@@ -1466,9 +1466,6 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 
 			case *BmapRequest:
 				return ENOSYS
-
-			case *SetvolnameRequest, *GetxtimesRequest, *ExchangeRequest:
-				return ENOSYS
 		*/
 	}
 
