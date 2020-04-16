@@ -1015,6 +1015,12 @@ func (c *Conn) ReadRequest() (Request, error) {
 		req = &DestroyRequest{
 			Header: m.Header(),
 		}
+
+	case opNotifyReply:
+		req = &NotifyReply{
+			Header: m.Header(),
+			msg:    m,
+		}
 	}
 
 	return req, nil
@@ -1175,6 +1181,53 @@ func (c *Conn) NotifyStore(nodeID NodeID, offset uint64, data []byte) error {
 	out.Size = uint32(len(data))
 	buf = append(buf, data...)
 	return c.sendNotify(buf)
+}
+
+type NotifyRetrieval struct {
+	// we may want fields later, so don't let callers know it's the
+	// empty struct
+	_ struct{}
+}
+
+func (n *NotifyRetrieval) Finish(r *NotifyReply) []byte {
+	m := r.msg
+	defer putMessage(m)
+	in := (*notifyRetrieveIn)(m.data())
+	if m.len() < unsafe.Sizeof(*in) {
+		Debug(malformedMessage{})
+		return nil
+	}
+	m.off += int(unsafe.Sizeof(*in))
+	buf := m.bytes()
+	if uint32(len(buf)) < in.Size {
+		Debug(malformedMessage{})
+		return nil
+	}
+
+	data := make([]byte, in.Size)
+	copy(data, buf)
+	return data
+}
+
+func (c *Conn) NotifyRetrieve(notificationID RequestID, nodeID NodeID, offset uint64, size uint32) (*NotifyRetrieval, error) {
+	// notificationID may collide with kernel-chosen requestIDs, it's
+	// up to the caller to branch based on the opCode.
+
+	buf := newBuffer(unsafe.Sizeof(notifyRetrieveOut{}))
+	h := (*outHeader)(unsafe.Pointer(&buf[0]))
+	// h.Unique is 0
+	h.Error = notifyCodeRetrieve
+	out := (*notifyRetrieveOut)(buf.alloc(unsafe.Sizeof(notifyRetrieveOut{})))
+	out.NotifyUnique = uint64(notificationID)
+	out.Nodeid = uint64(nodeID)
+	out.Offset = offset
+	// kernel constrains size to maxWrite for us
+	out.Size = size
+	if err := c.sendNotify(buf); err != nil {
+		return nil, err
+	}
+	r := &NotifyRetrieval{}
+	return r, nil
 }
 
 // An initRequest is the first request sent on a FUSE file system.
@@ -2275,4 +2328,17 @@ func (r *ExchangeDataRequest) String() string {
 func (r *ExchangeDataRequest) Respond() {
 	buf := newBuffer(0)
 	r.respond(buf)
+}
+
+// NotifyReply is a response to an earlier notification. It behaves
+// like a Request, but is not really a request expecting a response.
+type NotifyReply struct {
+	Header `json:"-"`
+	msg    *message
+}
+
+var _ = Request(&NotifyReply{})
+
+func (r *NotifyReply) String() string {
+	return fmt.Sprintf("NotifyReply [%s]", &r.Header)
 }

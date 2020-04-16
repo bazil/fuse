@@ -3807,6 +3807,38 @@ func TestNotifyStore(t *testing.T) {
 	}
 }
 
+func TestNotifyRetrieve(t *testing.T) {
+	// This test may see false positive failures when run under
+	// extreme memory pressure.
+	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	child := readAll{}
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": child}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+	control := readHelper.Spawn(ctx, t)
+	defer control.Close()
+
+	// read to fill page cache
+	var got readResult
+	if err := control.JSON("/").Call(ctx, mnt.Dir+"/child", &got); err != nil {
+		t.Fatalf("calling helper: %v", err)
+	}
+
+	t.Logf("retrieving...")
+	data, err := mnt.Server.NotifyRetrieve(child, 0, 5)
+	if err != nil {
+		t.Fatalf("retrieve error: %v", err)
+	}
+
+	if g, e := string(data), hi[:5]; g != e {
+		t.Errorf("retrieve = %q, want %q", g, e)
+	}
+}
+
 type contextFile struct {
 	fstestutil.File
 }

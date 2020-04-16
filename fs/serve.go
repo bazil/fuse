@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -347,6 +348,7 @@ func New(conn *fuse.Conn, config *Config) *Server {
 		conn:         conn,
 		req:          map[fuse.RequestID]*serveRequest{},
 		nodeRef:      map[Node]fuse.NodeID{},
+		notifyWait:   map[fuse.RequestID]chan<- *fuse.NotifyReply{},
 		dynamicInode: GenerateDynamicInode,
 	}
 	if config != nil {
@@ -378,6 +380,11 @@ type Server struct {
 	freeNode   []fuse.NodeID
 	freeHandle []fuse.HandleID
 	nodeGen    uint64
+
+	// pending notify upcalls to kernel
+	notifyMu   sync.Mutex
+	notifySeq  fuse.RequestID
+	notifyWait map[fuse.RequestID]chan<- *fuse.NotifyReply
 
 	// Used to ensure worker goroutines finish before Serve returns
 	wg sync.WaitGroup
@@ -668,6 +675,57 @@ func (n notification) String() string {
 	return buf.String()
 }
 
+type notificationRequest struct {
+	ID   fuse.RequestID
+	Op   string
+	Node fuse.NodeID
+	Out  interface{} `json:",omitempty"`
+}
+
+func (n notificationRequest) String() string {
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, ">> %s [ID=%d] %v", n.Op, n.ID, n.Node)
+	if n.Out != nil {
+		// make sure (seemingly) empty values are readable
+		switch n.Out.(type) {
+		case string:
+			fmt.Fprintf(&buf, " %q", n.Out)
+		case []byte:
+			fmt.Fprintf(&buf, " [% x]", n.Out)
+		default:
+			fmt.Fprintf(&buf, " %s", n.Out)
+		}
+	}
+	return buf.String()
+}
+
+type notificationResponse struct {
+	ID  fuse.RequestID
+	Op  string
+	In  interface{} `json:",omitempty"`
+	Err string      `json:",omitempty"`
+}
+
+func (n notificationResponse) String() string {
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "<< [ID=%d] %s", n.ID, n.Op)
+	if n.In != nil {
+		// make sure (seemingly) empty values are readable
+		switch n.In.(type) {
+		case string:
+			fmt.Fprintf(&buf, " %q", n.In)
+		case []byte:
+			fmt.Fprintf(&buf, " [% x]", n.In)
+		default:
+			fmt.Fprintf(&buf, " %s", n.In)
+		}
+	}
+	if n.Err != "" {
+		fmt.Fprintf(&buf, " Err:%v", n.Err)
+	}
+	return buf.String()
+}
+
 type logMissingNode struct {
 	MaxNode fuse.NodeID
 }
@@ -775,11 +833,17 @@ func (c *Server) serve(r fuse.Request) {
 
 	req := &serveRequest{Request: r, cancel: cancel}
 
-	c.debug(request{
-		Op:      opName(r),
-		Request: r.Hdr(),
-		In:      r,
-	})
+	switch r.(type) {
+	case *fuse.NotifyReply:
+		// don't log NotifyReply here, they're logged by the recipient
+		// as soon as we have decoded them to the right types
+	default:
+		c.debug(request{
+			Op:      opName(r),
+			Request: r.Hdr(),
+			In:      r,
+		})
+	}
 	var node Node
 	var snode *serveNode
 	c.meta.Lock()
@@ -1376,6 +1440,24 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 		r.Respond()
 		return nil
 
+	case *fuse.NotifyReply:
+		c.notifyMu.Lock()
+		w, ok := c.notifyWait[r.Hdr().ID]
+		if ok {
+			delete(c.notifyWait, r.Hdr().ID)
+		}
+		c.notifyMu.Unlock()
+		if !ok {
+			c.debug(notificationResponse{
+				ID:  r.Hdr().ID,
+				Op:  "NotifyReply",
+				Err: "unknown ID",
+			})
+			return nil
+		}
+		w <- r
+		return nil
+
 		/*	case *FsyncdirRequest:
 				return ENOSYS
 
@@ -1522,13 +1604,21 @@ func (s *Server) InvalidateEntry(parent Node, name string) error {
 	return err
 }
 
-type notifyStoreDetail struct {
+type notifyStoreRetrieveDetail struct {
 	Off  uint64
 	Size uint64
 }
 
-func (i notifyStoreDetail) String() string {
+func (i notifyStoreRetrieveDetail) String() string {
 	return fmt.Sprintf("Off:%d Size:%d", i.Off, i.Size)
+}
+
+type notifyRetrieveReplyDetail struct {
+	Size uint64
+}
+
+func (i notifyRetrieveReplyDetail) String() string {
+	return fmt.Sprintf("Size:%d", i.Size)
 }
 
 // NotifyStore puts data into the kernel page cache.
@@ -1556,13 +1646,75 @@ func (s *Server) NotifyStore(node Node, offset uint64, data []byte) error {
 	s.debug(notification{
 		Op:   "NotifyStore",
 		Node: id,
-		Out: notifyStoreDetail{
+		Out: notifyStoreRetrieveDetail{
 			Off:  offset,
 			Size: uint64(len(data)),
 		},
 		Err: errstr(err),
 	})
 	return err
+}
+
+// NotifyRetrieve gets data from the kernel page cache.
+//
+// Returns fuse.ErrNotCached if the kernel is not currently caching
+// the node.
+func (s *Server) NotifyRetrieve(node Node, offset uint64, size uint32) ([]byte, error) {
+	s.meta.Lock()
+	id, ok := s.nodeRef[node]
+	if ok {
+		snode := s.node[id]
+		snode.wg.Add(1)
+		defer snode.wg.Done()
+	}
+	s.meta.Unlock()
+	if !ok {
+		// This is what the kernel would have said, if we had been
+		// able to send this message; it's not cached.
+		return nil, fuse.ErrNotCached
+	}
+
+	ch := make(chan *fuse.NotifyReply, 1)
+	s.notifyMu.Lock()
+	const wraparoundThreshold = 1 << 63
+	if s.notifySeq > wraparoundThreshold {
+		s.notifyMu.Unlock()
+		return nil, errors.New("running out of notify sequence numbers")
+	}
+	s.notifySeq++
+	seq := s.notifySeq
+	s.notifyWait[seq] = ch
+	s.notifyMu.Unlock()
+
+	s.debug(notificationRequest{
+		ID:   seq,
+		Op:   "NotifyRetrieve",
+		Node: id,
+		Out: notifyStoreRetrieveDetail{
+			Off:  offset,
+			Size: uint64(size),
+		},
+	})
+	retrieval, err := s.conn.NotifyRetrieve(seq, id, offset, size)
+	if err != nil {
+		s.debug(notificationResponse{
+			ID:  seq,
+			Op:  "NotifyRetrieve",
+			Err: errstr(err),
+		})
+		return nil, err
+	}
+
+	reply := <-ch
+	data := retrieval.Finish(reply)
+	s.debug(notificationResponse{
+		ID: seq,
+		Op: "NotifyRetrieve",
+		In: notifyRetrieveReplyDetail{
+			Size: uint64(len(data)),
+		},
+	})
+	return data, nil
 }
 
 // DataHandle returns a read-only Handle that satisfies reads
