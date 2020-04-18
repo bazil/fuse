@@ -132,6 +132,9 @@ func TestMountOptionSubtype(t *testing.T) {
 func etcFuseHasAllowOther(t testing.TB) bool {
 	// sucks to go poking around in other programs' config files.
 	f, err := os.Open("/etc/fuse.conf")
+	if errors.Is(err, os.ErrNotExist) {
+		return false
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
