@@ -322,6 +322,32 @@ type HandleReleaser interface {
 	Release(ctx context.Context, req *fuse.ReleaseRequest) error
 }
 
+type HandlePoller interface {
+	// Poll checks whether the handle is currently ready for I/O, and
+	// may request a wakeup when it is.
+	//
+	// Poll should always return quickly. Clients waiting for
+	// readiness can be woken up by passing the return value of
+	// PollRequest.Wakeup to fs.Server.NotifyPollWakeup or
+	// fuse.Conn.NotifyPollWakeup.
+	//
+	// To allow supporting poll for only some of your Nodes/Handles,
+	// the default behavior is to report immediate readiness. If your
+	// FS does not support polling and you want to minimize needless
+	// requests and log noise, implement NodePoller and return
+	// syscall.ENOSYS.
+	//
+	// The Go runtime uses epoll-based I/O whenever possible, even for
+	// regular files.
+	Poll(ctx context.Context, req *fuse.PollRequest, resp *fuse.PollResponse) error
+}
+
+type NodePoller interface {
+	// Poll checks whether the node is currently ready for I/O, and
+	// may request a wakeup when it is. See HandlePoller.
+	Poll(ctx context.Context, req *fuse.PollRequest, resp *fuse.PollResponse) error
+}
+
 type Config struct {
 	// Function to send debug log messages to. If nil, use fuse.Debug.
 	// Note that changing this or fuse.Debug may not affect existing
@@ -1436,6 +1462,37 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 		r.Respond()
 		return nil
 
+	case *fuse.PollRequest:
+		shandle := c.getHandle(r.Handle)
+		if shandle == nil {
+			return syscall.ESTALE
+		}
+		s := &fuse.PollResponse{}
+
+		if h, ok := shandle.handle.(HandlePoller); ok {
+			if err := h.Poll(ctx, r, s); err != nil {
+				return err
+			}
+			done(s)
+			r.Respond(s)
+			return nil
+		}
+
+		if n, ok := node.(NodePoller); ok {
+			if err := n.Poll(ctx, r, s); err != nil {
+				return err
+			}
+			done(s)
+			r.Respond(s)
+			return nil
+		}
+
+		// fallback to always claim ready
+		s.REvents = fuse.DefaultPollMask
+		done(s)
+		r.Respond(s)
+		return nil
+
 	case *fuse.NotifyReply:
 		c.notifyMu.Lock()
 		w, ok := c.notifyWait[r.Hdr().ID]
@@ -1708,6 +1765,19 @@ func (s *Server) NotifyRetrieve(node Node, offset uint64, size uint32) ([]byte, 
 		},
 	})
 	return data, nil
+}
+
+func (s *Server) NotifyPollWakeup(wakeup fuse.PollWakeup) error {
+	// Delay logging until after we can record the error too. We
+	// consider a /dev/fuse write to be instantaneous enough to not
+	// need separate before and after messages.
+	err := s.conn.NotifyPollWakeup(wakeup)
+	s.debug(notification{
+		Op:  "NotifyPollWakeup",
+		Out: wakeup,
+		Err: errstr(err),
+	})
+	return err
 }
 
 // DataHandle returns a read-only Handle that satisfies reads

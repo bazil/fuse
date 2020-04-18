@@ -3949,3 +3949,175 @@ func TestGoexit(t *testing.T) {
 		t.Fatalf("calling helper: %v", err)
 	}
 }
+
+// Test Poll: NodePoller and HandlePoller
+
+// pollDelayRead is a HandleReader that only lets a read succeed after
+// one round of polling.
+type pollDelayRead struct {
+	t      testing.TB
+	server *fs.Server
+
+	mu   sync.Mutex
+	seen []string
+
+	wakeup atomic.Value
+	ready  uint64
+}
+
+// Can be used as either Handle or Node. If these interfaces diverge,
+// change this to a common core with two wrappers.
+var _ fs.HandlePoller = (*pollDelayRead)(nil)
+var _ fs.NodePoller = (*pollDelayRead)(nil)
+
+func (r *pollDelayRead) saw(s string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.t.Logf("saw %s", s)
+	r.seen = append(r.seen, s)
+}
+
+func (n *pollDelayRead) Poll(ctx context.Context, req *fuse.PollRequest, resp *fuse.PollResponse) error {
+	if w, ok := req.Wakeup(); ok {
+		n.wakeup.Store(w)
+	}
+	resp.REvents = fuse.PollOut
+	if atomic.LoadUint64(&n.ready) == 1 {
+		resp.REvents |= fuse.PollIn
+		return nil
+	}
+	return nil
+}
+
+func (n *pollDelayRead) doWakeup() {
+	n.saw("wakeup")
+	atomic.StoreUint64(&n.ready, 1)
+	if w, ok := n.wakeup.Load().(fuse.PollWakeup); ok {
+		if err := n.server.NotifyPollWakeup(w); err != nil {
+			n.t.Errorf("wakeup error: %v", err)
+		}
+	}
+}
+
+var _ fs.HandleReader = (*pollDelayRead)(nil)
+
+func (n *pollDelayRead) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
+	if req.FileFlags&fuse.OpenNonblock == 0 {
+		n.t.Errorf("expected a non-blocking read")
+		return syscall.ENAMETOOLONG
+	}
+	if atomic.LoadUint64(&n.ready) == 0 {
+		n.saw("read-eagain")
+		time.AfterFunc(1*time.Millisecond, n.doWakeup)
+		return syscall.EAGAIN
+	}
+	n.saw("read-ready")
+	fuseutil.HandleRead(req, resp, []byte(hi))
+	return nil
+}
+
+// Test NodePoller
+
+type readPolledNode struct {
+	pollDelayRead
+}
+
+var _ fs.Node = (*readPolledNode)(nil)
+
+func (readPolledNode) Attr(ctx context.Context, a *fuse.Attr) error {
+	a.Mode = 0666
+	a.Size = uint64(len(hi))
+	return nil
+}
+
+func TestReadPollNode(t *testing.T) {
+	if runtime.GOOS == "freebsd" {
+		t.Skip("no poll on FreeBSD")
+	}
+	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	child := &readPolledNode{
+		pollDelayRead: pollDelayRead{
+			t: t,
+		},
+	}
+	filesys := fstestutil.SimpleFS{&fstestutil.ChildMap{"child": child}}
+	setup := func(mnt *fstestutil.Mount) fs.FS {
+		child.server = mnt.Server
+		return filesys
+	}
+	mnt, err := fstestutil.MountedFuncT(t, setup, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+	control := readHelper.Spawn(ctx, t)
+	defer control.Close()
+	var got readResult
+	if err := control.JSON("/").Call(ctx, mnt.Dir+"/child", &got); err != nil {
+		t.Fatalf("calling helper: %v", err)
+	}
+	if g, e := string(got.Data), hi; g != e {
+		t.Errorf("readAll = %q, want %q", g, e)
+	}
+	if g, e := strings.Join(child.seen, " "), "read-eagain wakeup read-ready"; g != e {
+		t.Errorf("wrong events: %q != %q", g, e)
+	}
+}
+
+// Test HandlePoller
+
+type readPolledNodeWithHandle struct {
+	handle pollDelayRead
+}
+
+var _ fs.Node = (*readPolledNodeWithHandle)(nil)
+
+func (readPolledNodeWithHandle) Attr(ctx context.Context, a *fuse.Attr) error {
+	a.Mode = 0666
+	a.Size = uint64(len(hi))
+	return nil
+}
+
+var _ fs.NodeOpener = (*readPolledNodeWithHandle)(nil)
+
+func (f *readPolledNodeWithHandle) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
+	return &f.handle, nil
+}
+
+func TestReadPollHandle(t *testing.T) {
+	if runtime.GOOS == "freebsd" {
+		t.Skip("no poll on FreeBSD")
+	}
+	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	child := &readPolledNodeWithHandle{
+		handle: pollDelayRead{
+			t: t,
+		},
+	}
+	filesys := fstestutil.SimpleFS{&fstestutil.ChildMap{"child": child}}
+	setup := func(mnt *fstestutil.Mount) fs.FS {
+		child.handle.server = mnt.Server
+		return filesys
+	}
+	mnt, err := fstestutil.MountedFuncT(t, setup, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+	control := readHelper.Spawn(ctx, t)
+	defer control.Close()
+	var got readResult
+	if err := control.JSON("/").Call(ctx, mnt.Dir+"/child", &got); err != nil {
+		t.Fatalf("calling helper: %v", err)
+	}
+	if g, e := string(got.Data), hi; g != e {
+		t.Errorf("readAll = %q, want %q", g, e)
+	}
+	if g, e := strings.Join(child.handle.seen, " "), "read-eagain wakeup read-ready"; g != e {
+		t.Errorf("wrong events: %q != %q", g, e)
+	}
+}

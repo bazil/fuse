@@ -1021,6 +1021,19 @@ func (c *Conn) ReadRequest() (Request, error) {
 			Header: m.Header(),
 			msg:    m,
 		}
+
+	case opPoll:
+		in := (*pollIn)(m.data())
+		if m.len() < unsafe.Sizeof(*in) {
+			goto corrupt
+		}
+		req = &PollRequest{
+			Header: m.Header(),
+			Handle: HandleID(in.Fh),
+			kh:     in.Kh,
+			Flags:  PollFlags(in.Flags),
+			Events: PollEvents(in.Events),
+		}
 	}
 
 	return req, nil
@@ -1228,6 +1241,24 @@ func (c *Conn) NotifyRetrieve(notificationID RequestID, nodeID NodeID, offset ui
 	}
 	r := &NotifyRetrieval{}
 	return r, nil
+}
+
+// NotifyPollWakeup sends a notification to the kernel to wake up all
+// clients waiting on this node. Wakeup is a value from a PollRequest
+// for a Handle or a Node currently alive (Forget has not been called
+// on it).
+func (c *Conn) NotifyPollWakeup(wakeup PollWakeup) error {
+	if wakeup.kh == 0 {
+		// likely somebody ignored the comma-ok return
+		return nil
+	}
+	buf := newBuffer(unsafe.Sizeof(notifyPollWakeupOut{}))
+	h := (*outHeader)(unsafe.Pointer(&buf[0]))
+	// h.Unique is 0
+	h.Error = notifyCodePoll
+	out := (*notifyPollWakeupOut)(buf.alloc(unsafe.Sizeof(notifyPollWakeupOut{})))
+	out.Kh = wakeup.kh
+	return c.sendNotify(buf)
 }
 
 // An initRequest is the first request sent on a FUSE file system.
@@ -2341,4 +2372,60 @@ var _ = Request(&NotifyReply{})
 
 func (r *NotifyReply) String() string {
 	return fmt.Sprintf("NotifyReply [%s]", &r.Header)
+}
+
+type PollRequest struct {
+	Header `json:"-"`
+	Handle HandleID
+	kh     uint64
+	Flags  PollFlags
+	// Events is a bitmap of events of interest.
+	//
+	// This field is only set for FUSE protocol 7.21 and later.
+	Events PollEvents
+}
+
+var _ Request = (*PollRequest)(nil)
+
+func (r *PollRequest) String() string {
+	return fmt.Sprintf("Poll [%s] %v kh=%v fl=%v ev=%v", &r.Header, r.Handle, r.kh, r.Flags, r.Events)
+}
+
+type PollWakeup struct {
+	kh uint64
+}
+
+func (p PollWakeup) String() string {
+	return fmt.Sprintf("PollWakeup{kh=%d}", p.kh)
+}
+
+// Wakeup returns information that can be used later to wake up file
+// system clients polling a Handle or a Node.
+//
+// ok is false if wakeups are not requested for this poll.
+//
+// Do not retain PollWakeup past the lifetime of the Handle or Node.
+func (r *PollRequest) Wakeup() (_ PollWakeup, ok bool) {
+	if r.Flags&PollScheduleNotify == 0 {
+		return PollWakeup{}, false
+	}
+	p := PollWakeup{
+		kh: r.kh,
+	}
+	return p, true
+}
+
+func (r *PollRequest) Respond(resp *PollResponse) {
+	buf := newBuffer(unsafe.Sizeof(pollOut{}))
+	out := (*pollOut)(buf.alloc(unsafe.Sizeof(pollOut{})))
+	out.REvents = uint32(resp.REvents)
+	r.respond(buf)
+}
+
+type PollResponse struct {
+	REvents PollEvents
+}
+
+func (r *PollResponse) String() string {
+	return fmt.Sprintf("Poll revents=%v", r.REvents)
 }
