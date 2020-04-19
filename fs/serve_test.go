@@ -540,7 +540,8 @@ type writeFlags struct {
 
 func (r *writeFlags) Attr(ctx context.Context, a *fuse.Attr) error {
 	a.Mode = 0666
-	a.Size = uint64(len(hi))
+	// do not set Size here or FreeBSD will do a read-modify-write,
+	// even if the write replaces whole page contents
 	return nil
 }
 
