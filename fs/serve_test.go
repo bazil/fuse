@@ -3727,7 +3727,15 @@ func TestInvalidateEntry(t *testing.T) {
 }
 
 type cachedFile struct {
-	fstestutil.File
+}
+
+var _ fs.Node = cachedFile{}
+
+func (f cachedFile) Attr(ctx context.Context, a *fuse.Attr) error {
+	a.Mode = 0666
+	// FreeBSD won't issue reads if the file is empty.
+	a.Size = 4096
+	return nil
 }
 
 var _ fs.NodeOpener = cachedFile{}
@@ -3792,7 +3800,13 @@ func TestNotifyStore(t *testing.T) {
 	}
 	t.Logf("storing...")
 	if err := mnt.Server.NotifyStore(child, 0, []byte(greeting)); err != nil {
+		if runtime.GOOS == "freebsd" && errors.Is(err, syscall.ENOSYS) {
+			t.Skip("FreeBSD does not support NotifyStore")
+		}
 		t.Fatalf("store error: %v", err)
+	}
+	if runtime.GOOS == "freebsd" {
+		t.Errorf("FreeBSD started supporting NotifyStore, update code")
 	}
 
 	var got readResult
@@ -3831,7 +3845,13 @@ func TestNotifyRetrieve(t *testing.T) {
 	t.Logf("retrieving...")
 	data, err := mnt.Server.NotifyRetrieve(child, 0, 5)
 	if err != nil {
+		if runtime.GOOS == "freebsd" && errors.Is(err, syscall.ENOSYS) {
+			t.Skip("FreeBSD does not support NotifyRetrieve")
+		}
 		t.Fatalf("retrieve error: %v", err)
+	}
+	if runtime.GOOS == "freebsd" {
+		t.Errorf("FreeBSD started supporting NotifyRetrieve, update code")
 	}
 
 	if g, e := string(data), hi[:5]; g != e {
