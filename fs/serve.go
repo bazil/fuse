@@ -111,6 +111,10 @@ type NodeGetattrer interface {
 	Getattr(ctx context.Context, req *fuse.GetattrRequest, resp *fuse.GetattrResponse) error
 }
 
+type HandleGetattrer interface {
+	Getattr(ctx context.Context, req *fuse.GetattrRequest, resp *fuse.GetattrResponse) error
+}
+
 type NodeSetattrer interface {
 	// Setattr sets the standard metadata for the receiver.
 	//
@@ -120,6 +124,10 @@ type NodeSetattrer interface {
 	// req.Valid is a bitmask of what fields are actually being set.
 	// For example, the method should not change the mode of the file
 	// unless req.Valid.Mode() is true.
+	Setattr(ctx context.Context, req *fuse.SetattrRequest, resp *fuse.SetattrResponse) error
+}
+
+type HandleSetattrer interface {
 	Setattr(ctx context.Context, req *fuse.SetattrRequest, resp *fuse.SetattrResponse) error
 }
 
@@ -220,6 +228,10 @@ type NodeMknoder interface {
 
 // TODO this should be on Handle not Node
 type NodeFsyncer interface {
+	Fsync(ctx context.Context, req *fuse.FsyncRequest) error
+}
+
+type HandleFsyncer interface {
 	Fsync(ctx context.Context, req *fuse.FsyncRequest) error
 }
 
@@ -979,6 +991,17 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 	// Node operations.
 	case *fuse.GetattrRequest:
 		s := &fuse.GetattrResponse{}
+		shandle := c.getHandle(r.Handle)
+		if shandle != nil {
+			if h, ok := shandle.handle.(HandleGetattrer); ok {
+				if err := h.Getattr(ctx, r, s); err != nil {
+					return err
+				}
+				done(s)
+				r.Respond(s)
+				return nil
+			}
+		}
 		if n, ok := node.(NodeGetattrer); ok {
 			if err := n.Getattr(ctx, r, s); err != nil {
 				return err
@@ -994,6 +1017,21 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 
 	case *fuse.SetattrRequest:
 		s := &fuse.SetattrResponse{}
+		shandle := c.getHandle(r.Handle)
+		if shandle != nil {
+			if h, ok := shandle.handle.(HandleSetattrer); ok {
+				if err := h.Setattr(ctx, r, s); err != nil {
+					return err
+				}
+				if err := snode.attr(ctx, &s.Attr); err != nil {
+					return err
+				}
+				done(s)
+				r.Respond(s)
+				return nil
+			}
+		}
+
 		if n, ok := node.(NodeSetattrer); ok {
 			if err := n.Setattr(ctx, r, s); err != nil {
 				return err
@@ -1412,6 +1450,18 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 		return nil
 
 	case *fuse.FsyncRequest:
+		if shandle := c.getHandle(r.Handle); shandle != nil {
+			if h, ok := shandle.handle.(HandleFsyncer); ok {
+				err := h.Fsync(ctx, r)
+				if err != nil {
+					return err
+				}
+				done(nil)
+				r.Respond()
+				return nil
+			}
+		}
+
 		n, ok := node.(NodeFsyncer)
 		if !ok {
 			return syscall.EIO

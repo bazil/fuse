@@ -2277,6 +2277,7 @@ func (r *MknodRequest) Respond(resp *LookupResponse) {
 type FsyncRequest struct {
 	Header `json:"-"`
 	Handle HandleID
+	Hndle  interface{}
 	// TODO bit 1 is datasync, not well documented upstream
 	Flags uint32
 	Dir   bool
