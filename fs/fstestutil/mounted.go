@@ -119,6 +119,7 @@ func MountedFuncT(t testing.TB, fn func(*Mount) fs.FS, conf *fs.Config, options 
 	}
 	if debug && conf.Debug == nil {
 		conf.Debug = func(msg interface{}) {
+			t.Helper()
 			t.Logf("FUSE: %s", msg)
 		}
 	}
