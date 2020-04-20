@@ -1071,8 +1071,11 @@ corrupt:
 unrecognized:
 	// Unrecognized message.
 	// Assume higher-level code will send a "no idea what you mean" error.
-	h := m.Header()
-	return &h, nil
+	req = &UnrecognizedRequest{
+		Header: m.Header(),
+		Opcode: m.hdr.Opcode,
+	}
+	return req, nil
 }
 
 type bugShortKernelWrite struct {
@@ -1299,6 +1302,17 @@ var _ = Request(&initRequest{})
 
 func (r *initRequest) String() string {
 	return fmt.Sprintf("Init [%v] %v ra=%d fl=%v", &r.Header, r.Kernel, r.MaxReadahead, r.Flags)
+}
+
+type UnrecognizedRequest struct {
+	Header `json:"-"`
+	Opcode uint32
+}
+
+var _ = Request(&UnrecognizedRequest{})
+
+func (r *UnrecognizedRequest) String() string {
+	return fmt.Sprintf("Unrecognized [%v] opcode=%d", &r.Header, r.Opcode)
 }
 
 // An initResponse is the response to an initRequest.
