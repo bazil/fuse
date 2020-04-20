@@ -105,6 +105,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -1034,6 +1035,30 @@ func (c *Conn) ReadRequest() (Request, error) {
 			Flags:  PollFlags(in.Flags),
 			Events: PollEvents(in.Events),
 		}
+
+	case opBatchForget:
+		in := (*batchForgetIn)(m.data())
+		if m.len() < unsafe.Sizeof(*in) {
+			goto corrupt
+		}
+		m.off += int(unsafe.Sizeof(*in))
+		items := make([]BatchForgetItem, 0, in.Count)
+		for count := in.Count; count > 0; count-- {
+			one := (*forgetOne)(m.data())
+			if m.len() < unsafe.Sizeof(*one) {
+				goto corrupt
+			}
+			m.off += int(unsafe.Sizeof(*one))
+			items = append(items, BatchForgetItem{
+				NodeID: NodeID(one.NodeID),
+				N:      one.Nlookup,
+			})
+		}
+		req = &BatchForgetRequest{
+			Header: m.Header(),
+			Forget: items,
+		}
+
 	}
 
 	return req, nil
@@ -1910,6 +1935,37 @@ func (r *ForgetRequest) String() string {
 
 // Respond replies to the request, indicating that the forgetfulness has been recorded.
 func (r *ForgetRequest) Respond() {
+	// Don't reply to forget messages.
+	r.noResponse()
+}
+
+type BatchForgetItem struct {
+	NodeID NodeID
+	N      uint64
+}
+
+type BatchForgetRequest struct {
+	Header `json:"-"`
+	Forget []BatchForgetItem
+}
+
+var _ = Request(&BatchForgetRequest{})
+
+func (r *BatchForgetRequest) String() string {
+	b := new(strings.Builder)
+	fmt.Fprintf(b, "BatchForget [%s]", &r.Header)
+	if len(r.Forget) == 0 {
+		b.WriteString(" empty")
+	} else {
+		for _, item := range r.Forget {
+			fmt.Fprintf(b, " %dx%d", item.NodeID, item.N)
+		}
+	}
+	return b.String()
+}
+
+// Respond replies to the request, indicating that the forgetfulness has been recorded.
+func (r *BatchForgetRequest) Respond() {
 	// Don't reply to forget messages.
 	r.noResponse()
 }
