@@ -548,7 +548,7 @@ type nodeRefcountDropBug struct {
 	Node fuse.NodeID
 }
 
-func (n *nodeRefcountDropBug) String() string {
+func (n nodeRefcountDropBug) String() string {
 	return fmt.Sprintf("bug: trying to drop %d of %d references to %v", n.N, n.Refs, n.Node)
 }
 
