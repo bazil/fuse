@@ -9,27 +9,29 @@ import (
 	"bazil.org/fuse/fs"
 )
 
-type nothing struct{}
-
 // ReleaseWaiter notes whether a FUSE Release call has been seen.
 //
 // Releases are not guaranteed to happen synchronously with any client
 // call, so they must be waited for.
 type ReleaseWaiter struct {
 	once sync.Once
-	seen chan nothing
+	seen chan *fuse.ReleaseRequest
 }
 
 var _ = fs.HandleReleaser(&ReleaseWaiter{})
 
 func (r *ReleaseWaiter) init() {
 	r.once.Do(func() {
-		r.seen = make(chan nothing, 1)
+		r.seen = make(chan *fuse.ReleaseRequest, 1)
 	})
 }
 
 func (r *ReleaseWaiter) Release(ctx context.Context, req *fuse.ReleaseRequest) error {
 	r.init()
+	tmp := *req
+	hdr := tmp.Hdr()
+	*hdr = fuse.Header{}
+	r.seen <- &tmp
 	close(r.seen)
 	return nil
 }
@@ -39,17 +41,18 @@ func (r *ReleaseWaiter) Release(ctx context.Context, req *fuse.ReleaseRequest) e
 // With zero duration, wait forever. Otherwise, timeout early
 // in a more controlled way than `-test.timeout`.
 //
-// Returns whether a Release was seen. Always true if dur==0.
-func (r *ReleaseWaiter) WaitForRelease(dur time.Duration) bool {
+// Returns a sanitized ReleaseRequest and whether a Release was seen.
+// Always true if dur==0.
+func (r *ReleaseWaiter) WaitForRelease(dur time.Duration) (*fuse.ReleaseRequest, bool) {
 	r.init()
 	var timeout <-chan time.Time
 	if dur > 0 {
 		timeout = time.After(dur)
 	}
 	select {
-	case <-r.seen:
-		return true
+	case req := <-r.seen:
+		return req, true
 	case <-timeout:
-		return false
+		return nil, false
 	}
 }

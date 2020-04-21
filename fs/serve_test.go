@@ -635,8 +635,20 @@ func TestRelease(t *testing.T) {
 	if err := control.JSON("/").Call(ctx, mnt.Dir+"/child", &nothing); err != nil {
 		t.Fatalf("calling helper: %v", err)
 	}
-	if !r.WaitForRelease(1 * time.Second) {
+	got, ok := r.WaitForRelease(1 * time.Second)
+	if !ok {
 		t.Error("Close did not Release in time")
+	}
+	// dynamic values that are too hard to control
+	if got.Handle == 0 {
+		t.Errorf("got ReleaseRequest with no Handle")
+	}
+	got.Handle = 0
+	want := &fuse.ReleaseRequest{
+		Flags: fuse.OpenReadOnly | fuse.OpenNonblock,
+	}
+	if g, e := got, want; *g != *e {
+		t.Errorf("bad release:\ngot\t%v\nwant\t%v", g, e)
 	}
 }
 
