@@ -263,3 +263,26 @@ func CongestionThreshold(n uint16) MountOption {
 		return nil
 	}
 }
+
+// LockingFlock enables flock-based (BSD) locking. This is mostly
+// useful for distributed filesystems with global locking. Without
+// this, kernel manages local locking automatically.
+func LockingFlock() MountOption {
+	return func(conf *mountConfig) error {
+		conf.initFlags |= InitFlockLocks
+		return nil
+	}
+}
+
+// LockingPOSIX enables flock-based (BSD) locking. This is mostly
+// useful for distributed filesystems with global locking. Without
+// this, kernel manages local locking automatically.
+//
+// Beware POSIX locks are a broken API with unintuitive behavior for
+// callers.
+func LockingPOSIX() MountOption {
+	return func(conf *mountConfig) error {
+		conf.initFlags |= InitPOSIXLocks
+		return nil
+	}
+}

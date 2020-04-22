@@ -20,6 +20,7 @@ import (
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fuseutil"
+	"golang.org/x/sys/unix"
 )
 
 const (
@@ -346,6 +347,60 @@ type NodePoller interface {
 	// Poll checks whether the node is currently ready for I/O, and
 	// may request a wakeup when it is. See HandlePoller.
 	Poll(ctx context.Context, req *fuse.PollRequest, resp *fuse.PollResponse) error
+}
+
+// HandleLocker contains the common operations for all kinds of file
+// locks. See also lock family specific interfaces: HandleFlockLocker,
+// HandlePOSIXLocker.
+type HandleLocker interface {
+	// Lock tries to acquire a lock on a byte range of the node. If a
+	// conflicting lock is already held, returns syscall.EAGAIN.
+	//
+	// LockRequest.LockOwner is a file-unique identifier for this
+	// lock, and will be seen in calls releasing this lock
+	// (UnlockRequest, ReleaseRequest, FlushRequest) and also
+	// in e.g. ReadRequest, WriteRequest.
+	Lock(ctx context.Context, req *fuse.LockRequest) error
+
+	// LockWait acquires a lock on a byte range of the node, waiting
+	// until the lock can be obtained (or context is canceled).
+	LockWait(ctx context.Context, req *fuse.LockWaitRequest) error
+
+	// Unlock releases the lock on a byte range of the node. Locks can
+	// be released also implicitly, see HandleFlockLocker and
+	// HandlePOSIXLocker.
+	Unlock(ctx context.Context, req *fuse.UnlockRequest) error
+
+	// QueryLock returns the current state of locks held for the byte
+	// range of the node.
+	//
+	// See QueryLockRequest for details on how to respond.
+	//
+	// To simplify implementing this method, resp.Lock is prefilled to
+	// have Lock.Type F_UNLCK, and the whole struct should be
+	// overwritten for in case of conflicting locks.
+	QueryLock(ctx context.Context, req *fuse.QueryLockRequest, resp *fuse.QueryLockResponse) error
+}
+
+// HandleFlockLocker describes locking behavior unique to flock (BSD)
+// locks. See HandleLocker.
+type HandleFlockLocker interface {
+	HandleLocker
+
+	// Flock unlocking can also happen implicitly as part of Release,
+	// in which case Unlock is not called, and Release will have
+	// ReleaseFlags bit ReleaseFlockUnlock set.
+	HandleReleaser
+}
+
+// HandlePOSIXLocker describes locking behavior unique to POSIX (fcntl
+// F_SETLK) locks. See HandleLocker.
+type HandlePOSIXLocker interface {
+	HandleLocker
+
+	// POSIX unlocking can also happen implicitly as part of Flush,
+	// in which case Unlock is not called.
+	HandleFlusher
 }
 
 type Config struct {
@@ -1525,10 +1580,76 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 		w <- r
 		return nil
 
-		/*	case *FsyncdirRequest:
-				return ENOSYS
+	case *fuse.LockRequest:
+		shandle := c.getHandle(r.Handle)
+		if shandle == nil {
+			return syscall.ESTALE
+		}
+		h, ok := shandle.handle.(HandleLocker)
+		if !ok {
+			return syscall.ENOTSUP
+		}
+		if err := h.Lock(ctx, r); err != nil {
+			return err
+		}
+		done(nil)
+		r.Respond()
+		return nil
 
-			case *GetlkRequest, *SetlkRequest, *SetlkwRequest:
+	case *fuse.LockWaitRequest:
+		shandle := c.getHandle(r.Handle)
+		if shandle == nil {
+			return syscall.ESTALE
+		}
+		h, ok := shandle.handle.(HandleLocker)
+		if !ok {
+			return syscall.ENOTSUP
+		}
+		if err := h.LockWait(ctx, r); err != nil {
+			return err
+		}
+		done(nil)
+		r.Respond()
+		return nil
+
+	case *fuse.UnlockRequest:
+		shandle := c.getHandle(r.Handle)
+		if shandle == nil {
+			return syscall.ESTALE
+		}
+		h, ok := shandle.handle.(HandleLocker)
+		if !ok {
+			return syscall.ENOTSUP
+		}
+		if err := h.Unlock(ctx, r); err != nil {
+			return err
+		}
+		done(nil)
+		r.Respond()
+		return nil
+
+	case *fuse.QueryLockRequest:
+		shandle := c.getHandle(r.Handle)
+		if shandle == nil {
+			return syscall.ESTALE
+		}
+		h, ok := shandle.handle.(HandleLocker)
+		if !ok {
+			return syscall.ENOTSUP
+		}
+		s := &fuse.QueryLockResponse{
+			Lock: fuse.FileLock{
+				Type: unix.F_UNLCK,
+			},
+		}
+		if err := h.QueryLock(ctx, r, s); err != nil {
+			return err
+		}
+		done(s)
+		r.Respond(s)
+		return nil
+
+		/*	case *FsyncdirRequest:
 				return ENOSYS
 
 			case *BmapRequest:

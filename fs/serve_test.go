@@ -4133,3 +4133,591 @@ func TestReadPollHandle(t *testing.T) {
 		t.Errorf("wrong events: %q != %q", g, e)
 	}
 }
+
+// Test flock
+
+// Go syscall & golang.org/x/sys/unix do a horrible thing where they
+// muddle the difference between fcntl and flock by naming the syscall
+// "FcntlFlock" and the result type "Flock_t". Make no mistake that is
+// fcntl and has nothing to do with flock.
+
+type lockFile struct {
+	fstestutil.File
+
+	lock    record.RequestRecorder
+	unlock  record.RequestRecorder
+	release record.ReleaseWaiter
+	flush   record.RequestRecorder
+}
+
+var _ fs.NodeOpener = (*lockFile)(nil)
+
+func (f *lockFile) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
+	h := &lockHandle{
+		f: f,
+	}
+	return h, nil
+}
+
+type lockHandle struct {
+	f *lockFile
+}
+
+var _ fs.Handle = (*lockHandle)(nil)
+
+var _ fs.HandleLocker = (*lockHandle)(nil)
+
+func (h *lockHandle) Lock(ctx context.Context, req *fuse.LockRequest) error {
+	tmp := *req
+	h.f.lock.RecordRequest(&tmp)
+	return nil
+}
+
+func (h *lockHandle) LockWait(ctx context.Context, req *fuse.LockWaitRequest) error {
+	tmp := *req
+	h.f.lock.RecordRequest(&tmp)
+	return nil
+}
+
+func (h *lockHandle) Unlock(ctx context.Context, req *fuse.UnlockRequest) error {
+	tmp := *req
+	h.f.unlock.RecordRequest(&tmp)
+	return nil
+}
+
+func (h *lockHandle) QueryLock(ctx context.Context, req *fuse.QueryLockRequest, resp *fuse.QueryLockResponse) error {
+	return nil
+}
+
+var _ fs.HandleFlockLocker = (*lockHandle)(nil)
+
+var _ fs.HandleReleaser = (*lockHandle)(nil)
+
+func (h *lockHandle) Release(ctx context.Context, req *fuse.ReleaseRequest) error {
+	return h.f.release.Release(ctx, req)
+}
+
+var _ fs.HandlePOSIXLocker = (*lockHandle)(nil)
+
+var _ fs.HandleFlusher = (*lockHandle)(nil)
+
+func (h *lockHandle) Flush(ctx context.Context, req *fuse.FlushRequest) error {
+	tmp := *req
+	h.f.flush.RecordRequest(&tmp)
+	return nil
+}
+
+type lockHelp struct {
+	lockFn   func(fd uintptr, req *lockReq) error
+	unlockFn func(fd uintptr, req *lockReq) error
+	queryFn  func(fd uintptr, lk *unix.Flock_t) error
+
+	mu   sync.Mutex
+	file *os.File
+}
+
+func (lh *lockHelp) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	switch req.URL.Path {
+	case "/lock":
+		httpjson.ServePOST(lh.doLock).ServeHTTP(w, req)
+	case "/unlock":
+		httpjson.ServePOST(lh.doUnlock).ServeHTTP(w, req)
+	case "/close":
+		httpjson.ServePOST(lh.doClose).ServeHTTP(w, req)
+	case "/query":
+		httpjson.ServePOST(lh.doQuery).ServeHTTP(w, req)
+	default:
+		http.NotFound(w, req)
+	}
+}
+
+type lockReq struct {
+	Path  string
+	Wait  bool
+	Start int64
+	Len   int64
+}
+
+func (lh *lockHelp) doLock(ctx context.Context, req *lockReq) (*struct{}, error) {
+	lh.mu.Lock()
+	defer lh.mu.Unlock()
+	f, err := os.OpenFile(req.Path, os.O_RDWR, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("open: %v", err)
+	}
+	lh.file = f
+	c, err := lh.file.SyscallConn()
+	if err != nil {
+		return nil, fmt.Errorf("syscallconn: %v", err)
+	}
+	var outerr error
+	lockFn := func(fd uintptr) {
+		outerr = lh.lockFn(fd, req)
+	}
+	if err := c.Control(lockFn); err != nil {
+		return nil, fmt.Errorf("error calling lock: %v", err)
+	}
+	if err := outerr; err != nil {
+		return nil, fmt.Errorf("lock error: %v", err)
+	}
+	return &struct{}{}, nil
+}
+
+func (lh *lockHelp) doUnlock(ctx context.Context, req *lockReq) (*struct{}, error) {
+	lh.mu.Lock()
+	defer lh.mu.Unlock()
+	if lh.file == nil {
+		return nil, errors.New("file not open")
+	}
+	c, err := lh.file.SyscallConn()
+	if err != nil {
+		return nil, fmt.Errorf("syscallconn: %v", err)
+	}
+	var outerr error
+	unlockFn := func(fd uintptr) {
+		outerr = lh.unlockFn(fd, req)
+	}
+	if err := c.Control(unlockFn); err != nil {
+		return nil, fmt.Errorf("error calling unlock: %v", err)
+	}
+	if err := outerr; err != nil {
+		return nil, fmt.Errorf("unlock error: %v", err)
+	}
+	return &struct{}{}, nil
+}
+
+func (lh *lockHelp) doClose(ctx context.Context, _ struct{}) (*struct{}, error) {
+	lh.mu.Lock()
+	defer lh.mu.Unlock()
+	if err := lh.file.Close(); err != nil {
+		return nil, fmt.Errorf("Close: %v", err)
+	}
+	return &struct{}{}, nil
+}
+
+func (lh *lockHelp) doQuery(ctx context.Context, req *lockReq) (*unix.Flock_t, error) {
+	lh.mu.Lock()
+	defer lh.mu.Unlock()
+	if lh.file == nil {
+		return nil, errors.New("file not open")
+	}
+	c, err := lh.file.SyscallConn()
+	if err != nil {
+		return nil, fmt.Errorf("syscallconn: %v", err)
+	}
+	var outerr error
+	lk := unix.Flock_t{
+		Type:   unix.F_WRLCK,
+		Whence: int16(io.SeekStart),
+		Start:  req.Start,
+		Len:    req.Len,
+	}
+	queryFn := func(fd uintptr) {
+		outerr = lh.queryFn(fd, &lk)
+	}
+	if err := c.Control(queryFn); err != nil {
+		return nil, fmt.Errorf("error calling getlk: %v", err)
+	}
+	if err := outerr; err != nil {
+		return nil, fmt.Errorf("query lock error: %v", err)
+	}
+	return &lk, nil
+}
+
+var lockFlockHelper = helpers.Register("lock-flock", &lockHelp{
+	lockFn: func(fd uintptr, req *lockReq) error {
+		flags := unix.LOCK_EX
+		if !req.Wait {
+			flags |= unix.LOCK_NB
+		}
+		return unix.Flock(int(fd), flags)
+	},
+	unlockFn: func(fd uintptr, req *lockReq) error {
+		return unix.Flock(int(fd), unix.LOCK_UN)
+	},
+	queryFn: func(fd uintptr, lk *unix.Flock_t) error {
+		return errors.New("no query in flock api")
+	},
+})
+
+var lockPOSIXHelper = helpers.Register("lock-posix", &lockHelp{
+	lockFn: func(fd uintptr, req *lockReq) error {
+		lk := unix.Flock_t{
+			Type:   unix.F_WRLCK,
+			Whence: int16(io.SeekStart),
+			Start:  req.Start,
+			Len:    req.Len,
+		}
+		cmd := unix.F_SETLK
+		if req.Wait {
+			cmd = unix.F_SETLKW
+		}
+		//		return unix.FcntlFlock(fd, cmd, &lk)
+		err := unix.FcntlFlock(fd, cmd, &lk)
+		log.Printf("WTF L %d %v %#v: %v", fd, cmd, lk, err)
+		return err
+	},
+	unlockFn: func(fd uintptr, req *lockReq) error {
+		lk := unix.Flock_t{
+			Type:   unix.F_UNLCK,
+			Whence: int16(io.SeekStart),
+			Start:  req.Start,
+			Len:    req.Len,
+		}
+		cmd := unix.F_SETLK
+		//		return unix.FcntlFlock(fd, cmd, &lk)
+		err := unix.FcntlFlock(fd, cmd, &lk)
+		log.Printf("WTF U %d %v %#v: %v", fd, cmd, lk, err)
+		return err
+	},
+	queryFn: func(fd uintptr, lk *unix.Flock_t) error {
+		cmd := unix.F_GETLK
+		return unix.FcntlFlock(fd, cmd, lk)
+	},
+})
+
+// ugly kludge to have platform-specific subtests. filled in
+// elsewhere, when on linux.
+var lockOFDHelper *spawntest.Helper
+
+type lockTest struct {
+	*testing.T
+	ctx     context.Context
+	kind    string
+	child   *lockFile
+	mnt     *fstestutil.Mount
+	control *spawntest.Control
+}
+
+func (t *lockTest) recordedLockRequest() (_ *fuse.LockRequest, waited bool) {
+	switch req := t.child.lock.Recorded().(type) {
+	case *fuse.LockRequest:
+		return req, false
+	case *fuse.LockWaitRequest:
+		return (*fuse.LockRequest)(req), true
+	default:
+		t.Fatalf("bad lock request: %#v", req)
+	}
+	panic("not reached")
+}
+
+func (t *lockTest) callLock(req *lockReq) {
+	t.Logf("calling lock")
+	if req.Path == "" {
+		req.Path = "child"
+	}
+	req.Path = filepath.Join(t.mnt.Dir, req.Path)
+	var nothing struct{}
+	if err := t.control.JSON("/lock").Call(t.ctx, req, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
+	}
+	want := &fuse.LockRequest{
+		LockFlags: 0,
+		Lock: fuse.FileLock{
+			Start: uint64(req.Start),
+			End:   uint64(req.Start) + uint64(req.Len) - 1,
+			Type:  fuse.LockWrite,
+			PID:   0,
+		},
+	}
+	if t.kind == "flock" {
+		want.LockFlags |= fuse.LockFlock
+		want.Lock.Start = 0
+		want.Lock.End = 0x7fff_ffff_ffff_ffff
+	}
+	got, waited := t.recordedLockRequest()
+	if g, e := waited, req.Wait; g != e {
+		t.Errorf("lock non-blocking field is bad: %v != %v", g, e)
+	}
+	// dynamic values that are too hard to control
+	if got.Handle == 0 {
+		t.Errorf("got LockRequest with no Handle")
+	}
+	want.Handle = got.Handle
+	if got.LockOwner == 0 {
+		t.Errorf("got LockRequest with no LockOwner")
+	}
+	want.LockOwner = got.LockOwner
+	if got.Lock.PID == 0 {
+		t.Errorf("got LockRequest with no PID")
+	}
+	want.Lock.PID = got.Lock.PID
+	if g, e := got, want; *g != *e {
+		t.Errorf("lock bad request\ngot\t%v\nwant\t%v", g, e)
+	}
+}
+
+func (t *lockTest) callUnlock(req *lockReq) {
+	t.Logf("calling unlock")
+	var nothing struct{}
+	if err := t.control.JSON("/unlock").Call(t.ctx, req, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
+	}
+	lockReq, _ := t.recordedLockRequest()
+	t.Logf("previous lock request: %v", lockReq)
+	want := &fuse.UnlockRequest{
+		LockOwner: lockReq.LockOwner,
+		LockFlags: 0,
+		Lock: fuse.FileLock{
+			Start: uint64(req.Start),
+			End:   uint64(req.Start) + uint64(req.Len) - 1,
+			Type:  fuse.LockUnlock,
+			PID:   0,
+		},
+	}
+	if t.kind == "flock" {
+		want.LockFlags |= fuse.LockFlock
+		want.Lock.Start = 0
+		want.Lock.End = 0x7fff_ffff_ffff_ffff
+	}
+	got := t.child.unlock.Recorded().(*fuse.UnlockRequest)
+	// dynamic values that are too hard to control
+	if got.Handle == 0 {
+		t.Errorf("got UnlockRequest with no Handle")
+	}
+	want.Handle = got.Handle
+	if g, e := got, want; *g != *e {
+		t.Errorf("unlock bad request\ngot\t%v\nwant\t%v", g, e)
+	}
+}
+
+func (t *lockTest) callCloseToUnlock() {
+	t.Logf("calling close with automatic unlock")
+	var nothing struct{}
+	if err := t.control.JSON("/close").Call(t.ctx, struct{}{}, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
+	}
+
+	if t.kind == "posix" {
+		lockReq, _ := t.recordedLockRequest()
+		want := &fuse.FlushRequest{
+			LockOwner: lockReq.LockOwner,
+		}
+		got := t.child.flush.Recorded().(*fuse.FlushRequest)
+		// dynamic values that are too hard to control
+		if got.Handle == 0 {
+			t.Errorf("got FlushRequest with no Handle")
+		}
+		want.Handle = got.Handle
+		if g, e := got, want; *g != *e {
+			t.Errorf("close to unlock bad flush request\ngot\t%v\nwant\t%v", g, e)
+		}
+	}
+
+	if t.kind == "flock" || t.kind == "ofd" {
+		lockReq, _ := t.recordedLockRequest()
+		want := &fuse.ReleaseRequest{
+			Flags:     fuse.OpenReadWrite | fuse.OpenNonblock,
+			LockOwner: lockReq.LockOwner,
+		}
+		if t.kind == "ofd" {
+			// TODO linux kernel ofd FUSE support is very partial;
+			// disable parts that don't work
+			want.LockOwner = 0
+		}
+		if t.kind == "flock" {
+			want.ReleaseFlags |= fuse.ReleaseFlockUnlock
+		}
+		got, ok := t.child.release.WaitForRelease(1 * time.Second)
+		if !ok {
+			t.Fatalf("Close did not Release in time")
+		}
+		// dynamic values that are too hard to control
+		if got.Handle == 0 {
+			t.Errorf("got ReleaseRequest with no Handle")
+		}
+		want.Handle = got.Handle
+		if g, e := got, want; *g != *e {
+			t.Errorf("bad release:\ngot\t%v\nwant\t%v", g, e)
+		}
+	}
+}
+
+func (t *lockTest) callQueryLock(req *lockReq) *unix.Flock_t {
+	t.Logf("calling queryLock")
+	var resp unix.Flock_t
+	if err := t.control.JSON("/query").Call(t.ctx, req, &resp); err != nil {
+		t.Fatalf("calling helper: %v", err)
+	}
+	return &resp
+}
+
+type lockFamily struct {
+	name         string
+	mountOptions []fuse.MountOption
+	helper       *spawntest.Helper
+}
+
+func (family lockFamily) run(t *testing.T, name string, fn func(t *lockTest)) {
+	t.Helper()
+	t.Run(name, func(t *testing.T) {
+		maybeParallel(t)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		child := &lockFile{}
+		mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": child}}, nil, family.mountOptions...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer mnt.Close()
+		control := family.helper.Spawn(ctx, t)
+		defer control.Close()
+		lt := &lockTest{
+			T:       t,
+			ctx:     ctx,
+			kind:    family.name,
+			child:   child,
+			mnt:     mnt,
+			control: control,
+		}
+		fn(lt)
+	})
+}
+
+func TestLocking(t *testing.T) {
+	if runtime.GOOS == "freebsd" {
+		// Non-exhaustive list of issues encountered, too many to add
+		// workarounds or kludge tests:
+		//
+		//     - flock is not implemented
+		//     - F_SETLKW comes through as non-blocking
+		//     - fcntl F_UNLCK calls give EINVAL for some reason
+		//     - LockRequest.LockOwner == 0
+		//     - LockRequest.Lock.PID == 0, while Linux fills it
+		t.Skip("FreeBSD locking support does not work")
+	}
+
+	t.Run("Flock", func(t *testing.T) {
+		run := lockFamily{
+			name:         "flock",
+			mountOptions: []fuse.MountOption{fuse.LockingFlock()},
+			helper:       lockFlockHelper,
+		}.run
+		run(t, "Nonblock", func(t *lockTest) {
+			t.callLock(&lockReq{})
+			t.callUnlock(&lockReq{})
+		})
+		run(t, "Wait", func(t *lockTest) {
+			t.callLock(&lockReq{
+				Wait: true,
+			})
+			t.callUnlock(&lockReq{})
+		})
+		run(t, "CloseUnlocks", func(t *lockTest) {
+			t.callLock(&lockReq{})
+			t.callCloseToUnlock()
+		})
+	})
+
+	t.Run("POSIX", func(t *testing.T) {
+		run := lockFamily{
+			name:         "posix",
+			mountOptions: []fuse.MountOption{fuse.LockingPOSIX()},
+			helper:       lockPOSIXHelper,
+		}.run
+		run(t, "Nonblock", func(t *lockTest) {
+			lr := &lockReq{
+				Start: 42,
+				Len:   13,
+			}
+			t.callLock(lr)
+			t.callUnlock(lr)
+		})
+		run(t, "Wait", func(t *lockTest) {
+			lr := &lockReq{
+				Wait:  true,
+				Start: 42,
+				Len:   13,
+			}
+			t.callLock(lr)
+			t.callUnlock(lr)
+		})
+		run(t, "CloseUnlocks", func(t *lockTest) {
+			t.callLock(&lockReq{
+				Wait:  true,
+				Start: 42,
+				Len:   13,
+			})
+			t.callCloseToUnlock()
+		})
+		run(t, "QueryLock", func(t *lockTest) {
+			t.callLock(&lockReq{
+				Wait:  true,
+				Start: 42,
+				Len:   13,
+			})
+			got := t.callQueryLock(&lockReq{
+				Start: 40,
+				Len:   10,
+			})
+			want := &unix.Flock_t{
+				Type:   unix.F_UNLCK,
+				Whence: io.SeekStart,
+				Start:  40,
+				Len:    10,
+				Pid:    0,
+			}
+			if g, e := got, want; *g != *e {
+				t.Errorf("bad query lock\ngot\t%#v\nwant\t%#v", g, e)
+			}
+		})
+	})
+
+	t.Run("OpenFileDescription", func(t *testing.T) {
+		if runtime.GOOS != "linux" {
+			t.Skip("Open File Descriptor locks are Linux-only")
+		}
+		run := lockFamily{
+			name:         "ofd",
+			mountOptions: []fuse.MountOption{fuse.LockingPOSIX()},
+			helper:       lockOFDHelper,
+		}.run
+		run(t, "Nonblock", func(t *lockTest) {
+			lr := &lockReq{
+				Start: 42,
+				Len:   13,
+			}
+			t.callLock(lr)
+			t.callUnlock(lr)
+		})
+		run(t, "Wait", func(t *lockTest) {
+			lr := &lockReq{
+				Wait:  true,
+				Start: 42,
+				Len:   13,
+			}
+			t.callLock(lr)
+			t.callUnlock(lr)
+		})
+		run(t, "CloseUnlocks", func(t *lockTest) {
+			t.callLock(&lockReq{
+				Wait:  true,
+				Start: 42,
+				Len:   13,
+			})
+			t.callCloseToUnlock()
+		})
+		run(t, "QueryLock", func(t *lockTest) {
+			t.callLock(&lockReq{
+				Wait:  true,
+				Start: 42,
+				Len:   13,
+			})
+			got := t.callQueryLock(&lockReq{
+				Start: 40,
+				Len:   10,
+			})
+			want := &unix.Flock_t{
+				Type:   unix.F_UNLCK,
+				Whence: io.SeekStart,
+				Start:  40,
+				Len:    10,
+				Pid:    0,
+			}
+			if g, e := got, want; *g != *e {
+				t.Errorf("bad query lock\ngot\t%#v\nwant\t%#v", g, e)
+			}
+		})
+	})
+
+}
