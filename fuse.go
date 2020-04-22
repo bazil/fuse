@@ -814,7 +814,7 @@ func (c *Conn) ReadRequest() (Request, error) {
 		}
 		if c.proto.GE(Protocol{7, 9}) {
 			r.Flags = ReadFlags(in.ReadFlags)
-			r.LockOwner = in.LockOwner
+			r.LockOwner = LockOwner(in.LockOwner)
 			r.FileFlags = openFlags(in.Flags)
 		}
 		req = r
@@ -831,7 +831,7 @@ func (c *Conn) ReadRequest() (Request, error) {
 			Flags:  WriteFlags(in.WriteFlags),
 		}
 		if c.proto.GE(Protocol{7, 9}) {
-			r.LockOwner = in.LockOwner
+			r.LockOwner = LockOwner(in.LockOwner)
 			r.FileFlags = openFlags(in.Flags)
 		}
 		buf := m.bytes()[writeInSize(c.proto):]
@@ -857,7 +857,7 @@ func (c *Conn) ReadRequest() (Request, error) {
 			Handle:       HandleID(in.Fh),
 			Flags:        openFlags(in.Flags),
 			ReleaseFlags: ReleaseFlags(in.ReleaseFlags),
-			LockOwner:    in.LockOwner,
+			LockOwner:    LockOwner(in.LockOwner),
 		}
 
 	case opFsync, opFsyncdir:
@@ -940,7 +940,7 @@ func (c *Conn) ReadRequest() (Request, error) {
 		req = &FlushRequest{
 			Header:    m.Header(),
 			Handle:    HandleID(in.Fh),
-			LockOwner: in.LockOwner,
+			LockOwner: LockOwner(in.LockOwner),
 		}
 
 	case opInit:
@@ -1287,6 +1287,17 @@ func (c *Conn) NotifyPollWakeup(wakeup PollWakeup) error {
 	out := (*notifyPollWakeupOut)(buf.alloc(unsafe.Sizeof(notifyPollWakeupOut{})))
 	out.Kh = wakeup.kh
 	return c.sendNotify(buf)
+}
+
+// LockOwner is a file-local opaque identifier assigned by the kernel
+// to identify the owner of a particular lock.
+type LockOwner uint64
+
+func (o LockOwner) String() string {
+	if o == 0 {
+		return "0"
+	}
+	return fmt.Sprintf("%016x", uint64(o))
 }
 
 // An initRequest is the first request sent on a FUSE file system.
@@ -1856,14 +1867,14 @@ type ReadRequest struct {
 	Offset    int64
 	Size      int
 	Flags     ReadFlags
-	LockOwner uint64
+	LockOwner LockOwner
 	FileFlags OpenFlags
 }
 
 var _ = Request(&ReadRequest{})
 
 func (r *ReadRequest) String() string {
-	return fmt.Sprintf("Read [%s] %v %d @%#x dir=%v fl=%v lock=%d ffl=%v", &r.Header, r.Handle, r.Size, r.Offset, r.Dir, r.Flags, r.LockOwner, r.FileFlags)
+	return fmt.Sprintf("Read [%s] %v %d @%#x dir=%v fl=%v owner=%v ffl=%v", &r.Header, r.Handle, r.Size, r.Offset, r.Dir, r.Flags, r.LockOwner, r.FileFlags)
 }
 
 // Respond replies to the request with the given response.
@@ -1900,13 +1911,13 @@ type ReleaseRequest struct {
 	Handle       HandleID
 	Flags        OpenFlags // flags from OpenRequest
 	ReleaseFlags ReleaseFlags
-	LockOwner    uint64
+	LockOwner    LockOwner
 }
 
 var _ = Request(&ReleaseRequest{})
 
 func (r *ReleaseRequest) String() string {
-	return fmt.Sprintf("Release [%s] %v fl=%v rfl=%v owner=%#x", &r.Header, r.Handle, r.Flags, r.ReleaseFlags, r.LockOwner)
+	return fmt.Sprintf("Release [%s] %v fl=%v rfl=%v owner=%v", &r.Header, r.Handle, r.Flags, r.ReleaseFlags, r.LockOwner)
 }
 
 // Respond replies to the request, indicating that the handle has been released.
@@ -2072,14 +2083,14 @@ type WriteRequest struct {
 	Offset    int64
 	Data      []byte
 	Flags     WriteFlags
-	LockOwner uint64
+	LockOwner LockOwner
 	FileFlags OpenFlags
 }
 
 var _ = Request(&WriteRequest{})
 
 func (r *WriteRequest) String() string {
-	return fmt.Sprintf("Write [%s] %v %d @%d fl=%v lock=%d ffl=%v", &r.Header, r.Handle, len(r.Data), r.Offset, r.Flags, r.LockOwner, r.FileFlags)
+	return fmt.Sprintf("Write [%s] %v %d @%d fl=%v owner=%v ffl=%v", &r.Header, r.Handle, len(r.Data), r.Offset, r.Flags, r.LockOwner, r.FileFlags)
 }
 
 type jsonWriteRequest struct {
@@ -2213,13 +2224,13 @@ type FlushRequest struct {
 	Handle HandleID
 	// Deprecated: Unused since 2006.
 	Flags     uint32
-	LockOwner uint64
+	LockOwner LockOwner
 }
 
 var _ = Request(&FlushRequest{})
 
 func (r *FlushRequest) String() string {
-	return fmt.Sprintf("Flush [%s] %v fl=%#x lk=%#x", &r.Header, r.Handle, r.Flags, r.LockOwner)
+	return fmt.Sprintf("Flush [%s] %v fl=%#x owner=%v", &r.Header, r.Handle, r.Flags, r.LockOwner)
 }
 
 // Respond replies to the request, indicating that the flush succeeded.
