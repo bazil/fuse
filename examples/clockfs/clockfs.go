@@ -35,10 +35,6 @@ func run(mountpoint string) error {
 	}
 	defer c.Close()
 
-	if p := c.Protocol(); !p.HasInvalidate() {
-		return fmt.Errorf("kernel FUSE support is too old to have invalidations: version %v", p)
-	}
-
 	srv := fs.New(c, nil)
 	filesys := &FS{
 		// We pre-create the clock node so that it's always the same

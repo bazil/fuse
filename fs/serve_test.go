@@ -364,10 +364,8 @@ func TestStatRoot(t *testing.T) {
 	if got.GID != 0 {
 		t.Errorf("root has wrong gid: %d", got.GID)
 	}
-	if mnt.Conn.Protocol().HasAttrBlockSize() {
-		if g, e := got.Blksize, int64(65536); g != e {
-			t.Errorf("root has wrong blocksize: %d != %d", g, e)
-		}
+	if g, e := got.Blksize, int64(65536); g != e {
+		t.Errorf("root has wrong blocksize: %d != %d", g, e)
 	}
 }
 
@@ -510,10 +508,6 @@ func TestReadFileFlags(t *testing.T) {
 	}
 	defer mnt.Close()
 
-	if !mnt.Conn.Protocol().HasReadWriteFlags() {
-		t.Skip("Old FUSE protocol")
-	}
-
 	control := readFileFlagsHelper.Spawn(ctx, t)
 	defer control.Close()
 	var nothing struct{}
@@ -576,10 +570,6 @@ func TestWriteFileFlags(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
-
-	if !mnt.Conn.Protocol().HasReadWriteFlags() {
-		t.Skip("Old FUSE protocol")
-	}
 
 	control := writeFileFlagsHelper.Spawn(ctx, t)
 	defer control.Close()
@@ -904,9 +894,10 @@ func TestMkdir(t *testing.T) {
 		t.Fatalf("calling helper: %v", err)
 	}
 
-	want := fuse.MkdirRequest{Name: "foo", Mode: os.ModeDir | 0751}
-	if mnt.Conn.Protocol().HasUmask() {
-		want.Umask = 0022
+	want := fuse.MkdirRequest{
+		Name:  "foo",
+		Mode:  os.ModeDir | 0751,
+		Umask: 0022,
 	}
 	if g, e := f.RecordedMkdir(), want; g != e {
 		t.Errorf("mkdir saw %+v, want %+v", g, e)
@@ -971,9 +962,7 @@ func TestCreate(t *testing.T) {
 		Name:  "foo",
 		Flags: fuse.OpenReadWrite | fuse.OpenCreate | fuse.OpenTruncate,
 		Mode:  0640,
-	}
-	if mnt.Conn.Protocol().HasUmask() {
-		want.Umask = 0022
+		Umask: 0022,
 	}
 	if runtime.GOOS == "freebsd" {
 		// FreeBSD doesn't pass truncate to FUSE?; as this is a
@@ -1362,18 +1351,16 @@ func TestMknod(t *testing.T) {
 	}
 
 	want := fuse.MknodRequest{
-		Name: "node",
-		Mode: os.FileMode(os.ModeNamedPipe | 0640),
-		Rdev: uint32(123),
+		Name:  "node",
+		Mode:  os.FileMode(os.ModeNamedPipe | 0640),
+		Rdev:  uint32(123),
+		Umask: 0022,
 	}
 	if runtime.GOOS == "linux" {
 		// Linux fuse doesn't echo back the rdev if the node
 		// isn't a device (we're using a FIFO here, as that
 		// bit is portable.)
 		want.Rdev = 0
-	}
-	if mnt.Conn.Protocol().HasUmask() {
-		want.Umask = 0022
 	}
 	if g, e := f.RecordedMknod(), want; g != e {
 		t.Fatalf("mknod saw %+v, want %+v", g, e)
@@ -2254,9 +2241,6 @@ func TestOpenNonSeekable(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
-	if !mnt.Conn.Protocol().HasOpenNonSeekable() {
-		t.Skip("Old FUSE protocol")
-	}
 	control := openNonseekableHelper.Spawn(ctx, t)
 	defer control.Close()
 
@@ -3226,9 +3210,6 @@ func TestInvalidateNodeAttr(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
-	if !mnt.Conn.Protocol().HasInvalidate() {
-		t.Skip("Old FUSE protocol")
-	}
 	control := statHelper.Spawn(ctx, t)
 	defer control.Close()
 
@@ -3357,9 +3338,6 @@ func TestInvalidateNodeDataInvalidatesAttr(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
-	if !mnt.Conn.Protocol().HasInvalidate() {
-		t.Skip("Old FUSE protocol")
-	}
 	control := fstatHelper.Spawn(ctx, t)
 	defer control.Close()
 
@@ -3462,9 +3440,6 @@ func TestInvalidateNodeDataInvalidatesData(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
-	if !mnt.Conn.Protocol().HasInvalidate() {
-		t.Skip("Old FUSE protocol")
-	}
 	control := manyReadsHelper.Spawn(ctx, t)
 	defer control.Close()
 
@@ -3570,9 +3545,6 @@ func TestInvalidateNodeDataRangeMiss(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
-	if !mnt.Conn.Protocol().HasInvalidate() {
-		t.Skip("Old FUSE protocol")
-	}
 	control := manyReadsHelper.Spawn(ctx, t)
 	defer control.Close()
 
@@ -3631,9 +3603,6 @@ func TestInvalidateNodeDataRangeHit(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
-	if !mnt.Conn.Protocol().HasInvalidate() {
-		t.Skip("Old FUSE protocol")
-	}
 	control := manyReadsHelper.Spawn(ctx, t)
 	defer control.Close()
 
@@ -3715,9 +3684,6 @@ func TestInvalidateEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer mnt.Close()
-	if !mnt.Conn.Protocol().HasInvalidate() {
-		t.Skip("Old FUSE protocol")
-	}
 	control := statHelper.Spawn(ctx, t)
 	defer control.Close()
 
