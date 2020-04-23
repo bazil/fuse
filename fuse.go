@@ -1463,7 +1463,7 @@ func (a Attr) String() string {
 	return fmt.Sprintf("valid=%v ino=%v size=%d mode=%v", a.Valid, a.Inode, a.Size, a.Mode)
 }
 
-func unix(t time.Time) (sec uint64, nsec uint32) {
+func unixTime(t time.Time) (sec uint64, nsec uint32) {
 	nano := t.UnixNano()
 	sec = uint64(nano / 1e9)
 	nsec = uint32(nano % 1e9)
@@ -1474,9 +1474,9 @@ func (a *Attr) attr(out *attr, proto Protocol) {
 	out.Ino = a.Inode
 	out.Size = a.Size
 	out.Blocks = a.Blocks
-	out.Atime, out.AtimeNsec = unix(a.Atime)
-	out.Mtime, out.MtimeNsec = unix(a.Mtime)
-	out.Ctime, out.CtimeNsec = unix(a.Ctime)
+	out.Atime, out.AtimeNsec = unixTime(a.Atime)
+	out.Mtime, out.MtimeNsec = unixTime(a.Mtime)
+	out.Ctime, out.CtimeNsec = unixTime(a.Ctime)
 	out.Mode = uint32(a.Mode) & 0777
 	switch {
 	default:
