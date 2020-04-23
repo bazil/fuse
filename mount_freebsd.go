@@ -56,7 +56,7 @@ func mount(dir string, conf *mountConfig) (*os.File, error) {
 		}
 	}
 
-	f, err := os.OpenFile("/dev/fuse", os.O_RDWR, 0000)
+	f, err := os.OpenFile("/dev/fuse", os.O_RDWR, 0o000)
 	if err != nil {
 		return nil, err
 	}

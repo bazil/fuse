@@ -41,7 +41,7 @@ var _ = fs.HandleReadDirAller(benchDir{})
 
 func (benchDir) Attr(ctx context.Context, a *fuse.Attr) error {
 	a.Inode = 1
-	a.Mode = os.ModeDir | 0555
+	a.Mode = os.ModeDir | 0o555
 	return nil
 }
 
@@ -72,7 +72,7 @@ var _ = fs.HandleWriter(benchFile{})
 
 func (benchFile) Attr(ctx context.Context, a *fuse.Attr) error {
 	a.Inode = 2
-	a.Mode = 0644
+	a.Mode = 0o644
 	a.Size = 9999999999999999
 	return nil
 }

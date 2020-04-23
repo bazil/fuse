@@ -172,7 +172,7 @@ func TestMountOptionAllowOther(t *testing.T) {
 type unwritableFile struct{}
 
 func (f unwritableFile) Attr(ctx context.Context, a *fuse.Attr) error {
-	a.Mode = 0000
+	a.Mode = 0o000
 	return nil
 }
 

@@ -495,7 +495,7 @@ func (m *message) Header() Header {
 
 // fileMode returns a Go os.FileMode from a Unix mode.
 func fileMode(unixMode uint32) os.FileMode {
-	mode := os.FileMode(unixMode & 0777)
+	mode := os.FileMode(unixMode & 0o777)
 	switch unixMode & syscall.S_IFMT {
 	case syscall.S_IFREG:
 		// nothing
@@ -1527,7 +1527,7 @@ func (a *Attr) attr(out *attr, proto Protocol) {
 	out.Atime, out.AtimeNsec = unixTime(a.Atime)
 	out.Mtime, out.MtimeNsec = unixTime(a.Mtime)
 	out.Ctime, out.CtimeNsec = unixTime(a.Ctime)
-	out.Mode = uint32(a.Mode) & 0777
+	out.Mode = uint32(a.Mode) & 0o777
 	switch {
 	default:
 		out.Mode |= syscall.S_IFREG

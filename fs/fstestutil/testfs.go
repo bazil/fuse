@@ -24,7 +24,7 @@ func (f SimpleFS) Root() (fs.Node, error) {
 type File struct{}
 
 func (f File) Attr(ctx context.Context, a *fuse.Attr) error {
-	a.Mode = 0666
+	a.Mode = 0o666
 	return nil
 }
 
@@ -32,7 +32,7 @@ func (f File) Attr(ctx context.Context, a *fuse.Attr) error {
 type Dir struct{}
 
 func (f Dir) Attr(ctx context.Context, a *fuse.Attr) error {
-	a.Mode = os.ModeDir | 0777
+	a.Mode = os.ModeDir | 0o777
 	return nil
 }
 
@@ -43,7 +43,7 @@ var _ = fs.Node(&ChildMap{})
 var _ = fs.NodeStringLookuper(&ChildMap{})
 
 func (f *ChildMap) Attr(ctx context.Context, a *fuse.Attr) error {
-	a.Mode = os.ModeDir | 0777
+	a.Mode = os.ModeDir | 0o777
 	return nil
 }
 
