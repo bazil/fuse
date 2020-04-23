@@ -1,0 +1,1 @@
+268 48 0:139 / /xyz\123zy rw,nosuid,nodev,relatime shared:94 - foo\001bar /dev/fuse rw,user_id=1000,group_id=1000

@@ -1,0 +1,5 @@
+/mountinfo-fuzz.zip
+/testdata/fuzz/crashers/
+/testdata/fuzz/suppressions/
+/testdata/fuzz/corpus/*
+!/testdata/fuzz/corpus/*.mountinfo
