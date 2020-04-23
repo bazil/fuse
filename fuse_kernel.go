@@ -279,7 +279,7 @@ type InitFlags uint32
 
 const (
 	InitAsyncRead     InitFlags = 1 << 0
-	InitPosixLocks    InitFlags = 1 << 1
+	InitPOSIXLocks    InitFlags = 1 << 1
 	InitFileOps       InitFlags = 1 << 2
 	InitAtomicTrunc   InitFlags = 1 << 3
 	InitExportSupport InitFlags = 1 << 4
@@ -313,7 +313,7 @@ type flagName struct {
 
 var initFlagNames = []flagName{
 	{uint32(InitAsyncRead), "InitAsyncRead"},
-	{uint32(InitPosixLocks), "InitPosixLocks"},
+	{uint32(InitPOSIXLocks), "InitPOSIXLocks"},
 	{uint32(InitFileOps), "InitFileOps"},
 	{uint32(InitAtomicTrunc), "InitAtomicTrunc"},
 	{uint32(InitExportSupport), "InitExportSupport"},
