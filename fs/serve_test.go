@@ -637,6 +637,12 @@ func TestRelease(t *testing.T) {
 	want := &fuse.ReleaseRequest{
 		Flags: fuse.OpenReadOnly | fuse.OpenNonblock,
 	}
+	if runtime.GOOS == "freebsd" {
+		// Go on FreeBSD isn't using the netpoller for os.File?
+		want.Flags &^= fuse.OpenNonblock
+		// no locking used but FreeBSD sets LockOwner?
+		got.LockOwner = 0
+	}
 	if g, e := got, want; *g != *e {
 		t.Errorf("bad release:\ngot\t%v\nwant\t%v", g, e)
 	}
