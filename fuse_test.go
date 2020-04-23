@@ -25,11 +25,11 @@ func getFeatures(t *testing.T, opts ...fuse.MountOption) fuse.InitFlags {
 		t.Fatalf("error mounting: %v", err)
 	}
 	defer func() {
-		if err := fuse.Unmount(tmp); err != nil {
-			t.Errorf("error unmounting: %v", err)
-		}
 		if err := conn.Close(); err != nil {
 			t.Errorf("error closing FUSE connection: %v", err)
+		}
+		if err := fuse.Unmount(tmp); err != nil {
+			t.Errorf("error unmounting: %v", err)
 		}
 	}()
 
@@ -37,12 +37,13 @@ func getFeatures(t *testing.T, opts ...fuse.MountOption) fuse.InitFlags {
 }
 
 func TestFeatures(t *testing.T) {
-	if runtime.GOOS == "freebsd" {
-		t.Skip("FreeBSD has a weird delay if we Mount without starting to serve, but gives no errors either")
-	}
-
 	run := func(name string, want, notwant fuse.InitFlags, opts ...fuse.MountOption) {
 		t.Run(name, func(t *testing.T) {
+			if runtime.GOOS == "freebsd" {
+				if want&fuse.InitFlockLocks != 0 {
+					t.Skip("FreeBSD FUSE does not implement Flock locks")
+				}
+			}
 			got := getFeatures(t, opts...)
 			t.Logf("features: %v", got)
 			missing := want &^ got
