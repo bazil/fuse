@@ -188,6 +188,14 @@ func WritebackCache() MountOption {
 	}
 }
 
+// PosixACL enables filesystem posix acls support in the kernel.
+func PosixACL() MountOption {
+	return func(conf *mountConfig) error {
+		conf.initFlags |= InitPosixACL
+		return nil
+	}
+}
+
 // Deprecated: Not used, OS X remnant.
 type OSXFUSEPaths struct {
 	// Prefix for the device file. At mount time, an incrementing
