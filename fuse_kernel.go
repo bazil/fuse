@@ -280,18 +280,27 @@ const (
 	InitExportSupport InitFlags = 1 << 4
 	InitBigWrites     InitFlags = 1 << 5
 	// Do not mask file access modes with umask.
-	InitDontMask        InitFlags = 1 << 6
-	InitSpliceWrite     InitFlags = 1 << 7
-	InitSpliceMove      InitFlags = 1 << 8
-	InitSpliceRead      InitFlags = 1 << 9
-	InitFlockLocks      InitFlags = 1 << 10
-	InitHasIoctlDir     InitFlags = 1 << 11
-	InitAutoInvalData   InitFlags = 1 << 12
-	InitDoReaddirplus   InitFlags = 1 << 13
-	InitReaddirplusAuto InitFlags = 1 << 14
-	InitAsyncDIO        InitFlags = 1 << 15
-	InitWritebackCache  InitFlags = 1 << 16
-	InitNoOpenSupport   InitFlags = 1 << 17
+	InitDontMask          InitFlags = 1 << 6
+	InitSpliceWrite       InitFlags = 1 << 7
+	InitSpliceMove        InitFlags = 1 << 8
+	InitSpliceRead        InitFlags = 1 << 9
+	InitFlockLocks        InitFlags = 1 << 10
+	InitHasIoctlDir       InitFlags = 1 << 11
+	InitAutoInvalData     InitFlags = 1 << 12
+	InitDoReaddirplus     InitFlags = 1 << 13
+	InitReaddirplusAuto   InitFlags = 1 << 14
+	InitAsyncDIO          InitFlags = 1 << 15
+	InitWritebackCache    InitFlags = 1 << 16
+	InitNoOpenSupport     InitFlags = 1 << 17
+	InitParallelDirops    InitFlags = 1 << 18
+	InitHandleKillpriv    InitFlags = 1 << 19
+	InitPosixACL          InitFlags = 1 << 20
+	InitAbortError        InitFlags = 1 << 21
+	InitMaxPages          InitFlags = 1 << 22
+	InitCacheSymlinks     InitFlags = 1 << 23
+	InitNoOpendirSupport  InitFlags = 1 << 24
+	InitExplicitInvalData InitFlags = 1 << 25
+	InitMapAlignment      InitFlags = 1 << 26
 
 	// Deprecated: Not used, OS X remnant.
 	InitCaseSensitive InitFlags = 1 << 29
@@ -325,6 +334,15 @@ var initFlagNames = []flagName{
 	{uint32(InitAsyncDIO), "InitAsyncDIO"},
 	{uint32(InitWritebackCache), "InitWritebackCache"},
 	{uint32(InitNoOpenSupport), "InitNoOpenSupport"},
+	{uint32(InitParallelDirops), "InitParallelDirops"},
+	{uint32(InitHandleKillpriv), "InitHandleKillpriv"},
+	{uint32(InitPosixACL), "InitPosixACL"},
+	{uint32(InitAbortError), "InitAbortError"},
+	{uint32(InitMaxPages), "InitMaxPages"},
+	{uint32(InitCacheSymlinks), "InitCacheSymlinks"},
+	{uint32(InitNoOpendirSupport), "InitNoOpendirSupport"},
+	{uint32(InitExplicitInvalData), "InitExplicitInvalData"},
+	{uint32(InitMapAlignment), "InitMapAlignment"},
 }
 
 func (fl InitFlags) String() string {
