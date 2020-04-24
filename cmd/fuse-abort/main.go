@@ -131,7 +131,13 @@ func run(prune bool, mountpoints []string) error {
 	if err != nil {
 		return err
 	}
-	for _, p := range mountpoints {
+	for _, mountpoint := range mountpoints {
+		p, err := filepath.Abs(mountpoint)
+		if err != nil {
+			log.Printf("cannot make path absolute: %s: %v", mountpoint, err)
+			success = false
+			continue
+		}
 		id, ok := mounts[p]
 		if !ok {
 			log.Printf("mountpoint not found: %v", p)
