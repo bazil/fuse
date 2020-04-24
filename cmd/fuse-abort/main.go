@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/cmd/fuse-abort/internal/mountinfo"
@@ -97,9 +98,32 @@ func abort(id string) error {
 	return nil
 }
 
+func pruneEmptyDir(p string) error {
+	// we want an rmdir and not a generic delete like
+	// os.Remove; the node underlying the mountpoint might not
+	// be a directory, and we really want to only prune
+	// directories
+	if err := syscall.Rmdir(p); err != nil {
+		switch err {
+		case syscall.ENOTEMPTY, syscall.ENOTDIR:
+			// underlying node wasn't an empty dir; ignore
+		case syscall.ENOENT:
+			// someone else removed it for us; ignore
+		default:
+			err = &os.PathError{
+				Op:   "rmdir",
+				Path: p,
+				Err:  err,
+			}
+			return err
+		}
+	}
+	return nil
+}
+
 var errWarnings = errors.New("encountered warnings")
 
-func run(mountpoints []string) error {
+func run(prune bool, mountpoints []string) error {
 	success := true
 	// make an explicit effort to process mountpoints in command line
 	// order, even if mountinfo is not in that order
@@ -127,6 +151,12 @@ func run(mountpoints []string) error {
 			success = false
 			continue
 		}
+		if prune {
+			if err := pruneEmptyDir(p); err != nil {
+				log.Printf("cannot prune mountpoint: %v", err)
+				success = false
+			}
+		}
 	}
 
 	if !success {
@@ -143,11 +173,15 @@ func usage() {
 	fmt.Fprintf(flag.CommandLine.Output(), "\n")
 	fmt.Fprintf(flag.CommandLine.Output(), "Forcibly aborts a FUSE filesystem mounted at the given path.\n")
 	fmt.Fprintf(flag.CommandLine.Output(), "\n")
+	flag.PrintDefaults()
 }
 
 func main() {
 	log.SetFlags(0)
 	log.SetPrefix(prog + ": ")
+
+	var prune bool
+	flag.BoolVar(&prune, "p", false, "prune empty mountpoints after unmounting")
 
 	flag.Usage = usage
 	flag.Parse()
@@ -156,7 +190,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	if err := run(flag.Args()); err != nil {
+	if err := run(prune, flag.Args()); err != nil {
 		if err == errWarnings {
 			// they've already been logged
 			os.Exit(1)
