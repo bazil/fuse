@@ -78,6 +78,11 @@ func findFUSEMounts() (map[string]string, error) {
 func abort(id string) error {
 	p := filepath.Join("/sys/fs/fuse/connections", id, "abort")
 	f, err := os.OpenFile(p, os.O_WRONLY, 0600)
+	if errors.Is(err, os.ErrNotExist) {
+		// nothing to abort, consider that a success because we might
+		// have just raced against an unmount
+		return nil
+	}
 	if err != nil {
 		return err
 	}
