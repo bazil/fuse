@@ -607,7 +607,7 @@ func (n nodeRefcountDropBug) String() string {
 	return fmt.Sprintf("bug: trying to drop %d of %d references to %v", n.N, n.Refs, n.Node)
 }
 
-func (c *Server) dropNode(id fuse.NodeID, n uint64) (forget bool) {
+func (c *Server) dropNode(id fuse.NodeID, n uint64) (forget bool, node Node) {
 	c.meta.Lock()
 	defer c.meta.Unlock()
 	snode := c.node[id]
@@ -620,7 +620,7 @@ func (c *Server) dropNode(id fuse.NodeID, n uint64) (forget bool) {
 
 		// we may end up triggering Forget twice, but that's better
 		// than not even once, and that's the best we can do
-		return true
+		return true, nil
 	}
 
 	if n > snode.refs {
@@ -628,15 +628,16 @@ func (c *Server) dropNode(id fuse.NodeID, n uint64) (forget bool) {
 		n = snode.refs
 	}
 
+	node = snode.node
 	snode.refs -= n
 	if snode.refs == 0 {
 		snode.wg.Wait()
 		c.node[id] = nil
 		delete(c.nodeRef, snode.node)
 		c.freeNode = append(c.freeNode, id)
-		return true
+		return true, node
 	}
-	return false
+	return false, node
 }
 
 func (c *Server) dropHandle(id fuse.HandleID) {
@@ -1311,7 +1312,7 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 		return nil
 
 	case *fuse.ForgetRequest:
-		forget := c.dropNode(r.Hdr().Node, r.N)
+		forget, node := c.dropNode(r.Hdr().Node, r.N)
 		if forget {
 			n, ok := node.(NodeForgetter)
 			if ok {
@@ -1324,7 +1325,7 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 
 	case *fuse.BatchForgetRequest:
 		for _, item := range r.Forget {
-			forget := c.dropNode(item.NodeID, item.N)
+			forget, node := c.dropNode(item.NodeID, item.N)
 			if forget {
 				n, ok := node.(NodeForgetter)
 				if ok {
