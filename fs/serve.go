@@ -1326,6 +1326,16 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 		return nil
 
 	case *fuse.BatchForgetRequest:
+		// BatchForgetRequest is hard to unit test, as it
+		// fundamentally relies on something unprivileged userspace
+		// has little control over. A root-only, Linux-only test could
+		// be written with `echo 2 >/proc/sys/vm/drop_caches`, but
+		// that would still rely on timing, the number of batches and
+		// operation spread over them could vary, it wouldn't run in a
+		// typical container regardless of privileges, and it would
+		// degrade performance for the rest of the machine. It would
+		// still probably be worth doing, just not the most fun.
+
 		// node is nil here because BatchForget as a message is not
 		// aimed at a any one node
 		for _, item := range r.Forget {
