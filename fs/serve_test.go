@@ -2845,7 +2845,7 @@ type myCustomError struct {
 	fuse.ErrorNumber
 }
 
-var _ = fuse.ErrorNumber(myCustomError{})
+var _ fuse.ErrorNumber = myCustomError{}
 
 func (myCustomError) Error() string {
 	return "bork"

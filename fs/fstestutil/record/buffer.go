@@ -13,7 +13,7 @@ type Buffer struct {
 	buf bytes.Buffer
 }
 
-var _ = io.Writer(&Buffer{})
+var _ io.Writer = (*Buffer)(nil)
 
 func (b *Buffer) Write(p []byte) (n int, err error) {
 	b.mu.Lock()

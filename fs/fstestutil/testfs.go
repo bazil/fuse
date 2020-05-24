@@ -14,7 +14,7 @@ type SimpleFS struct {
 	Node fs.Node
 }
 
-var _ = fs.FS(SimpleFS{})
+var _ fs.FS = SimpleFS{}
 
 func (f SimpleFS) Root() (fs.Node, error) {
 	return f.Node, nil
@@ -39,8 +39,8 @@ func (f Dir) Attr(ctx context.Context, a *fuse.Attr) error {
 // ChildMap is a directory with child nodes looked up from a map.
 type ChildMap map[string]fs.Node
 
-var _ = fs.Node(&ChildMap{})
-var _ = fs.NodeStringLookuper(&ChildMap{})
+var _ fs.Node = (*ChildMap)(nil)
+var _ fs.NodeStringLookuper = (*ChildMap)(nil)
 
 func (f *ChildMap) Attr(ctx context.Context, a *fuse.Attr) error {
 	a.Mode = os.ModeDir | 0o777

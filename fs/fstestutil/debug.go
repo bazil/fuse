@@ -12,7 +12,7 @@ type flagDebug bool
 
 var debug flagDebug
 
-var _ = flag.Value(&debug)
+var _ flag.Value = &debug
 
 func (f *flagDebug) IsBoolFlag() bool {
 	return true

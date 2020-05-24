@@ -15,7 +15,7 @@ type Writes struct {
 	buf Buffer
 }
 
-var _ = fs.HandleWriter(&Writes{})
+var _ fs.HandleWriter = (*Writes)(nil)
 
 func (w *Writes) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
 	n, err := w.buf.Write(req.Data)
@@ -61,7 +61,7 @@ type Flushes struct {
 	rec MarkRecorder
 }
 
-var _ = fs.HandleFlusher(&Flushes{})
+var _ fs.HandleFlusher = (*Flushes)(nil)
 
 func (r *Flushes) Flush(ctx context.Context, req *fuse.FlushRequest) error {
 	r.rec.Mark()
@@ -119,7 +119,7 @@ type Setattrs struct {
 	rec RequestRecorder
 }
 
-var _ = fs.NodeSetattrer(&Setattrs{})
+var _ fs.NodeSetattrer = (*Setattrs)(nil)
 
 func (r *Setattrs) Setattr(ctx context.Context, req *fuse.SetattrRequest, resp *fuse.SetattrResponse) error {
 	tmp := *req
@@ -140,7 +140,7 @@ type Fsyncs struct {
 	rec RequestRecorder
 }
 
-var _ = fs.NodeFsyncer(&Fsyncs{})
+var _ fs.NodeFsyncer = (*Fsyncs)(nil)
 
 func (r *Fsyncs) Fsync(ctx context.Context, req *fuse.FsyncRequest) error {
 	tmp := *req
@@ -161,7 +161,7 @@ type Mkdirs struct {
 	rec RequestRecorder
 }
 
-var _ = fs.NodeMkdirer(&Mkdirs{})
+var _ fs.NodeMkdirer = (*Mkdirs)(nil)
 
 // Mkdir records the request and returns an error. Most callers should
 // wrap this call in a function that returns a more useful result.
@@ -186,7 +186,7 @@ type Symlinks struct {
 	rec RequestRecorder
 }
 
-var _ = fs.NodeSymlinker(&Symlinks{})
+var _ fs.NodeSymlinker = (*Symlinks)(nil)
 
 // Symlink records the request and returns an error. Most callers should
 // wrap this call in a function that returns a more useful result.
@@ -211,7 +211,7 @@ type Links struct {
 	rec RequestRecorder
 }
 
-var _ = fs.NodeLinker(&Links{})
+var _ fs.NodeLinker = (*Links)(nil)
 
 // Link records the request and returns an error. Most callers should
 // wrap this call in a function that returns a more useful result.
@@ -236,7 +236,7 @@ type Mknods struct {
 	rec RequestRecorder
 }
 
-var _ = fs.NodeMknoder(&Mknods{})
+var _ fs.NodeMknoder = (*Mknods)(nil)
 
 // Mknod records the request and returns an error. Most callers should
 // wrap this call in a function that returns a more useful result.
@@ -261,7 +261,7 @@ type Opens struct {
 	rec RequestRecorder
 }
 
-var _ = fs.NodeOpener(&Opens{})
+var _ fs.NodeOpener = (*Opens)(nil)
 
 // Open records the request and returns an error. Most callers should
 // wrap this call in a function that returns a more useful result.
@@ -286,7 +286,7 @@ type Getxattrs struct {
 	rec RequestRecorder
 }
 
-var _ = fs.NodeGetxattrer(&Getxattrs{})
+var _ fs.NodeGetxattrer = (*Getxattrs)(nil)
 
 // Getxattr records the request and returns an error. Most callers should
 // wrap this call in a function that returns a more useful result.
@@ -311,7 +311,7 @@ type Listxattrs struct {
 	rec RequestRecorder
 }
 
-var _ = fs.NodeListxattrer(&Listxattrs{})
+var _ fs.NodeListxattrer = (*Listxattrs)(nil)
 
 // Listxattr records the request and returns an error. Most callers should
 // wrap this call in a function that returns a more useful result.
@@ -336,7 +336,7 @@ type Setxattrs struct {
 	rec RequestRecorder
 }
 
-var _ = fs.NodeSetxattrer(&Setxattrs{})
+var _ fs.NodeSetxattrer = (*Setxattrs)(nil)
 
 // Setxattr records the request and returns an error. Most callers should
 // wrap this call in a function that returns a more useful result.
@@ -364,7 +364,7 @@ type Removexattrs struct {
 	rec RequestRecorder
 }
 
-var _ = fs.NodeRemovexattrer(&Removexattrs{})
+var _ fs.NodeRemovexattrer = (*Removexattrs)(nil)
 
 // Removexattr records the request and returns an error. Most callers should
 // wrap this call in a function that returns a more useful result.
@@ -389,7 +389,7 @@ type Creates struct {
 	rec RequestRecorder
 }
 
-var _ = fs.NodeCreater(&Creates{})
+var _ fs.NodeCreater = (*Creates)(nil)
 
 // Create records the request and returns an error. Most callers should
 // wrap this call in a function that returns a more useful result.

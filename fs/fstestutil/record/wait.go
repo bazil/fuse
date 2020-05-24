@@ -18,7 +18,7 @@ type ReleaseWaiter struct {
 	seen chan *fuse.ReleaseRequest
 }
 
-var _ = fs.HandleReleaser(&ReleaseWaiter{})
+var _ fs.HandleReleaser = (*ReleaseWaiter)(nil)
 
 func (r *ReleaseWaiter) init() {
 	r.once.Do(func() {

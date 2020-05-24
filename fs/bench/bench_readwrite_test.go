@@ -34,10 +34,10 @@ type benchDir struct {
 	fs *benchFS
 }
 
-var _ = fs.Node(benchDir{})
-var _ = fs.NodeStringLookuper(benchDir{})
-var _ = fs.Handle(benchDir{})
-var _ = fs.HandleReadDirAller(benchDir{})
+var _ fs.Node = benchDir{}
+var _ fs.NodeStringLookuper = benchDir{}
+var _ fs.Handle = benchDir{}
+var _ fs.HandleReadDirAller = benchDir{}
 
 func (benchDir) Attr(ctx context.Context, a *fuse.Attr) error {
 	a.Inode = 1
@@ -63,12 +63,12 @@ type benchFile struct {
 	conf *benchConfig
 }
 
-var _ = fs.Node(benchFile{})
-var _ = fs.NodeOpener(benchFile{})
-var _ = fs.NodeFsyncer(benchFile{})
-var _ = fs.Handle(benchFile{})
-var _ = fs.HandleReader(benchFile{})
-var _ = fs.HandleWriter(benchFile{})
+var _ fs.Node = benchFile{}
+var _ fs.NodeOpener = benchFile{}
+var _ fs.NodeFsyncer = benchFile{}
+var _ fs.Handle = benchFile{}
+var _ fs.HandleReader = benchFile{}
+var _ fs.HandleWriter = benchFile{}
 
 func (benchFile) Attr(ctx context.Context, a *fuse.Attr) error {
 	a.Inode = 2
