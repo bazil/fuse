@@ -1109,6 +1109,28 @@ func (c *Conn) ReadRequest() (Request, error) {
 			},
 			LockFlags: LockFlags(in.LkFlags),
 		}
+
+	case opIoctl:
+		in := (*ioctlIn)(m.data())
+		if m.len() < unsafe.Sizeof(*in) {
+			goto corrupt
+		}
+		if unsafe.Sizeof(*in)+uintptr(in.InSize) != m.len() {
+			goto corrupt
+		}
+		var inData []byte
+		if in.InSize != 0 {
+			inData = m.bytes()[unsafe.Sizeof(*in):]
+		}
+		req = &IoctlRequest{
+			Header:  m.Header(),
+			Handle:  HandleID(in.Fh),
+			Flags:   in.Flags,
+			Cmd:     in.Cmd,
+			Arg:     in.Arg,
+			InData:  inData,
+			OutSize: in.OutSize,
+		}
 	}
 
 	return req, nil
@@ -2700,4 +2722,37 @@ type QueryLockResponse struct {
 
 func (r *QueryLockResponse) String() string {
 	return fmt.Sprintf("QueryLock range=%d..%d type=%v pid=%v", r.Lock.Start, r.Lock.End, r.Lock.Type, r.Lock.PID)
+}
+
+type IoctlRequest struct {
+	Header
+	Handle  HandleID
+	Flags   uint32
+	Cmd     uint32
+	Arg     uint64
+	InData  []byte
+	OutSize uint32
+}
+
+func (r *IoctlRequest) String() string {
+	return fmt.Sprintf("Ioctl [%s] %v flags=%v cmd=%d arg=%d insize=%d outsize=%d", &r.Header, r.Handle, r.Flags, r.Cmd, r.Arg, len(r.InData), r.OutSize)
+}
+
+func (r *IoctlRequest) Respond(resp *IoctlResponse) {
+	buf := newBuffer(unsafe.Sizeof(ioctlOut{}) + uintptr(len(resp.Data)))
+
+	out := (*ioctlOut)(buf.alloc(unsafe.Sizeof(ioctlOut{})))
+	out.Result = resp.Result
+	out.Flags = uint32(resp.Flags)
+	out.InIovs = 0
+	out.OutIovs = 0
+
+	buf = append(buf, resp.Data...)
+	r.respond(buf)
+}
+
+type IoctlResponse struct {
+	Result int32
+	Flags  IoctlFlags
+	Data   []byte
 }

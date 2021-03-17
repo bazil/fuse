@@ -913,3 +913,30 @@ type pollOut struct {
 type notifyPollWakeupOut struct {
 	Kh uint64
 }
+
+type ioctlIn struct {
+	Fh      uint64
+	Flags   uint32
+	Cmd     uint32
+	Arg     uint64
+	InSize  uint32
+	OutSize uint32
+}
+
+type ioctlOut struct {
+	Result  int32
+	Flags   uint32
+	InIovs  uint32 // fuse servers cannot do unresticted ioctls so these are always 0
+	OutIovs uint32
+}
+
+type IoctlFlags uint32
+
+const (
+	IoctlCompat       IoctlFlags = 1 << 0 // 32bit compat ioctl on 64bit machine
+	IoctlUnrestricted IoctlFlags = 1 << 1 // not restricted to well-formed ioctls, retry allowed
+	IoctlRetry        IoctlFlags = 1 << 2 // retry with new iovecs
+	Ioctl32Bit        IoctlFlags = 1 << 3 // 32bit ioctl
+	IoctlDir          IoctlFlags = 1 << 4 // is a directory
+	IoctlCompatX32    IoctlFlags = 1 << 5 // x32 compat ioctl on 64bit machine (64bit time_t)
+)
