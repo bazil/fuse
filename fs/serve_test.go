@@ -19,6 +19,7 @@ import (
 	"syscall"
 	"testing"
 	"time"
+	"unsafe"
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
@@ -4692,4 +4693,95 @@ func TestLocking(t *testing.T) {
 		})
 	})
 
+}
+
+const IOCTL_TEST_READ_DATA = "howareyoudoing"
+const IOCTL_TEST_WRITE_DATA = "imdoingwellthx"
+const IOCTL_TEST_RESULT = 123
+
+// Recreates the _IOC macro in asm-generic/ioctl.h. The ioctl command encodes
+// important information used by the fuse driver to control whether data is
+// being read/written and how much data to transfer
+func computeIoctlCommand(read, write bool, iotype uint32, size uint32, nr uint32) uint32 {
+	result := (size << 16) | (iotype << 8) | nr
+	if read {
+		result |= 1 << 31
+	}
+	if write {
+		result |= 1 << 30
+	}
+	return result
+}
+
+func doIoctlRequest(ctx context.Context, path string) (*ioctlResult, error) {
+	fd, err := syscall.Open(path, syscall.O_RDONLY, 0)
+	if err != nil {
+		return nil, err
+	}
+	defer syscall.Close(fd)
+
+	mydata := []byte(IOCTL_TEST_READ_DATA)
+	cmd := computeIoctlCommand(true, true, 0, uint32(len(mydata)), 0)
+
+	// No syscall.Ioctl so we manually invoke ioctl through syscall.Syscall
+	result, _, _ := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), uintptr(cmd), uintptr(unsafe.Pointer(&mydata[0])))
+
+	return &ioctlResult{
+		Result:    uint32(result),
+		WriteData: mydata,
+	}, nil
+}
+
+var doIoctlHelper = helpers.Register("doIoctl", httpjson.ServePOST(doIoctlRequest))
+
+type ioctlData struct {
+	readData []byte
+}
+
+type ioctlResult struct {
+	Result    uint32
+	WriteData []byte
+}
+
+func (r *ioctlData) Attr(ctx context.Context, a *fuse.Attr) error {
+	a.Mode = 0o666
+	return nil
+}
+
+func (r *ioctlData) Ioctl(ctx context.Context, req *fuse.IoctlRequest, resp *fuse.IoctlResponse) error {
+	r.readData = make([]byte, len(req.InData))
+	copy(r.readData, req.InData)
+	resp.Data = append(resp.Data, IOCTL_TEST_WRITE_DATA...)
+	fmt.Println("WRITE:", resp.Data)
+	resp.Result = IOCTL_TEST_RESULT
+	return nil
+}
+
+func TestIoctl(t *testing.T) {
+	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	r := &ioctlData{}
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": r}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	control := doIoctlHelper.Spawn(ctx, t)
+	defer control.Close()
+	var result ioctlResult
+	if err := control.JSON("/").Call(ctx, mnt.Dir+"/child", &result); err != nil {
+		t.Fatalf("calling helper: %v", err)
+	}
+
+	if string(r.readData) != IOCTL_TEST_READ_DATA {
+		t.Errorf("bad read data:\ngot\t%s\nwant\t%s", string(r.readData), IOCTL_TEST_READ_DATA)
+	}
+	if string(result.WriteData) != IOCTL_TEST_WRITE_DATA {
+		t.Errorf("bad write data:\ngot\t%s\nwant\t%s", string(result.WriteData), IOCTL_TEST_WRITE_DATA)
+	}
+	if result.Result != IOCTL_TEST_RESULT {
+		t.Errorf("bad result:\ngot\t%d\nwant\t%d", result.Result, IOCTL_TEST_RESULT)
+	}
 }

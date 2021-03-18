@@ -323,6 +323,10 @@ type HandleReleaser interface {
 	Release(ctx context.Context, req *fuse.ReleaseRequest) error
 }
 
+type HandleIoctlHandler interface {
+	Ioctl(ctx context.Context, req *fuse.IoctlRequest, resp *fuse.IoctlResponse) error
+}
+
 type HandlePoller interface {
 	// Poll checks whether the handle is currently ready for I/O, and
 	// may request a wakeup when it is.
@@ -1473,6 +1477,24 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 		}
 		done(nil)
 		r.Respond()
+		return nil
+
+	case *fuse.IoctlRequest:
+		shandle := c.getHandle(r.Handle)
+		if shandle == nil {
+			return syscall.ESTALE
+		}
+		handle := shandle.handle
+
+		s := &fuse.IoctlResponse{Data: make([]byte, 0, r.OutSize)}
+		if h, ok := handle.(HandleIoctlHandler); ok {
+			if err := h.Ioctl(ctx, r, s); err != nil {
+				return err
+			}
+		}
+
+		done(s)
+		r.Respond(s)
 		return nil
 
 	case *fuse.DestroyRequest:
