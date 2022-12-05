@@ -905,6 +905,13 @@ func (m *logDuplicateRequestID) String() string {
 	return fmt.Sprintf("Duplicate request: new %v, old %v", m.New, m.Old)
 }
 
+type AccessLog struct {
+	Timestamp time.Time     `json:"timestamp,omitempty"`
+	Request   fuse.Request  `json:"request,omitempty"`
+	Response  interface{}   `json:"response,omitempty"`
+	Elapsed   time.Duration `json:"elapsed,omitempty"`
+}
+
 func (c *Server) serve(r fuse.Request) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -914,6 +921,10 @@ func (c *Server) serve(r fuse.Request) {
 	}
 
 	req := &serveRequest{Request: r, cancel: cancel}
+	accessLog := &AccessLog{
+		Timestamp: time.Now().In(time.Local),
+		Request:   r,
+	}
 
 	switch r.(type) {
 	case *fuse.NotifyReply:
@@ -980,6 +991,11 @@ func (c *Server) serve(r fuse.Request) {
 			msg.Out = resp
 		}
 		c.debug(msg)
+
+		// log access log
+		accessLog.Response = resp
+		accessLog.Elapsed = time.Since(accessLog.Timestamp)
+		c.debug(accessLog)
 
 		c.meta.Lock()
 		delete(c.req, hdr.ID)
