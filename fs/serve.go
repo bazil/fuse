@@ -867,7 +867,7 @@ type handlerTerminatedError struct {
 var _ error = handlerTerminatedError{}
 
 func (h handlerTerminatedError) Error() string {
-	return fmt.Sprintf("handler terminated (called runtime.Goexit)")
+	return "handler terminated (called runtime.Goexit)"
 }
 
 var _ fuse.ErrorNumber = handlerTerminatedError{}
