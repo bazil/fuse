@@ -43,7 +43,7 @@ func BenchmarkLookup(b *testing.B) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f := &benchLookupDir{}
-	mnt, err := fstestutil.MountedT(b, fstestutil.SimpleFS{f}, nil)
+	mnt, err := fstestutil.MountedT(b, fstestutil.SimpleFS{Node: f}, nil)
 	if err != nil {
 		b.Fatal(err)
 	}
