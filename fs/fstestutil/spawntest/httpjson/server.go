@@ -15,7 +15,7 @@ import (
 //
 // fn is expected to be of the form
 //
-//     func(context.Context, T1) (T2, error)
+//	func(context.Context, T1) (T2, error)
 //
 // or similar with pointers to T1 or T2.
 func ServePOST(fn interface{}) http.Handler {

@@ -39,7 +39,7 @@
 //
 // The hellofs subdirectory contains a simple illustration of the fs.Serve approach.
 //
-// Service Methods
+// # Service Methods
 //
 // The required and optional methods for the FS, Node, and Handle interfaces
 // have the general form
@@ -58,7 +58,7 @@
 // including any []byte fields such as WriteRequest.Data or
 // SetxattrRequest.Xattr.
 //
-// Errors
+// # Errors
 //
 // Operations can return errors. The FUSE interface can only
 // communicate POSIX errno error numbers to file system clients, the
@@ -69,7 +69,7 @@
 // Error messages will be visible in the debug log as part of the
 // response.
 //
-// Interrupted Operations
+// # Interrupted Operations
 //
 // In some file systems, some operations
 // may take an undetermined amount of time.  For example, a Read waiting for
@@ -82,7 +82,7 @@
 // If an operation does not block for an indefinite amount of time, supporting
 // cancellation is not necessary.
 //
-// Authentication
+// # Authentication
 //
 // All requests types embed a Header, meaning that the method can
 // inspect req.Pid, req.Uid, and req.Gid as necessary to implement
@@ -91,11 +91,10 @@
 // AllowOther), but does not enforce access modes (to change this, see
 // DefaultPermissions).
 //
-// Mount Options
+// # Mount Options
 //
 // Behavior and metadata of the mounted file system can be changed by
 // passing MountOption values to Mount.
-//
 package fuse // import "bazil.org/fuse"
 
 import (
@@ -2573,12 +2572,12 @@ type FileLock struct {
 //
 // Unlocking can be
 //
-//     - explicit with UnlockRequest
-//     - for flock: implicit on final close (ReleaseRequest.ReleaseFlags
-//       has ReleaseFlockUnlock set)
-//     - for POSIX locks: implicit on any close (FlushRequest)
-//     - for Open File Description locks: implicit on final close
-//       (no LockOwner observed as of 2020-04)
+//   - explicit with UnlockRequest
+//   - for flock: implicit on final close (ReleaseRequest.ReleaseFlags
+//     has ReleaseFlockUnlock set)
+//   - for POSIX locks: implicit on any close (FlushRequest)
+//   - for Open File Description locks: implicit on final close
+//     (no LockOwner observed as of 2020-04)
 //
 // See LockFlags to know which kind of a lock is being requested. (As
 // of 2020-04, Open File Descriptor locks are indistinguishable from

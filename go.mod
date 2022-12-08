@@ -1,6 +1,6 @@
 module bazil.org/fuse
 
-go 1.13
+go 1.19
 
 require (
 	github.com/dvyukov/go-fuzz v0.0.0-20200318091601-be3528f3a813

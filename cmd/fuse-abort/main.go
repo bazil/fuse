@@ -1,4 +1,4 @@
-// +build linux
+//go:build linux
 
 // Forcibly abort a FUSE filesystem mounted at the given path.
 //
