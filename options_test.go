@@ -41,7 +41,7 @@ func TestMountOptionFSName(t *testing.T) {
 	}
 	maybeParallel(t)
 	const name = "FuseTestMarker"
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}}, nil,
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: fstestutil.Dir{}}, nil,
 		fuse.FSName(name),
 	)
 	if err != nil {
@@ -64,7 +64,7 @@ func testMountOptionFSNameEvil(t *testing.T, evil string) {
 	}
 	maybeParallel(t)
 	var name = "FuseTest" + evil + "Marker"
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}}, nil,
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: fstestutil.Dir{}}, nil,
 		fuse.FSName(name),
 	)
 	if err != nil {
@@ -112,7 +112,7 @@ func TestMountOptionSubtype(t *testing.T) {
 	}
 	maybeParallel(t)
 	const name = "FuseTestMarker"
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}}, nil,
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: fstestutil.Dir{}}, nil,
 		fuse.Subtype(name),
 	)
 	if err != nil {
@@ -156,7 +156,7 @@ func TestMountOptionAllowOther(t *testing.T) {
 		t.Skip("need user_allow_other in /etc/fuse.conf")
 	}
 	maybeParallel(t)
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}}, nil,
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: fstestutil.Dir{}}, nil,
 		fuse.AllowOther(),
 	)
 	if err != nil {
@@ -209,7 +209,7 @@ func TestMountOptionDefaultPermissions(t *testing.T) {
 
 	mnt, err := fstestutil.MountedT(t,
 		fstestutil.SimpleFS{
-			&fstestutil.ChildMap{"child": unwritableFile{}},
+			Node: &fstestutil.ChildMap{"child": unwritableFile{}},
 		},
 		nil,
 		fuse.DefaultPermissions(),
@@ -252,7 +252,7 @@ func TestMountOptionReadOnly(t *testing.T) {
 	defer cancel()
 
 	mnt, err := fstestutil.MountedT(t,
-		fstestutil.SimpleFS{createrDir{}},
+		fstestutil.SimpleFS{Node: createrDir{}},
 		nil,
 		fuse.ReadOnly(),
 	)
@@ -279,7 +279,7 @@ func TestMountOptionReadOnly(t *testing.T) {
 
 func TestMountOptionMaxBackground(t *testing.T) {
 	maybeParallel(t)
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}}, nil,
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: fstestutil.Dir{}}, nil,
 		fuse.MaxBackground(4),
 	)
 	if err != nil {
@@ -293,7 +293,7 @@ func TestMountOptionMaxBackground(t *testing.T) {
 
 func TestMountOptionCongestionThreshold(t *testing.T) {
 	maybeParallel(t)
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{fstestutil.Dir{}}, nil,
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: fstestutil.Dir{}}, nil,
 		fuse.CongestionThreshold(3),
 	)
 	if err != nil {
