@@ -17,7 +17,6 @@ import (
 	"context"
 	"errors"
 	"flag"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -164,7 +163,7 @@ func (h *Helper) Spawn(ctx context.Context, t testing.TB) *Control {
 
 	// could use TB.TempDir()
 	// https://github.com/golang/go/issues/35998
-	dir, err := ioutil.TempDir("", "spawntest")
+	dir, err := os.MkdirTemp("", "spawntest")
 	if err != nil {
 		t.Fatalf("spawnmount.Spawn: cannot make temp dir: %v", err)
 	}

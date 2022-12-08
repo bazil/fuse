@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"syscall"
 	"testing"
@@ -218,7 +217,7 @@ func doBenchRead(ctx context.Context, req benchReadWriteRequest) (*struct{}, err
 	defer f.Close()
 
 	for i := 0; i < req.N; i++ {
-		n, err := io.CopyN(ioutil.Discard, f, req.Size)
+		n, err := io.CopyN(io.Discard, f, req.Size)
 		if err != nil {
 			return nil, err
 		}

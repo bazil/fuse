@@ -1,7 +1,6 @@
 package fstestutil
 
 import (
-	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -68,7 +67,7 @@ func (mnt *Mount) Close() {
 //
 // After successful return, caller must clean up by calling Close.
 func MountedFunc(fn func(*Mount) fs.FS, conf *fs.Config, options ...fuse.MountOption) (*Mount, error) {
-	dir, err := ioutil.TempDir("", "fusetest")
+	dir, err := os.MkdirTemp("", "fusetest")
 	if err != nil {
 		return nil, err
 	}

@@ -2,7 +2,6 @@ package fstestutil
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 )
 
@@ -41,24 +40,28 @@ func CheckDir(path string, want map[string]FileInfoCheck) error {
 		problems.missing[k] = struct{}{}
 	}
 
-	fis, err := ioutil.ReadDir(path)
+	entries, err := os.ReadDir(path)
 	if err != nil {
 		return fmt.Errorf("cannot read directory: %v", err)
 	}
 
-	for _, fi := range fis {
-		check, ok := want[fi.Name()]
+	for _, entry := range entries {
+		fi, err := entry.Info()
+		if err != nil {
+			return fmt.Errorf("cannot stat: %v: %w", entry.Name(), err)
+		}
+		check, ok := want[entry.Name()]
 		if !ok {
 			check, ok = want[""]
 		}
 		if !ok {
-			problems.extra[fi.Name()] = fi.Mode()
+			problems.extra[entry.Name()] = fi.Mode()
 			continue
 		}
-		delete(problems.missing, fi.Name())
+		delete(problems.missing, entry.Name())
 		if check != nil {
 			if err := check(fi); err != nil {
-				return fmt.Errorf("check failed: %v: %v", fi.Name(), err)
+				return fmt.Errorf("check failed: %v: %v", entry.Name(), err)
 			}
 		}
 	}

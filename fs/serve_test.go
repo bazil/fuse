@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -69,7 +68,7 @@ func (f fifo) Attr(ctx context.Context, a *fuse.Attr) error {
 
 func TestMountpointDoesNotExist(t *testing.T) {
 	maybeParallel(t)
-	tmp, err := ioutil.TempDir("", "fusetest")
+	tmp, err := os.MkdirTemp("", "fusetest")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -818,7 +817,7 @@ type writeFileRequest struct {
 }
 
 func doWriteFile(ctx context.Context, req writeFileRequest) (*struct{}, error) {
-	if err := ioutil.WriteFile(req.Path, req.Data, 0o666); err != nil {
+	if err := os.WriteFile(req.Path, req.Data, 0o666); err != nil {
 		return nil, fmt.Errorf("WriteFile: %v", err)
 	}
 	return &struct{}{}, nil
@@ -1026,7 +1025,7 @@ func (f *create3) Remove(ctx context.Context, r *fuse.RemoveRequest) error {
 }
 
 func doCreateWriteRemove(ctx context.Context, path string) (*struct{}, error) {
-	if err := ioutil.WriteFile(path, []byte(hi), 0o666); err != nil {
+	if err := os.WriteFile(path, []byte(hi), 0o666); err != nil {
 		return nil, fmt.Errorf("WriteFile: %v", err)
 	}
 	if err := os.Remove(path); err != nil {

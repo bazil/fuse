@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 )
 
@@ -62,7 +61,7 @@ func (c *Resource) Call(ctx context.Context, data interface{}, dst interface{}) 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		buf, err := ioutil.ReadAll(resp.Body)
+		buf, err := io.ReadAll(resp.Body)
 		if err != nil {
 			buf = []byte("(cannot read error body: " + err.Error() + ")")
 		}

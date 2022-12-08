@@ -1,7 +1,6 @@
 package fuse_test
 
 import (
-	"io/ioutil"
 	"os"
 	"runtime"
 	"testing"
@@ -10,7 +9,7 @@ import (
 )
 
 func getFeatures(t *testing.T, opts ...fuse.MountOption) fuse.InitFlags {
-	tmp, err := ioutil.TempDir("", "fusetest")
+	tmp, err := os.MkdirTemp("", "fusetest")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
 	}

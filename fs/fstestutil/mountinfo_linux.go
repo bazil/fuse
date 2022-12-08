@@ -2,7 +2,7 @@ package fstestutil
 
 import (
 	"errors"
-	"io/ioutil"
+	"os"
 	"strings"
 	"time"
 )
@@ -30,7 +30,7 @@ func getMountInfo(mnt string) (*MountInfo, error) {
 	// TODO delay a little to minimize an undiagnosed race
 	// https://github.com/bazil/fuse/issues/228
 	time.Sleep(10 * time.Millisecond)
-	data, err := ioutil.ReadFile("/proc/mounts")
+	data, err := os.ReadFile("/proc/mounts")
 	if err != nil {
 		return nil, err
 	}
