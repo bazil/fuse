@@ -411,7 +411,7 @@ func TestReadAll(t *testing.T) {
 	maybeParallel(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": readAll{}}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": readAll{}}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -448,7 +448,7 @@ func TestReadAllWithHandleRead(t *testing.T) {
 	maybeParallel(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": readWithHandleRead{}}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": readWithHandleRead{}}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -501,7 +501,7 @@ func TestReadFileFlags(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	r := &readFlags{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": r}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": r}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -564,7 +564,7 @@ func TestWriteFileFlags(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	r := &writeFlags{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": r}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": r}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -612,7 +612,7 @@ func TestRelease(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	r := &release{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": r}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": r}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -717,7 +717,7 @@ func TestWrite(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	w := &write{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": w}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": w}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -779,7 +779,7 @@ func TestWriteLarge(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	w := &write{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": w}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": w}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -830,7 +830,7 @@ func TestWriteTruncateFlush(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	w := &writeTruncateFlush{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": w}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": w}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -886,7 +886,7 @@ func TestMkdir(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f := &mkdir1{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: f}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -950,7 +950,7 @@ func TestCreate(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f := &create1{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: f}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1044,7 +1044,7 @@ func TestCreateWriteRemove(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f := &create3{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: f}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1131,7 +1131,7 @@ func TestSymlink(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f := &symlink1{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: f}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1201,7 +1201,7 @@ func TestLink(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f := &link1{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: f}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1275,7 +1275,7 @@ func TestRename(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f := &rename1{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: f}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1342,7 +1342,7 @@ func TestMknod(t *testing.T) {
 	defer cancel()
 
 	f := &mknod1{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: f}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1393,7 +1393,7 @@ func TestDataHandle(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f := &dataHandleTest{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1526,7 +1526,7 @@ func TestInterrupt(t *testing.T) {
 		hanging:     make(chan struct{}, 1),
 		interrupted: make(chan struct{}, 1),
 	}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1621,7 +1621,7 @@ func TestDeadline(t *testing.T) {
 			return ctx
 		},
 	}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": child}}, config)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": child}}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1669,7 +1669,7 @@ func testTruncate(t *testing.T, toSize int64) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f := &truncate{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1730,7 +1730,7 @@ func testFtruncate(t *testing.T, toSize int64) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f := &ftruncate{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1788,7 +1788,7 @@ func TestTruncateWithOpen(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f := &truncateWithOpen{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1860,7 +1860,7 @@ func TestReadDirAll(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f := &readDirAll{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: f}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1933,7 +1933,7 @@ func TestReadDirAllBad(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f := &readDirAllBad{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: f}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1958,7 +1958,7 @@ func TestReadDirNotImplemented(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f := &readDirNotImplemented{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: f}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2042,7 +2042,7 @@ func TestReadDirAllRewind(t *testing.T) {
 	f.entries.Store([]fuse.Dirent{
 		{Name: "one", Inode: 11, Type: fuse.DT_Dir},
 	})
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: f}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2117,7 +2117,7 @@ func TestChmod(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f := &chmod{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2167,7 +2167,7 @@ func TestOpen(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f := &open{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2241,7 +2241,7 @@ func TestOpenNonSeekable(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f := &openNonSeekable{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2282,7 +2282,7 @@ func TestFsyncDir(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f := &fsyncDir{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{f}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: f}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2365,7 +2365,7 @@ func TestGetxattr(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f := &getxattr{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2407,7 +2407,7 @@ func TestGetxattrTooSmall(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f := &getxattrTooSmall{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2443,7 +2443,7 @@ func TestGetxattrSize(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f := &getxattrSize{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2543,7 +2543,7 @@ func TestListxattr(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f := &listxattr{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2598,7 +2598,7 @@ func TestListxattrTooSmall(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f := &listxattrTooSmall{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2636,7 +2636,7 @@ func TestListxattrSize(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f := &listxattrSize{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2695,7 +2695,7 @@ func testSetxattr(t *testing.T, size int) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f := &setxattr{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2765,7 +2765,7 @@ func TestRemovexattr(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	f := &removexattr{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": f}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": f}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2816,7 +2816,7 @@ func TestDefaultErrno(t *testing.T) {
 	maybeParallel(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{defaultErrno{}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: defaultErrno{}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2860,7 +2860,7 @@ func TestCustomErrno(t *testing.T) {
 	maybeParallel(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{customErrNode{}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: customErrNode{}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2892,7 +2892,7 @@ func TestSyscallErrno(t *testing.T) {
 	maybeParallel(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{syscallErrNode{}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: syscallErrNode{}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3003,7 +3003,7 @@ func TestMmap(t *testing.T) {
 
 	w := &mmap{}
 	w.data = make([]byte, mmapSize)
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": w}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": w}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3056,7 +3056,7 @@ func TestDirectRead(t *testing.T) {
 	maybeParallel(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": directRead{}}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": directRead{}}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3092,7 +3092,7 @@ func TestDirectWrite(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	w := &directWrite{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": w}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": w}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3135,7 +3135,7 @@ func TestAttrUnlinked(t *testing.T) {
 	maybeParallel(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": attrUnlinked{}}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": attrUnlinked{}}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3167,7 +3167,7 @@ func TestAttrBad(t *testing.T) {
 	maybeParallel(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": attrBad{}}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": attrBad{}}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3210,7 +3210,7 @@ func TestInvalidateNodeAttr(t *testing.T) {
 	a := &invalidateAttr{
 		t: t,
 	}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": a}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": a}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3338,7 +3338,7 @@ func TestInvalidateNodeDataInvalidatesAttr(t *testing.T) {
 		t: t,
 	}
 	a.data.Store(invalidateDataContent1)
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": a}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": a}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3440,7 +3440,7 @@ func TestInvalidateNodeDataInvalidatesData(t *testing.T) {
 		t: t,
 	}
 	a.data.Store(invalidateDataContent1)
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": a}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": a}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3545,7 +3545,7 @@ func TestInvalidateNodeDataRangeMiss(t *testing.T) {
 	a := &invalidateDataPartial{
 		t: t,
 	}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": a}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": a}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3603,7 +3603,7 @@ func TestInvalidateNodeDataRangeHit(t *testing.T) {
 	a := &invalidateDataPartial{
 		t: t,
 	}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": a}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": a}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3684,7 +3684,7 @@ func TestInvalidateEntry(t *testing.T) {
 	a := &invalidateEntryRoot{
 		t: t,
 	}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{a}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: a}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3764,7 +3764,7 @@ func TestNotifyStore(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	child := cachedFile{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": child}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": child}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3820,7 +3820,7 @@ func TestNotifyRetrieve(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	child := readAll{}
-	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": child}}, nil)
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": child}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -3876,7 +3876,7 @@ func TestContext(t *testing.T) {
 	defer cancel()
 	const input = "kilroy was here"
 	mnt, err := fstestutil.MountedT(t,
-		fstestutil.SimpleFS{&fstestutil.ChildMap{"child": contextFile{}}},
+		fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": contextFile{}}},
 		&fs.Config{
 			WithContext: func(ctx context.Context, req fuse.Request) context.Context {
 				return context.WithValue(ctx, &contextFileSentinel, input)
@@ -3913,7 +3913,7 @@ func TestGoexit(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	mnt, err := fstestutil.MountedT(t,
-		fstestutil.SimpleFS{&fstestutil.ChildMap{"child": goexitFile{}}}, nil)
+		fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": goexitFile{}}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -4025,7 +4025,7 @@ func TestReadPollNode(t *testing.T) {
 			t: t,
 		},
 	}
-	filesys := fstestutil.SimpleFS{&fstestutil.ChildMap{"child": child}}
+	filesys := fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": child}}
 	setup := func(mnt *fstestutil.Mount) fs.FS {
 		child.server = mnt.Server
 		return filesys
@@ -4081,7 +4081,7 @@ func TestReadPollHandle(t *testing.T) {
 			t: t,
 		},
 	}
-	filesys := fstestutil.SimpleFS{&fstestutil.ChildMap{"child": child}}
+	filesys := fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": child}}
 	setup := func(mnt *fstestutil.Mount) fs.FS {
 		child.handle.server = mnt.Server
 		return filesys
@@ -4526,7 +4526,7 @@ func (family lockFamily) run(t *testing.T, name string, fn func(t *lockTest)) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		child := &lockFile{}
-		mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": child}}, nil, family.mountOptions...)
+		mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": child}}, nil, family.mountOptions...)
 		if err != nil {
 			t.Fatal(err)
 		}
