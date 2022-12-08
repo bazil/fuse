@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -4044,8 +4045,11 @@ func TestReadPollNode(t *testing.T) {
 	if g, e := string(got.Data), hi; g != e {
 		t.Errorf("readAll = %q, want %q", g, e)
 	}
-	if g, e := strings.Join(child.seen, " "), "read-eagain wakeup read-ready"; g != e {
-		t.Errorf("wrong events: %q != %q", g, e)
+	// Somewhere during Go v1.13..v1.19 Go started repeating polls and optimistic-reads (reads that happen before poll says ready).
+	// Recognize the repeat.
+	re := regexp.MustCompile(`^(read-eagain ){1,2}(wakeup ){1,2}read-ready$`)
+	if g := strings.Join(child.seen, " "); !re.MatchString(g) {
+		t.Errorf("wrong events: %q", g)
 	}
 }
 
@@ -4100,9 +4104,13 @@ func TestReadPollHandle(t *testing.T) {
 	if g, e := string(got.Data), hi; g != e {
 		t.Errorf("readAll = %q, want %q", g, e)
 	}
-	if g, e := strings.Join(child.handle.seen, " "), "read-eagain wakeup read-ready"; g != e {
-		t.Errorf("wrong events: %q != %q", g, e)
+	// Somewhere during Go v1.13..v1.19 Go started repeating polls and optimistic-reads (reads that happen before poll says ready).
+	// Recognize the repeat.
+	re := regexp.MustCompile(`^(read-eagain ){1,2}(wakeup ){1,2}read-ready$`)
+	if g := strings.Join(child.handle.seen, " "); !re.MatchString(g) {
+		t.Errorf("wrong events: %q", g)
 	}
+
 }
 
 // Test flock
