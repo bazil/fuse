@@ -1677,8 +1677,6 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 				return ENOSYS
 		*/
 	}
-
-	panic("not reached")
 }
 
 func (c *Server) saveLookup(ctx context.Context, s *fuse.LookupResponse, snode *serveNode, elem string, n2 Node) error {
