@@ -4007,7 +4007,7 @@ type readPolledNode struct {
 
 var _ fs.Node = (*readPolledNode)(nil)
 
-func (readPolledNode) Attr(ctx context.Context, a *fuse.Attr) error {
+func (*readPolledNode) Attr(ctx context.Context, a *fuse.Attr) error {
 	a.Mode = 0o666
 	a.Size = uint64(len(hi))
 	return nil
@@ -4057,7 +4057,7 @@ type readPolledNodeWithHandle struct {
 
 var _ fs.Node = (*readPolledNodeWithHandle)(nil)
 
-func (readPolledNodeWithHandle) Attr(ctx context.Context, a *fuse.Attr) error {
+func (*readPolledNodeWithHandle) Attr(ctx context.Context, a *fuse.Attr) error {
 	a.Mode = 0o666
 	a.Size = uint64(len(hi))
 	return nil
