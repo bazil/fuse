@@ -13,7 +13,7 @@ import (
 
 func handleFusermountStderr(errCh chan<- error) func(line string) (ignore bool) {
 	return func(line string) (ignore bool) {
-		if line == `fusermount: failed to open /etc/fuse.conf: Permission denied` {
+		if line == `fusermount3: failed to open /etc/fuse.conf: Permission denied` {
 			// Silence this particular message, it occurs way too
 			// commonly and isn't very relevant to whether the mount
 			// succeeds or not.
@@ -21,7 +21,7 @@ func handleFusermountStderr(errCh chan<- error) func(line string) (ignore bool) 
 		}
 
 		const (
-			noMountpointPrefix = `fusermount: failed to access mountpoint `
+			noMountpointPrefix = `fusermount3: failed to access mountpoint `
 			noMountpointSuffix = `: No such file or directory`
 		)
 		if strings.HasPrefix(line, noMountpointPrefix) && strings.HasSuffix(line, noMountpointSuffix) {
@@ -68,7 +68,7 @@ func mount(dir string, conf *mountConfig) (fusefd *os.File, err error) {
 	defer readFile.Close()
 
 	cmd := exec.Command(
-		"fusermount",
+		"fusermount3",
 		"-o", conf.getOptions(),
 		"--",
 		dir,

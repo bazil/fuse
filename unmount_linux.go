@@ -7,7 +7,7 @@ import (
 )
 
 func unmount(dir string) error {
-	cmd := exec.Command("fusermount", "-u", dir)
+	cmd := exec.Command("fusermount3", "-u", dir)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		if len(output) > 0 {
