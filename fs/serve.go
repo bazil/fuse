@@ -294,6 +294,9 @@ type HandleReadDirAller interface {
 type HandleReader interface {
 	// Read requests to read data from the handle.
 	//
+	// Copy the response bytes to the byte slice resp.Data, slicing
+	// it shorter when needed.
+	//
 	// There is a page cache in the kernel that normally submits only
 	// page-aligned reads spanning one or more pages. However, you
 	// should not rely on this. To see individual requests as
