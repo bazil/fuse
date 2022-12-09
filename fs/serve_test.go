@@ -2150,6 +2150,50 @@ func TestChmod(t *testing.T) {
 	}
 }
 
+func TestChmodSticky(t *testing.T) {
+	if os.Getuid() != 0 {
+		t.Skip("skipping unless root")
+	}
+	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	f := &chmod{}
+	mnt, err := fstestutil.MountedT(
+		t,
+		fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": f}},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+	control := chmodHelper.Spawn(ctx, t)
+	defer control.Close()
+
+	req := chmodRequest{
+		Path: mnt.Dir + "/child",
+		Mode: 0o764 | os.ModeSticky,
+	}
+	var nothing struct{}
+	if err := control.JSON("/").Call(ctx, req, &nothing); err != nil {
+		t.Fatalf("calling helper: %v", err)
+	}
+
+	got := f.RecordedSetattr()
+	if g, e := got.Mode, os.FileMode(0o764)|os.ModeSticky; g != e {
+		t.Errorf("wrong mode: %o %v != %o %v", g, g, e, e)
+	}
+	ftype := got.Mode & os.ModeType
+	switch {
+	case runtime.GOOS == "freebsd" && ftype == os.ModeIrregular:
+		// acceptable but unfortunate
+	default:
+		if !ftype.IsRegular() {
+			t.Errorf("mode is not regular: %o %v", got.Mode, got.Mode)
+		}
+	}
+}
+
 // Test open
 
 type open struct {

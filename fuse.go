@@ -526,6 +526,9 @@ func fileMode(unixMode uint32) os.FileMode {
 	if unixMode&syscall.S_ISGID != 0 {
 		mode |= os.ModeSetgid
 	}
+	if unixMode&syscall.S_ISVTX != 0 {
+		mode |= os.ModeSticky
+	}
 	return mode
 }
 
