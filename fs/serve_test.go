@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -4743,4 +4744,95 @@ func TestLocking(t *testing.T) {
 		})
 	})
 
+}
+
+// Test GenerateInode
+
+type generateInodeFS struct {
+	// For simplicity, the FS doubles as the root dir
+	fstestutil.Dir
+}
+
+var _ fs.FS = (*generateInodeFS)(nil)
+
+func (f *generateInodeFS) Root() (fs.Node, error) {
+	return f, nil
+}
+
+var _ fs.Node = (*generateInodeFS)(nil)
+
+var _ fs.FSInodeGenerator = (*generateInodeFS)(nil)
+
+func (f *generateInodeFS) GenerateInode(parentInode uint64, name string) uint64 {
+	const prefix = "inode-"
+	if parentInode != 1 {
+		return 10
+	}
+	if !strings.HasPrefix(name, prefix) {
+		return 11
+	}
+	suffix := name[len(prefix):]
+	inode, err := strconv.ParseUint(suffix, 10, 64)
+	if err != nil {
+		return 12
+	}
+	return inode
+}
+
+var _ fs.NodeStringLookuper = (*generateInodeFS)(nil)
+
+func (f *generateInodeFS) Lookup(ctx context.Context, name string) (fs.Node, error) {
+	const prefix = "inode-"
+	if !strings.HasPrefix(name, prefix) {
+		return nil, fuse.ENOENT
+	}
+	return fstestutil.File{}, nil
+}
+
+func doGenerateInodeLookup(ctx context.Context, path string) (uint64, error) {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return 0, fmt.Errorf("doGenerateInodeLookup: %v", err)
+	}
+	inode := fi.Sys().(*syscall.Stat_t).Ino
+	return inode, nil
+}
+
+var generateInodeLookupHelper = helpers.Register("generateInodeLookup", httpjson.ServePOST(doGenerateInodeLookup))
+
+func TestGenerateInode(t *testing.T) {
+	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	fsys := &generateInodeFS{}
+	mnt, err := fstestutil.MountedT(t, fsys, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	control := generateInodeLookupHelper.Spawn(ctx, t)
+	defer control.Close()
+
+	checkArbitraryLookup := func(name string, want uint64) {
+		t.Run(name, func(t *testing.T) {
+			// t.Parallel()
+
+			var got uint64
+			if err := control.JSON("/").Call(ctx, mnt.Dir+"/"+name, &got); err != nil {
+				t.Fatalf("calling helper: %v", err)
+			}
+			if g, e := got, want; g != e {
+				t.Fatalf("got inode %+v, want %+v", g, e)
+			}
+		})
+	}
+	checkInode := func(want uint64) {
+		name := fmt.Sprintf("inode-%d", want)
+		checkArbitraryLookup(name, want)
+	}
+
+	checkInode(2)
+	checkInode(1234)
+	checkInode(9999999)
 }
