@@ -37,7 +37,7 @@
 // but few are required.
 // The specific methods are described in the documentation for those interfaces.
 //
-// The hellofs subdirectory contains a simple illustration of the fs.Serve approach.
+// The examples/hellofs subdirectory contains a simple illustration of the fs.Serve approach.
 //
 // # Service Methods
 //
