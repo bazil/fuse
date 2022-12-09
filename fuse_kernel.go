@@ -48,7 +48,7 @@ const (
 	protoVersionMinMajor = 7
 	protoVersionMinMinor = 17
 	protoVersionMaxMajor = 7
-	protoVersionMaxMinor = 17
+	protoVersionMaxMinor = 18
 )
 
 const (
@@ -802,6 +802,7 @@ const (
 	notifyCodeInvalEntry int32 = 3
 	notifyCodeStore      int32 = 4
 	notifyCodeRetrieve   int32 = 5
+	notifyCodeDelete     int32 = 6
 )
 
 type notifyInvalInodeOut struct {
@@ -812,6 +813,13 @@ type notifyInvalInodeOut struct {
 
 type notifyInvalEntryOut struct {
 	Parent  uint64
+	Namelen uint32
+	_       uint32
+}
+
+type notifyDeleteOut struct {
+	Parent  uint64
+	Child   uint64
 	Namelen uint32
 	_       uint32
 }

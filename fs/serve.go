@@ -1811,6 +1811,70 @@ func (s *Server) InvalidateEntry(parent Node, name string) error {
 	return err
 }
 
+type notifyDeleteDetail struct {
+	ChildID fuse.NodeID
+	Name    string
+}
+
+func (i notifyDeleteDetail) String() string {
+	return fmt.Sprintf("child=%v %q", i.ChildID, i.Name)
+}
+
+// NotifyDelete informs the kernel that a directory entry has been deleted.
+//
+// Using this instead of [InvalidateEntry] races on networked systems where the directory is concurrently in use.
+// See [Linux kernel commit `451d0f599934fd97faf54a5d7954b518e66192cb`] for more.
+//
+// `child` can be `nil` to delete whatever entry is found with the given name, or set to ensure only matching entry is deleted.
+//
+// Only available when [Conn.Protocol] is greater than or equal to 7.18, see [Protocol.HasNotifyDelete].
+//
+// Errors include:
+//
+//   - [ENOTDIR]: `parent` does not refer to a directory
+//   - [ENOENT]: no such entry found
+//   - [EBUSY]: entry is a mountpoint
+//   - [ENOTEMPTY]: entry is a directory, with entries inside it still cached
+//
+// [Linux kernel commit `451d0f599934fd97faf54a5d7954b518e66192cb`]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=451d0f599934fd97faf54a5d7954b518e66192cb
+func (s *Server) NotifyDelete(parent Node, child Node, name string) error {
+	s.meta.Lock()
+	parentID, parentOk := s.nodeRef[parent]
+	var childID fuse.NodeID = 0
+	childOk := true
+	if parentOk {
+		snode := s.node[parentID]
+		snode.wg.Add(1)
+		defer snode.wg.Done()
+
+		if child != nil {
+			childID, childOk = s.nodeRef[child]
+			if childOk {
+				snode := s.node[childID]
+				snode.wg.Add(1)
+				defer snode.wg.Done()
+			}
+		}
+	}
+	s.meta.Unlock()
+	if !parentOk || !childOk {
+		// This is what the kernel would have said, if we had been
+		// able to send this message; it's not cached.
+		return fuse.ErrNotCached
+	}
+	err := s.conn.NotifyDelete(parentID, childID, name)
+	s.debug(notification{
+		Op:   "NotifyDelete",
+		Node: parentID,
+		Out: notifyDeleteDetail{
+			ChildID: childID,
+			Name:    name,
+		},
+		Err: errstr(err),
+	})
+	return err
+}
+
 type notifyStoreRetrieveDetail struct {
 	Off  uint64
 	Size uint64

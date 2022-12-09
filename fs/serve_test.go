@@ -3764,6 +3764,49 @@ func TestInvalidateEntry(t *testing.T) {
 	}
 }
 
+func TestNotifyDelete(t *testing.T) {
+	// This test may see false positive failures when run under
+	// extreme memory pressure.
+	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	a := &invalidateEntryRoot{
+		t: t,
+	}
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: a}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+	control := statHelper.Spawn(ctx, t)
+	defer control.Close()
+
+	for i := 0; i < 10; i++ {
+		var got statResult
+		if err := control.JSON("/").Call(ctx, mnt.Dir+"/child", &got); err != nil {
+			t.Fatalf("calling helper: %v", err)
+		}
+	}
+	if g, e := a.lookup.Count(), uint32(1); g != e {
+		t.Errorf("wrong Lookup call count: %d != %d", g, e)
+	}
+
+	t.Logf("invalidating...")
+	if err := mnt.Server.NotifyDelete(a, nil, "child"); err != nil {
+		t.Fatalf("invalidate error: %v", err)
+	}
+
+	for i := 0; i < 10; i++ {
+		var got statResult
+		if err := control.JSON("/").Call(ctx, mnt.Dir+"/child", &got); err != nil {
+			t.Fatalf("calling helper: %v", err)
+		}
+	}
+	if g, e := a.lookup.Count(), uint32(2); g != e {
+		t.Errorf("wrong Lookup call count: %d != %d", g, e)
+	}
+}
+
 type cachedFile struct {
 }
 

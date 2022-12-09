@@ -1263,6 +1263,42 @@ func (c *Conn) InvalidateEntry(parent NodeID, name string) error {
 	return c.sendNotify(buf)
 }
 
+// NotifyDelete informs the kernel that a directory entry has been deleted.
+//
+// Using this instead of [InvalidateEntry] races on networked systems where the directory is concurrently in use.
+// See [Linux kernel commit `451d0f599934fd97faf54a5d7954b518e66192cb`] for more.
+//
+// `child` can be 0 to delete whatever entry is found with the given name, or set to ensure only matching entry is deleted.
+//
+// Only available when [Conn.Protocol] is greater than or equal to 7.18, see [Protocol.HasNotifyDelete].
+//
+// Errors include:
+//
+//   - [ENOTDIR]: `parent` does not refer to a directory
+//   - [ENOENT]: no such entry found
+//   - [EBUSY]: entry is a mountpoint
+//   - [ENOTEMPTY]: entry is a directory, with entries inside it still cached
+//
+// [Linux kernel commit `451d0f599934fd97faf54a5d7954b518e66192cb`]: https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=451d0f599934fd97faf54a5d7954b518e66192cb
+func (c *Conn) NotifyDelete(parent NodeID, child NodeID, name string) error {
+	const maxUint32 = ^uint32(0)
+	if uint64(len(name)) > uint64(maxUint32) {
+		// very unlikely, but we don't want to silently truncate
+		return syscall.ENAMETOOLONG
+	}
+	buf := newBuffer(unsafe.Sizeof(notifyDeleteOut{}) + uintptr(len(name)) + 1)
+	h := (*outHeader)(unsafe.Pointer(&buf[0]))
+	// h.Unique is 0
+	h.Error = notifyCodeDelete
+	out := (*notifyDeleteOut)(buf.alloc(unsafe.Sizeof(notifyDeleteOut{})))
+	out.Parent = uint64(parent)
+	out.Child = uint64(child)
+	out.Namelen = uint32(len(name))
+	buf = append(buf, name...)
+	buf = append(buf, '\x00')
+	return c.sendNotify(buf)
+}
+
 func (c *Conn) NotifyStore(nodeID NodeID, offset uint64, data []byte) error {
 	buf := newBuffer(unsafe.Sizeof(notifyStoreOut{}) + uintptr(len(data)))
 	h := (*outHeader)(unsafe.Pointer(&buf[0]))

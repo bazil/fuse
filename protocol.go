@@ -79,3 +79,8 @@ func (a Protocol) HasUmask() bool {
 func (a Protocol) HasInvalidate() bool {
 	return true
 }
+
+// HasNotifyDelete returns whether NotifyDelete is supported.
+func (a Protocol) HasNotifyDelete() bool {
+	return a.GE(Protocol{7, 18})
+}
