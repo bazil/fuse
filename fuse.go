@@ -145,7 +145,7 @@ func (e *MountpointDoesNotExistError) Error() string {
 func Mount(dir string, options ...MountOption) (*Conn, error) {
 	conf := mountConfig{
 		options:   make(map[string]string),
-		initFlags: InitAsyncDIO,
+		initFlags: InitAsyncDIO | InitSetxattrExt,
 	}
 	for _, option := range options {
 		if err := option(&conf); err != nil {
@@ -795,9 +795,10 @@ func (c *Conn) ReadRequest() (Request, error) {
 			goto corrupt
 		}
 		req = &OpenRequest{
-			Header: m.Header(),
-			Dir:    m.hdr.Opcode == opOpendir,
-			Flags:  openFlags(in.Flags),
+			Header:    m.Header(),
+			Dir:       m.hdr.Opcode == opOpendir,
+			Flags:     openFlags(in.Flags),
+			OpenFlags: OpenRequestFlags(in.OpenFlags),
 		}
 
 	case opRead, opReaddir:
@@ -873,11 +874,12 @@ func (c *Conn) ReadRequest() (Request, error) {
 		}
 
 	case opSetxattr:
-		in := (*setxattrIn)(m.data())
-		if m.len() < unsafe.Sizeof(*in) {
+		size := setxattrInSize(c.flags)
+		if m.len() < size {
 			goto corrupt
 		}
-		m.off += int(unsafe.Sizeof(*in))
+		in := (*setxattrIn)(m.data())
+		m.off += int(size)
 		name := m.bytes()
 		i := bytes.IndexByte(name, '\x00')
 		if i < 0 {
@@ -888,12 +890,16 @@ func (c *Conn) ReadRequest() (Request, error) {
 			goto corrupt
 		}
 		xattr = xattr[:in.Size]
-		req = &SetxattrRequest{
+		r := &SetxattrRequest{
 			Header: m.Header(),
 			Flags:  in.Flags,
 			Name:   string(name[:i]),
 			Xattr:  xattr,
 		}
+		if c.proto.GE(Protocol{7, 32}) {
+			r.SetxattrFlags = SetxattrFlags(in.SetxattrFlags)
+		}
+		req = r
 
 	case opGetxattr:
 		in := (*getxattrIn)(m.data())
@@ -1754,6 +1760,9 @@ type SetxattrRequest struct {
 	// TODO XATTR_REPLACE and not exist -> ENODATA
 	Flags uint32
 
+	// FUSE-specific flags (as opposed to the flags from filesystem client `setxattr(2)` flags argument).
+	SetxattrFlags SetxattrFlags
+
 	Name  string
 	Xattr []byte
 }
@@ -1823,9 +1832,10 @@ func (r *LookupResponse) String() string {
 
 // An OpenRequest asks to open a file or directory
 type OpenRequest struct {
-	Header `json:"-"`
-	Dir    bool // is this Opendir?
-	Flags  OpenFlags
+	Header    `json:"-"`
+	Dir       bool // is this Opendir?
+	Flags     OpenFlags
+	OpenFlags OpenRequestFlags
 }
 
 var _ Request = (*OpenRequest)(nil)

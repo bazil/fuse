@@ -237,3 +237,13 @@ func LockingPOSIX() MountOption {
 		return nil
 	}
 }
+
+// HandleKillPriv enables SUID/SGID/cap management in the FUSE server.
+//
+// This is the newer `InitHandleKillPrivV2` interface from FUSE protocol 7.33, not the deprecated one from 7.26.
+func HandleKillPriv() MountOption {
+	return func(conf *mountConfig) error {
+		conf.initFlags |= InitHandleKillPrivV2
+		return nil
+	}
+}

@@ -48,7 +48,7 @@ const (
 	protoVersionMinMajor = 7
 	protoVersionMinMinor = 17
 	protoVersionMaxMajor = 7
-	protoVersionMaxMinor = 32
+	protoVersionMaxMinor = 33
 )
 
 const (
@@ -128,30 +128,32 @@ func (fl GetattrFlags) String() string {
 type SetattrValid uint32
 
 const (
-	SetattrMode      SetattrValid = 1 << 0
-	SetattrUid       SetattrValid = 1 << 1
-	SetattrGid       SetattrValid = 1 << 2
-	SetattrSize      SetattrValid = 1 << 3
-	SetattrAtime     SetattrValid = 1 << 4
-	SetattrMtime     SetattrValid = 1 << 5
-	SetattrHandle    SetattrValid = 1 << 6
-	SetattrAtimeNow  SetattrValid = 1 << 7
-	SetattrMtimeNow  SetattrValid = 1 << 8
-	SetattrLockOwner SetattrValid = 1 << 9 // http://www.mail-archive.com/git-commits-head@vger.kernel.org/msg27852.html
-	SetattrCTime     SetattrValid = 1 << 10
+	SetattrMode        SetattrValid = 1 << 0
+	SetattrUid         SetattrValid = 1 << 1
+	SetattrGid         SetattrValid = 1 << 2
+	SetattrSize        SetattrValid = 1 << 3
+	SetattrAtime       SetattrValid = 1 << 4
+	SetattrMtime       SetattrValid = 1 << 5
+	SetattrHandle      SetattrValid = 1 << 6
+	SetattrAtimeNow    SetattrValid = 1 << 7
+	SetattrMtimeNow    SetattrValid = 1 << 8
+	SetattrLockOwner   SetattrValid = 1 << 9 // http://www.mail-archive.com/git-commits-head@vger.kernel.org/msg27852.html
+	SetattrCTime       SetattrValid = 1 << 10
+	SetattrKillSUIDGID SetattrValid = 1 << 11
 )
 
-func (fl SetattrValid) Mode() bool         { return fl&SetattrMode != 0 }
-func (fl SetattrValid) Uid() bool          { return fl&SetattrUid != 0 }
-func (fl SetattrValid) Gid() bool          { return fl&SetattrGid != 0 }
-func (fl SetattrValid) Size() bool         { return fl&SetattrSize != 0 }
-func (fl SetattrValid) Atime() bool        { return fl&SetattrAtime != 0 }
-func (fl SetattrValid) Mtime() bool        { return fl&SetattrMtime != 0 }
-func (fl SetattrValid) Handle() bool       { return fl&SetattrHandle != 0 }
-func (fl SetattrValid) AtimeNow() bool     { return fl&SetattrAtimeNow != 0 }
-func (fl SetattrValid) MtimeNow() bool     { return fl&SetattrMtimeNow != 0 }
-func (fl SetattrValid) LockOwner() bool    { return fl&SetattrLockOwner != 0 }
-func (fl SetattrValid) SetattrCTime() bool { return fl&SetattrCTime != 0 }
+func (fl SetattrValid) Mode() bool               { return fl&SetattrMode != 0 }
+func (fl SetattrValid) Uid() bool                { return fl&SetattrUid != 0 }
+func (fl SetattrValid) Gid() bool                { return fl&SetattrGid != 0 }
+func (fl SetattrValid) Size() bool               { return fl&SetattrSize != 0 }
+func (fl SetattrValid) Atime() bool              { return fl&SetattrAtime != 0 }
+func (fl SetattrValid) Mtime() bool              { return fl&SetattrMtime != 0 }
+func (fl SetattrValid) Handle() bool             { return fl&SetattrHandle != 0 }
+func (fl SetattrValid) AtimeNow() bool           { return fl&SetattrAtimeNow != 0 }
+func (fl SetattrValid) MtimeNow() bool           { return fl&SetattrMtimeNow != 0 }
+func (fl SetattrValid) LockOwner() bool          { return fl&SetattrLockOwner != 0 }
+func (fl SetattrValid) SetattrCTime() bool       { return fl&SetattrCTime != 0 }
+func (fl SetattrValid) SetattrKillSUIDGID() bool { return fl&SetattrKillSUIDGID != 0 }
 
 func (fl SetattrValid) String() string {
 	return flagString(uint32(fl), setattrValidNames)
@@ -169,6 +171,7 @@ var setattrValidNames = []flagName{
 	{uint32(SetattrMtimeNow), "SetattrMtimeNow"},
 	{uint32(SetattrLockOwner), "SetattrLockOwner"},
 	{uint32(SetattrCTime), "SetattrCTime"},
+	{uint32(SetattrKillSUIDGID), "SetattrKillSUIDGID"},
 }
 
 // Flags that can be seen in OpenRequest.Flags.
@@ -247,6 +250,21 @@ var openFlagNames = []flagName{
 	{uint32(OpenTruncate), "OpenTruncate"},
 }
 
+// OpenRequestFlags are the FUSE-specific flags in an OpenRequest (as opposed to the flags from filesystem client `open(2)` flags argument).
+type OpenRequestFlags uint32
+
+const (
+	OpenKillSUIDGID OpenRequestFlags = 1 << 0
+)
+
+func (fl OpenRequestFlags) String() string {
+	return flagString(uint32(fl), openRequestFlagNames)
+}
+
+var openRequestFlagNames = []flagName{
+	{uint32(OpenKillSUIDGID), "OpenKillSUIDGID"},
+}
+
 // The OpenResponseFlags are returned in the OpenResponse.
 type OpenResponseFlags uint32
 
@@ -304,6 +322,9 @@ const (
 	InitExplicitInvalidateData InitFlags = 1 << 25
 	InitMapAlignment           InitFlags = 1 << 26
 	InitSubMounts              InitFlags = 1 << 27
+	// Filesystem promises to remove SUID/SGID/cap on writes and `chown`.
+	InitHandleKillPrivV2 InitFlags = 1 << 28
+	InitSetxattrExt      InitFlags = 1 << 29
 )
 
 type flagName struct {
@@ -340,6 +361,8 @@ var initFlagNames = []flagName{
 	{uint32(InitExplicitInvalidateData), "InitExplicitInvalidateData"},
 	{uint32(InitMapAlignment), "InitMapAlignment"},
 	{uint32(InitSubMounts), "InitSubMounts"},
+	{uint32(InitHandleKillPrivV2), "InitHandleKillPrivV2"},
+	{uint32(InitSetxattrExt), "InitSetxattrExt"},
 }
 
 func (fl InitFlags) String() string {
@@ -549,8 +572,8 @@ type setattrIn struct {
 }
 
 type openIn struct {
-	Flags  uint32
-	Unused uint32
+	Flags     uint32
+	OpenFlags uint32
 }
 
 type openOut struct {
@@ -655,11 +678,14 @@ const (
 	WriteCache WriteFlags = 1 << 0
 	// LockOwner field is valid.
 	WriteLockOwner WriteFlags = 1 << 1
+	// Remove SUID and GID bits.
+	WriteKillSUIDGID WriteFlags = 1 << 2
 )
 
 var writeFlagNames = []flagName{
 	{uint32(WriteCache), "WriteCache"},
 	{uint32(WriteLockOwner), "WriteLockOwner"},
+	{uint32(WriteKillSUIDGID), "WriteKillSUIDGID"},
 }
 
 func (fl WriteFlags) String() string {
@@ -676,9 +702,33 @@ type fsyncIn struct {
 	_          uint32
 }
 
+// SetxattrFlags re passed in SetxattrRequest.SetxattrFlags.
+type SetxattrFlags uint32
+
+const (
+	SetxattrACLKillSGID SetxattrFlags = 1 << 0
+)
+
+var setxattrFlagNames = []flagName{
+	{uint32(SetxattrACLKillSGID), "SetxattrACLKillSGID"},
+}
+
+func (fl SetxattrFlags) String() string {
+	return flagString(uint32(fl), setxattrFlagNames)
+}
+
 type setxattrIn struct {
-	Size  uint32
-	Flags uint32
+	Size          uint32
+	Flags         uint32
+	SetxattrFlags SetxattrFlags
+	_             uint32
+}
+
+func setxattrInSize(fl InitFlags) uintptr {
+	if fl&InitSetxattrExt == 0 {
+		return unsafe.Offsetof(setxattrIn{}.SetxattrFlags)
+	}
+	return unsafe.Sizeof(setxattrIn{})
 }
 
 type getxattrIn struct {
