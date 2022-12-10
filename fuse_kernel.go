@@ -48,7 +48,7 @@ const (
 	protoVersionMinMajor = 7
 	protoVersionMinMinor = 17
 	protoVersionMaxMajor = 7
-	protoVersionMaxMinor = 29
+	protoVersionMaxMinor = 30
 )
 
 const (
