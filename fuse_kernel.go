@@ -306,6 +306,8 @@ const (
 	InitCacheSymlinks  InitFlags = 1 << 23
 	// Kernel supports zero-message OpenDir.
 	InitNoOpenDirSupport InitFlags = 1 << 24
+	// Only invalidate cached pages on explicit request, instead of e.g. at every file size change.
+	InitExplicitInvalidateData InitFlags = 1 << 25
 
 	// Deprecated: Not used, OS X remnant.
 	InitCaseSensitive InitFlags = 1 << 29
@@ -346,6 +348,7 @@ var initFlagNames = []flagName{
 	{uint32(InitMaxPages), "InitMaxPages"},
 	{uint32(InitCacheSymlinks), "InitCacheSymlinks"},
 	{uint32(InitNoOpenDirSupport), "InitNoOpenDirSupport"},
+	{uint32(InitExplicitInvalidateData), "InitExplicitInvalidateData"},
 }
 
 func (fl InitFlags) String() string {

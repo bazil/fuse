@@ -62,4 +62,5 @@ func TestFeatures(t *testing.T) {
 	run("AsyncRead", fuse.InitAsyncRead, 0, fuse.AsyncRead())
 	run("WritebackCache", fuse.InitWritebackCache, 0, fuse.WritebackCache())
 	run("CacheSymlinks", fuse.InitCacheSymlinks, 0, fuse.CacheSymlinks())
+	run("ExplicitInvalidateData", fuse.InitExplicitInvalidateData, 0, fuse.ExplicitInvalidateData())
 }

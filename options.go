@@ -196,6 +196,15 @@ func CacheSymlinks() MountOption {
 	}
 }
 
+// ExplicitInvalidateData stops the kernel from invalidating cached file data automatically.
+// Use e.g. `InvalidateNodeData` to invalidate cached data as needed.
+func ExplicitInvalidateData() MountOption {
+	return func(conf *mountConfig) error {
+		conf.initFlags |= InitExplicitInvalidateData
+		return nil
+	}
+}
+
 // Deprecated: Not used, OS X remnant.
 type OSXFUSEPaths struct {
 	// Prefix for the device file. At mount time, an incrementing
