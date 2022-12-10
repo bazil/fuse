@@ -303,6 +303,7 @@ const (
 	InitPosixACL       InitFlags = 1 << 20
 	InitAbortError     InitFlags = 1 << 21
 	InitMaxPages       InitFlags = 1 << 22
+	InitCacheSymlinks  InitFlags = 1 << 23
 
 	// Deprecated: Not used, OS X remnant.
 	InitCaseSensitive InitFlags = 1 << 29
@@ -341,6 +342,7 @@ var initFlagNames = []flagName{
 	{uint32(InitPosixACL), "InitPosixACL"},
 	{uint32(InitAbortError), "InitAbortError"},
 	{uint32(InitMaxPages), "InitMaxPages"},
+	{uint32(InitCacheSymlinks), "InitCacheSymlinks"},
 }
 
 func (fl InitFlags) String() string {

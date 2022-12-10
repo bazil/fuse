@@ -188,6 +188,14 @@ func WritebackCache() MountOption {
 	}
 }
 
+// CacheSymlinks enables the kernel to cache symlink contents.
+func CacheSymlinks() MountOption {
+	return func(conf *mountConfig) error {
+		conf.initFlags |= InitCacheSymlinks
+		return nil
+	}
+}
+
 // Deprecated: Not used, OS X remnant.
 type OSXFUSEPaths struct {
 	// Prefix for the device file. At mount time, an incrementing
