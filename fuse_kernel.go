@@ -519,10 +519,10 @@ type setattrIn struct {
 	LockOwner uint64
 	Atime     uint64
 	Mtime     uint64
-	Unused2   uint64
+	Ctime     uint64
 	AtimeNsec uint32
 	MtimeNsec uint32
-	Unused3   uint32
+	CtimeNsec uint32
 	Mode      uint32
 	Unused4   uint32
 	Uid       uint32

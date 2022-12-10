@@ -672,6 +672,7 @@ func (c *Conn) ReadRequest() (Request, error) {
 			Size:   in.Size,
 			Atime:  time.Unix(int64(in.Atime), int64(in.AtimeNsec)),
 			Mtime:  time.Unix(int64(in.Mtime), int64(in.MtimeNsec)),
+			Ctime:  time.Unix(int64(in.Ctime), int64(in.CtimeNsec)),
 			Mode:   fileMode(in.Mode),
 			Uid:    in.Uid,
 			Gid:    in.Gid,
@@ -2244,6 +2245,7 @@ type SetattrRequest struct {
 	Size   uint64
 	Atime  time.Time
 	Mtime  time.Time
+	Ctime  time.Time
 	// Mode is the file mode to set (when valid).
 	//
 	// The type of the node (as in os.ModeType, os.ModeDir etc) is not
