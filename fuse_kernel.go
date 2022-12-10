@@ -48,7 +48,7 @@ const (
 	protoVersionMinMajor = 7
 	protoVersionMinMinor = 17
 	protoVersionMaxMajor = 7
-	protoVersionMaxMinor = 18
+	protoVersionMaxMinor = 19
 )
 
 const (
@@ -409,6 +409,7 @@ const (
 	opPoll        = 40
 	opNotifyReply = 41
 	opBatchForget = 42
+	opFAllocate   = 43
 )
 
 type entryOut struct {
@@ -920,4 +921,44 @@ type pollOut struct {
 
 type notifyPollWakeupOut struct {
 	Kh uint64
+}
+
+type FAllocateFlags uint32
+
+const (
+	FAllocateKeepSize  FAllocateFlags = unix.FALLOC_FL_KEEP_SIZE
+	FAllocatePunchHole FAllocateFlags = unix.FALLOC_FL_PUNCH_HOLE
+
+	// Only including constants supported by FUSE kernel implementation.
+	//
+	// FAllocateCollapseRange FAllocateFlags = unix.FALLOC_FL_COLLAPSE_RANGE
+	// FAllocateInsertRange   FAllocateFlags = unix.FALLOC_FL_INSERT_RANGE
+	// FAllocateNoHideStale   FAllocateFlags = unix.FALLOC_FL_NO_HIDE_STALE
+	// FAllocateUnshareRange  FAllocateFlags = unix.FALLOC_FL_UNSHARE_RANGE
+	// FAllocateZeroRange     FAllocateFlags = unix.FALLOC_FL_ZERO_RANGE
+)
+
+var fAllocateFlagsNames = []flagName{
+	{uint32(FAllocatePunchHole), "FAllocatePunchHole"},
+	{uint32(FAllocateKeepSize), "FAllocateKeepSize"},
+
+	// Only including constants supported by FUSE kernel implementation.
+	//
+	// {uint32(FAllocateCollapseRange), "FAllocateCollapseRange"},
+	// {uint32(FAllocateInsertRange), "FAllocateInsertRange"},
+	// {uint32(FAllocateNoHideStale), "FAllocateNoHideStale"},
+	// {uint32(FAllocateUnshareRange), "FAllocateUnshareRange"},
+	// {uint32(FAllocateZeroRange), "FAllocateZeroRange"},
+}
+
+func (fl FAllocateFlags) String() string {
+	return flagString(uint32(fl), fAllocateFlagsNames)
+}
+
+type fAllocateIn struct {
+	Fh     uint64
+	Offset uint64
+	Length uint64
+	Mode   uint32
+	_      uint32
 }

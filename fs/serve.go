@@ -406,6 +406,13 @@ type HandlePOSIXLocker interface {
 	HandleFlusher
 }
 
+type HandleFAllocater interface {
+	// FAllocate manipulates space reserved for the file.
+	//
+	// Note that the kernel limits what modes are acceptable in any FUSE filesystem.
+	FAllocate(ctx context.Context, req *fuse.FAllocateRequest) error
+}
+
 type Config struct {
 	// Function to send debug log messages to. If nil, use fuse.Debug.
 	// Note that changing this or fuse.Debug may not affect existing
@@ -1671,6 +1678,22 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 		}
 		done(s)
 		r.Respond(s)
+		return nil
+
+	case *fuse.FAllocateRequest:
+		shandle := c.getHandle(r.Handle)
+		if shandle == nil {
+			return syscall.ESTALE
+		}
+		h, ok := shandle.handle.(HandleFAllocater)
+		if !ok {
+			return syscall.ENOTSUP
+		}
+		if err := h.FAllocate(ctx, r); err != nil {
+			return err
+		}
+		done(nil)
+		r.Respond()
 		return nil
 
 		/*	case *FsyncdirRequest:

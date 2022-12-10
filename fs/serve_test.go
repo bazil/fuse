@@ -4879,3 +4879,103 @@ func TestGenerateInode(t *testing.T) {
 	checkInode(1234)
 	checkInode(9999999)
 }
+
+// Test FAllocate.
+
+type fAllocateFile struct {
+	falloc record.RequestRecorder
+}
+
+var _ fs.Node = (*fAllocateFile)(nil)
+
+func (f *fAllocateFile) Attr(ctx context.Context, a *fuse.Attr) error {
+	a.Mode = 0o666
+	a.Size = 42
+	return nil
+}
+
+var _ fs.HandleFAllocater = (*fAllocateFile)(nil)
+
+func (f *fAllocateFile) FAllocate(ctx context.Context, req *fuse.FAllocateRequest) error {
+	tmp := *req
+	f.falloc.RecordRequest(&tmp)
+	return nil
+}
+
+type fAllocateRequest struct {
+	Path   string
+	Offset uint64
+	Length uint64
+	Mode   fuse.FAllocateFlags
+}
+
+func doFAllocate(ctx context.Context, req fAllocateRequest) (*struct{}, error) {
+	f, err := os.OpenFile(req.Path, os.O_RDWR, 0)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	if err := unix.Fallocate(int(f.Fd()), uint32(req.Mode), int64(req.Offset), int64(req.Length)); err != nil {
+		err = &os.PathError{
+			Op:   "fallocate",
+			Path: req.Path,
+			Err:  err,
+		}
+		return nil, err
+	}
+	runtime.KeepAlive(f)
+	return &struct{}{}, nil
+}
+
+var fAllocateHelper = helpers.Register("fallocate", httpjson.ServePOST(doFAllocate))
+
+func TestFAllocate(t *testing.T) {
+	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	f := &fAllocateFile{}
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: &fstestutil.ChildMap{"child": f}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+	control := fAllocateHelper.Spawn(ctx, t)
+	defer control.Close()
+
+	run := func(offset uint64, length uint64, mode fuse.FAllocateFlags) {
+		name := fmt.Sprintf("%v %d@%d", mode, length, offset)
+		t.Run(name, func(t *testing.T) {
+			req := fAllocateRequest{
+				Path:   mnt.Dir + "/child",
+				Offset: offset,
+				Length: length,
+				Mode:   mode,
+			}
+			var nothing struct{}
+			if err := control.JSON("/").Call(ctx, req, &nothing); err != nil {
+				t.Fatalf("calling helper: %v", err)
+			}
+
+			got := f.falloc.Recorded().(*fuse.FAllocateRequest)
+
+			// Offset uint64
+			// Length uint64
+			// Mode   FAllocateFlags
+
+			if g, e := got.Offset, offset; g != e {
+				t.Errorf("wrong offset: %d != %d", g, e)
+			}
+			if g, e := got.Length, length; g != e {
+				t.Errorf("wrong length: %d != %d", g, e)
+			}
+			if g, e := got.Mode, mode; g != e {
+				t.Errorf("wrong mode: %v != %v", g, e)
+			}
+		})
+	}
+
+	// `fallocate(2)` says "The FALLOC_FL_PUNCH_HOLE flag must be ORed with FALLOC_FL_KEEP_SIZE in mode" (to preserve size)
+	run(11, 12, fuse.FAllocatePunchHole|fuse.FAllocateKeepSize)
+	run(11, 12, fuse.FAllocateKeepSize)
+}

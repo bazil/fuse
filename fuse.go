@@ -1111,6 +1111,19 @@ func (c *Conn) ReadRequest() (Request, error) {
 			},
 			LockFlags: LockFlags(in.LkFlags),
 		}
+
+	case opFAllocate:
+		in := (*fAllocateIn)(m.data())
+		if m.len() < unsafe.Sizeof(*in) {
+			goto corrupt
+		}
+		req = &FAllocateRequest{
+			Header: m.Header(),
+			Handle: HandleID(in.Fh),
+			Offset: in.Offset,
+			Length: in.Length,
+			Mode:   FAllocateFlags(in.Mode),
+		}
 	}
 
 	return req, nil
@@ -2738,4 +2751,28 @@ type QueryLockResponse struct {
 
 func (r *QueryLockResponse) String() string {
 	return fmt.Sprintf("QueryLock range=%d..%d type=%v pid=%v", r.Lock.Start, r.Lock.End, r.Lock.Type, r.Lock.PID)
+}
+
+// FAllocateRequest  manipulates space reserved for the file.
+//
+// Note that the kernel limits what modes are acceptable in any FUSE filesystem.
+type FAllocateRequest struct {
+	Header
+	Handle HandleID
+	Offset uint64
+	Length uint64
+	Mode   FAllocateFlags
+}
+
+var _ Request = (*FAllocateRequest)(nil)
+
+func (r *FAllocateRequest) String() string {
+	return fmt.Sprintf("FAllocate [%s] %v %d @%d mode=%s", &r.Header, r.Handle,
+		r.Length, r.Offset, r.Mode)
+}
+
+// Respond replies to the request, indicating that the FAllocate succeeded.
+func (r *FAllocateRequest) Respond() {
+	buf := newBuffer(0)
+	r.respond(buf)
 }
