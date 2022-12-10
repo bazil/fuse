@@ -118,6 +118,7 @@ const (
 	SetattrAtimeNow  SetattrValid = 1 << 7
 	SetattrMtimeNow  SetattrValid = 1 << 8
 	SetattrLockOwner SetattrValid = 1 << 9 // http://www.mail-archive.com/git-commits-head@vger.kernel.org/msg27852.html
+	SetattrCTime     SetattrValid = 1 << 10
 
 	// Deprecated: Not used, OS X remnant.
 	SetattrCrtime SetattrValid = 1 << 28
@@ -129,16 +130,17 @@ const (
 	SetattrFlags SetattrValid = 1 << 31
 )
 
-func (fl SetattrValid) Mode() bool      { return fl&SetattrMode != 0 }
-func (fl SetattrValid) Uid() bool       { return fl&SetattrUid != 0 }
-func (fl SetattrValid) Gid() bool       { return fl&SetattrGid != 0 }
-func (fl SetattrValid) Size() bool      { return fl&SetattrSize != 0 }
-func (fl SetattrValid) Atime() bool     { return fl&SetattrAtime != 0 }
-func (fl SetattrValid) Mtime() bool     { return fl&SetattrMtime != 0 }
-func (fl SetattrValid) Handle() bool    { return fl&SetattrHandle != 0 }
-func (fl SetattrValid) AtimeNow() bool  { return fl&SetattrAtimeNow != 0 }
-func (fl SetattrValid) MtimeNow() bool  { return fl&SetattrMtimeNow != 0 }
-func (fl SetattrValid) LockOwner() bool { return fl&SetattrLockOwner != 0 }
+func (fl SetattrValid) Mode() bool         { return fl&SetattrMode != 0 }
+func (fl SetattrValid) Uid() bool          { return fl&SetattrUid != 0 }
+func (fl SetattrValid) Gid() bool          { return fl&SetattrGid != 0 }
+func (fl SetattrValid) Size() bool         { return fl&SetattrSize != 0 }
+func (fl SetattrValid) Atime() bool        { return fl&SetattrAtime != 0 }
+func (fl SetattrValid) Mtime() bool        { return fl&SetattrMtime != 0 }
+func (fl SetattrValid) Handle() bool       { return fl&SetattrHandle != 0 }
+func (fl SetattrValid) AtimeNow() bool     { return fl&SetattrAtimeNow != 0 }
+func (fl SetattrValid) MtimeNow() bool     { return fl&SetattrMtimeNow != 0 }
+func (fl SetattrValid) LockOwner() bool    { return fl&SetattrLockOwner != 0 }
+func (fl SetattrValid) SetattrCTime() bool { return fl&SetattrCTime != 0 }
 
 // Deprecated: Not used, OS X remnant.
 func (fl SetattrValid) Crtime() bool { return false }
@@ -167,6 +169,7 @@ var setattrValidNames = []flagName{
 	{uint32(SetattrAtimeNow), "SetattrAtimeNow"},
 	{uint32(SetattrMtimeNow), "SetattrMtimeNow"},
 	{uint32(SetattrLockOwner), "SetattrLockOwner"},
+	{uint32(SetattrCTime), "SetattrCTime"},
 }
 
 // Flags that can be seen in OpenRequest.Flags.
