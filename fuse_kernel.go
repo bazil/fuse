@@ -48,7 +48,7 @@ const (
 	protoVersionMinMajor = 7
 	protoVersionMinMinor = 17
 	protoVersionMaxMajor = 7
-	protoVersionMaxMinor = 30
+	protoVersionMaxMinor = 31
 )
 
 const (
@@ -308,6 +308,7 @@ const (
 	InitNoOpenDirSupport InitFlags = 1 << 24
 	// Only invalidate cached pages on explicit request, instead of e.g. at every file size change.
 	InitExplicitInvalidateData InitFlags = 1 << 25
+	InitMapAlignment           InitFlags = 1 << 26
 
 	// Deprecated: Not used, OS X remnant.
 	InitCaseSensitive InitFlags = 1 << 29
@@ -349,6 +350,7 @@ var initFlagNames = []flagName{
 	{uint32(InitCacheSymlinks), "InitCacheSymlinks"},
 	{uint32(InitNoOpenDirSupport), "InitNoOpenDirSupport"},
 	{uint32(InitExplicitInvalidateData), "InitExplicitInvalidateData"},
+	{uint32(InitMapAlignment), "InitMapAlignment"},
 }
 
 func (fl InitFlags) String() string {
@@ -438,6 +440,8 @@ const (
 	opRename2       = 45
 	opLSeek         = 46
 	opCopyFileRange = 47
+	opSetupMapping  = 48
+	opRemoveMapping = 49
 )
 
 type entryOut struct {
