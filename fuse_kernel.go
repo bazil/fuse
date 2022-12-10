@@ -48,7 +48,7 @@ const (
 	protoVersionMinMajor = 7
 	protoVersionMinMinor = 17
 	protoVersionMaxMajor = 7
-	protoVersionMaxMinor = 26
+	protoVersionMaxMinor = 27
 )
 
 const (
@@ -299,6 +299,7 @@ const (
 	// Deprecated: Use `InitHandleKillPriv2`.
 	InitHandleKillPriv InitFlags = 1 << 19
 	InitPosixACL       InitFlags = 1 << 20
+	InitAbortError     InitFlags = 1 << 21
 
 	// Deprecated: Not used, OS X remnant.
 	InitCaseSensitive InitFlags = 1 << 29
@@ -335,6 +336,7 @@ var initFlagNames = []flagName{
 	{uint32(InitParallelDirOps), "InitParallelDirOps"},
 	{uint32(InitHandleKillPriv), "InitHandleKillPriv"},
 	{uint32(InitPosixACL), "InitPosixACL"},
+	{uint32(InitAbortError), "InitAbortError"},
 }
 
 func (fl InitFlags) String() string {
