@@ -1547,6 +1547,7 @@ type Attr struct {
 	Gid       uint32      // group gid
 	Rdev      uint32      // device numbers
 	BlockSize uint32      // preferred blocksize for filesystem I/O
+	Flags     AttrFlags
 }
 
 func (a Attr) String() string {
@@ -1598,6 +1599,9 @@ func (a *Attr) attr(out *attr, proto Protocol) {
 	out.Rdev = a.Rdev
 	if proto.GE(Protocol{7, 9}) {
 		out.Blksize = a.BlockSize
+	}
+	if proto.GE(Protocol{7, 32}) {
+		out.Flags = uint32(a.Flags & attrSubMount)
 	}
 }
 

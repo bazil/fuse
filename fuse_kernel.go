@@ -48,12 +48,32 @@ const (
 	protoVersionMinMajor = 7
 	protoVersionMinMinor = 17
 	protoVersionMaxMajor = 7
-	protoVersionMaxMinor = 31
+	protoVersionMaxMinor = 32
 )
 
 const (
 	rootID = 1
 )
+
+// AttrFlags are bit flags that can be seen in Attr.Flags.
+type AttrFlags uint32
+
+const (
+	// Node is a submount root.
+	//
+	// Don't use unless `Conn.Features` includes `InitSubMounts`.
+	//
+	// This doesn't seem to be usable outside of `virtio_fs``.
+	attrSubMount AttrFlags = 1 << 0
+)
+
+var attrFlagsNames = []flagName{
+	{uint32(attrSubMount), "AttrSubMount"},
+}
+
+func (fl AttrFlags) String() string {
+	return flagString(uint32(fl), attrFlagsNames)
+}
 
 type attr struct {
 	Ino       uint64
@@ -71,7 +91,7 @@ type attr struct {
 	Gid       uint32
 	Rdev      uint32
 	Blksize   uint32
-	_         uint32
+	Flags     uint32
 }
 
 type kstatfs struct {
@@ -283,6 +303,7 @@ const (
 	// Only invalidate cached pages on explicit request, instead of e.g. at every file size change.
 	InitExplicitInvalidateData InitFlags = 1 << 25
 	InitMapAlignment           InitFlags = 1 << 26
+	InitSubMounts              InitFlags = 1 << 27
 )
 
 type flagName struct {
@@ -318,6 +339,7 @@ var initFlagNames = []flagName{
 	{uint32(InitNoOpenDirSupport), "InitNoOpenDirSupport"},
 	{uint32(InitExplicitInvalidateData), "InitExplicitInvalidateData"},
 	{uint32(InitMapAlignment), "InitMapAlignment"},
+	{uint32(InitSubMounts), "InitSubMounts"},
 }
 
 func (fl InitFlags) String() string {
