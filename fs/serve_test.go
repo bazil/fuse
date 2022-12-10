@@ -1885,6 +1885,53 @@ func TestReadDirAll(t *testing.T) {
 	}
 }
 
+type readDirAllCached struct {
+	fstestutil.Dir
+	readDirs record.Counter
+}
+
+var _ fs.NodeOpener = (*readDirAllCached)(nil)
+
+func (d *readDirAllCached) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
+	resp.Flags |= fuse.OpenKeepCache | fuse.OpenCacheDir
+	return d, nil
+}
+
+var _ fs.HandleReadDirAller = (*readDirAllCached)(nil)
+
+func (d *readDirAllCached) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
+	d.readDirs.Inc()
+	return []fuse.Dirent{
+		{Name: "one", Inode: 11, Type: fuse.DT_Dir},
+		{Name: "three", Inode: 13},
+		{Name: "two", Inode: 12, Type: fuse.DT_File},
+	}, nil
+}
+
+func TestReadDirAllCached(t *testing.T) {
+	maybeParallel(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	f := &readDirAllCached{}
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{Node: f}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+	control := readdirHelper.Spawn(ctx, t)
+	defer control.Close()
+
+	for i := 0; i < 10; i++ {
+		var names []string
+		if err := control.JSON("/").Call(ctx, mnt.Dir, &names); err != nil {
+			t.Fatalf("calling helper: %v", err)
+		}
+	}
+	if g, e := f.readDirs.Count(), uint32(1); g != e {
+		t.Fatalf("caching didn't worked, saw %d readdirs", g)
+	}
+}
+
 type readDirAllBad struct {
 	fstestutil.Dir
 }

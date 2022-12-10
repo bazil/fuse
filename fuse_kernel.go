@@ -255,6 +255,7 @@ const (
 	OpenDirectIO    OpenResponseFlags = 1 << 0 // bypass page cache for this open file
 	OpenKeepCache   OpenResponseFlags = 1 << 1 // don't invalidate the data cache on open
 	OpenNonSeekable OpenResponseFlags = 1 << 2 // mark the file as non-seekable (not supported on FreeBSD)
+	OpenCacheDir    OpenResponseFlags = 1 << 3 // allow caching directory contents
 
 	// Deprecated: Not used, OS X remnant.
 	OpenPurgeAttr OpenResponseFlags = 1 << 30
@@ -270,6 +271,7 @@ var openResponseFlagNames = []flagName{
 	{uint32(OpenDirectIO), "OpenDirectIO"},
 	{uint32(OpenKeepCache), "OpenKeepCache"},
 	{uint32(OpenNonSeekable), "OpenNonSeekable"},
+	{uint32(OpenCacheDir), "OpenCacheDir"},
 }
 
 // The InitFlags are used in the Init exchange.
