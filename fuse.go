@@ -154,7 +154,8 @@ func (e *MountpointDoesNotExistError) Error() string {
 // resources.
 func Mount(dir string, options ...MountOption) (*Conn, error) {
 	conf := mountConfig{
-		options: make(map[string]string),
+		options:   make(map[string]string),
+		initFlags: InitAsyncDIO,
 	}
 	for _, option := range options {
 		if err := option(&conf); err != nil {
