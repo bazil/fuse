@@ -113,16 +113,6 @@ import (
 
 // A Conn represents a connection to a mounted FUSE file system.
 type Conn struct {
-	// Always closed, mount is ready when Mount returns.
-	//
-	// Deprecated: Not used, OS X remnant.
-	Ready <-chan struct{}
-
-	// Use error returned from Mount.
-	//
-	// Deprecated: Not used, OS X remnant.
-	MountError error
-
 	// File handle for kernel communication. Only safe to access if
 	// rio or wio is held.
 	dev *os.File
@@ -163,11 +153,7 @@ func Mount(dir string, options ...MountOption) (*Conn, error) {
 		}
 	}
 
-	ready := make(chan struct{})
-	close(ready)
-	c := &Conn{
-		Ready: ready,
-	}
+	c := &Conn{}
 	f, err := mount(dir, &conf)
 	if err != nil {
 		return nil, err
@@ -1561,11 +1547,6 @@ type Attr struct {
 	Gid       uint32      // group gid
 	Rdev      uint32      // device numbers
 	BlockSize uint32      // preferred blocksize for filesystem I/O
-
-	// Deprecated: Not used, OS X remnant.
-	Crtime time.Time
-	// Deprecated: Not used, OS X remnant.
-	Flags uint32
 }
 
 func (a Attr) String() string {
@@ -1662,9 +1643,6 @@ type GetxattrRequest struct {
 
 	// Name of the attribute requested.
 	Name string
-
-	// Deprecated: Not used, OS X remnant.
-	Position uint32
 }
 
 var _ Request = (*GetxattrRequest)(nil)
@@ -1700,9 +1678,6 @@ func (r *GetxattrResponse) String() string {
 type ListxattrRequest struct {
 	Header `json:"-"`
 	Size   uint32 // maximum size to return
-
-	// Deprecated: Not used, OS X remnant.
-	Position uint32
 }
 
 var _ Request = (*ListxattrRequest)(nil)
@@ -1774,9 +1749,6 @@ type SetxattrRequest struct {
 	//
 	// TODO XATTR_REPLACE and not exist -> ENODATA
 	Flags uint32
-
-	// Deprecated: Not used, OS X remnant.
-	Position uint32
 
 	Name  string
 	Xattr []byte
@@ -2254,15 +2226,6 @@ type SetattrRequest struct {
 	Mode os.FileMode
 	Uid  uint32
 	Gid  uint32
-
-	// Deprecated: Not used, OS X remnant.
-	Bkuptime time.Time
-	// Deprecated: Not used, OS X remnant.
-	Chgtime time.Time
-	// Deprecated: Not used, OS X remnant.
-	Crtime time.Time
-	// Deprecated: Not used, OS X remnant.
-	Flags uint32
 }
 
 var _ Request = (*SetattrRequest)(nil)
@@ -2531,25 +2494,6 @@ func (r *InterruptRequest) Respond() {
 
 func (r *InterruptRequest) String() string {
 	return fmt.Sprintf("Interrupt [%s] ID %v", &r.Header, r.IntrID)
-}
-
-// Deprecated: Not used, OS X remnant.
-type ExchangeDataRequest struct {
-	Header           `json:"-"`
-	OldDir, NewDir   NodeID
-	OldName, NewName string
-}
-
-var _ Request = (*ExchangeDataRequest)(nil)
-
-func (r *ExchangeDataRequest) String() string {
-	// TODO options
-	return fmt.Sprintf("ExchangeData [%s] %v %q and %v %q", &r.Header, r.OldDir, r.OldName, r.NewDir, r.NewName)
-}
-
-func (r *ExchangeDataRequest) Respond() {
-	buf := newBuffer(0)
-	r.respond(buf)
 }
 
 // NotifyReply is a response to an earlier notification. It behaves

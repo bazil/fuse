@@ -2,15 +2,9 @@ package fuse
 
 import (
 	"bufio"
-	"errors"
 	"io"
 	"log"
 	"sync"
-)
-
-var (
-	// Deprecated: Never used, OS X remnant.
-	ErrOSXFUSENotFound = errors.New("cannot locate OSXFUSE")
 )
 
 func neverIgnoreLine(line string) bool {

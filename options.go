@@ -67,36 +67,6 @@ func Subtype(fstype string) MountOption {
 	}
 }
 
-// Deprecated: Ignored, OS X remnant.
-func LocalVolume() MountOption {
-	return dummyOption
-}
-
-// Deprecated: Ignored, OS X remnant.
-func VolumeName(name string) MountOption {
-	return dummyOption
-}
-
-// Deprecated: Ignored, OS X remnant.
-func NoAppleDouble() MountOption {
-	return dummyOption
-}
-
-// Deprecated: Ignored, OS X remnant.
-func NoAppleXattr() MountOption {
-	return dummyOption
-}
-
-// Deprecated: Ignored, OS X remnant.
-func NoBrowse() MountOption {
-	return dummyOption
-}
-
-// Deprecated: Ignored, OS X remnant.
-func ExclCreate() MountOption {
-	return dummyOption
-}
-
 // DaemonTimeout sets the time in seconds between a request and a reply before
 // the FUSE mount is declared dead.
 //
@@ -203,42 +173,6 @@ func ExplicitInvalidateData() MountOption {
 		conf.initFlags |= InitExplicitInvalidateData
 		return nil
 	}
-}
-
-// Deprecated: Not used, OS X remnant.
-type OSXFUSEPaths struct {
-	// Prefix for the device file. At mount time, an incrementing
-	// number is suffixed until a free FUSE device is found.
-	DevicePrefix string
-	// Path of the load helper, used to load the kernel extension if
-	// no device files are found.
-	Load string
-	// Path of the mount helper, used for the actual mount operation.
-	Mount string
-	// Environment variable used to pass the path to the executable
-	// calling the mount helper.
-	DaemonVar string
-}
-
-// Deprecated: Not used, OS X remnant.
-var (
-	OSXFUSELocationV3 = OSXFUSEPaths{
-		DevicePrefix: "/dev/osxfuse",
-		Load:         "/Library/Filesystems/osxfuse.fs/Contents/Resources/load_osxfuse",
-		Mount:        "/Library/Filesystems/osxfuse.fs/Contents/Resources/mount_osxfuse",
-		DaemonVar:    "MOUNT_OSXFUSE_DAEMON_PATH",
-	}
-	OSXFUSELocationV2 = OSXFUSEPaths{
-		DevicePrefix: "/dev/osxfuse",
-		Load:         "/Library/Filesystems/osxfusefs.fs/Support/load_osxfusefs",
-		Mount:        "/Library/Filesystems/osxfusefs.fs/Support/mount_osxfusefs",
-		DaemonVar:    "MOUNT_FUSEFS_DAEMON_PATH",
-	}
-)
-
-// Deprecated: Ignored, OS X remnant.
-func OSXFUSELocations(paths ...OSXFUSEPaths) MountOption {
-	return dummyOption
 }
 
 // AllowNonEmptyMount allows the mounting over a non-empty directory.
