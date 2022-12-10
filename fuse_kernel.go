@@ -48,7 +48,7 @@ const (
 	protoVersionMinMajor = 7
 	protoVersionMinMinor = 17
 	protoVersionMaxMajor = 7
-	protoVersionMaxMinor = 28
+	protoVersionMaxMinor = 29
 )
 
 const (
@@ -304,6 +304,8 @@ const (
 	InitAbortError     InitFlags = 1 << 21
 	InitMaxPages       InitFlags = 1 << 22
 	InitCacheSymlinks  InitFlags = 1 << 23
+	// Kernel supports zero-message OpenDir.
+	InitNoOpenDirSupport InitFlags = 1 << 24
 
 	// Deprecated: Not used, OS X remnant.
 	InitCaseSensitive InitFlags = 1 << 29
@@ -343,6 +345,7 @@ var initFlagNames = []flagName{
 	{uint32(InitAbortError), "InitAbortError"},
 	{uint32(InitMaxPages), "InitMaxPages"},
 	{uint32(InitCacheSymlinks), "InitCacheSymlinks"},
+	{uint32(InitNoOpenDirSupport), "InitNoOpenDirSupport"},
 }
 
 func (fl InitFlags) String() string {
