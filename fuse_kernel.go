@@ -300,6 +300,7 @@ const (
 	InitHandleKillPriv InitFlags = 1 << 19
 	InitPosixACL       InitFlags = 1 << 20
 	InitAbortError     InitFlags = 1 << 21
+	InitMaxPages       InitFlags = 1 << 22
 
 	// Deprecated: Not used, OS X remnant.
 	InitCaseSensitive InitFlags = 1 << 29
@@ -337,6 +338,7 @@ var initFlagNames = []flagName{
 	{uint32(InitHandleKillPriv), "InitHandleKillPriv"},
 	{uint32(InitPosixACL), "InitPosixACL"},
 	{uint32(InitAbortError), "InitAbortError"},
+	{uint32(InitMaxPages), "InitMaxPages"},
 }
 
 func (fl InitFlags) String() string {
@@ -776,6 +778,7 @@ type initOut struct {
 	// Maximum value 1e9 (one second).
 	TimeGran uint32
 	// Maximum number of pages of data in one read or write request.
+	// Set initOut.Flags.InitMaxPages when valid.
 	MaxPages     uint16
 	MapAlignment uint16
 	_            [8]uint32
