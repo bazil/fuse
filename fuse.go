@@ -226,7 +226,7 @@ func initMount(c *Conn, conf *mountConfig) error {
 	}
 	c.proto = proto
 
-	c.flags = r.Flags & (InitBigWrites | conf.initFlags)
+	c.flags = r.Flags & (InitBigWrites | InitParallelDirOps | conf.initFlags)
 	s := &initResponse{
 		Library:             proto,
 		MaxReadahead:        conf.maxReadahead,
