@@ -1465,6 +1465,12 @@ func (r *initRequest) Respond(resp *initResponse) {
 	if out.MaxWrite > maxWrite {
 		out.MaxWrite = maxWrite
 	}
+
+	switch {
+	case resp.Library.LT(Protocol{7, 23}):
+		// Protocol version 7.23 added fields to `fuse_init_out`, see `FUSE_COMPAT_22_INIT_OUT_SIZE`.
+		buf = buf[:unsafe.Sizeof(outHeader{})+24]
+	}
 	r.respond(buf)
 }
 

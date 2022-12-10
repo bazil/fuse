@@ -756,6 +756,16 @@ type initOut struct {
 	MaxBackground       uint16
 	CongestionThreshold uint16
 	MaxWrite            uint32
+
+	// end of protocol 7.22 fields
+
+	// Granularity of timestamps, in nanoseconds.
+	// Maximum value 1e9 (one second).
+	TimeGran uint32
+	// Maximum number of pages of data in one read or write request.
+	MaxPages     uint16
+	MapAlignment uint16
+	_            [8]uint32
 }
 
 type interruptIn struct {
