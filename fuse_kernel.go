@@ -48,7 +48,7 @@ const (
 	protoVersionMinMajor = 7
 	protoVersionMinMinor = 17
 	protoVersionMaxMajor = 7
-	protoVersionMaxMinor = 25
+	protoVersionMaxMinor = 26
 )
 
 const (
@@ -296,6 +296,9 @@ const (
 	InitWritebackCache  InitFlags = 1 << 16
 	InitNoOpenSupport   InitFlags = 1 << 17
 	InitParallelDirOps  InitFlags = 1 << 18
+	// Deprecated: Use `InitHandleKillPriv2`.
+	InitHandleKillPriv InitFlags = 1 << 19
+	InitPosixACL       InitFlags = 1 << 20
 
 	// Deprecated: Not used, OS X remnant.
 	InitCaseSensitive InitFlags = 1 << 29
@@ -330,6 +333,8 @@ var initFlagNames = []flagName{
 	{uint32(InitWritebackCache), "InitWritebackCache"},
 	{uint32(InitNoOpenSupport), "InitNoOpenSupport"},
 	{uint32(InitParallelDirOps), "InitParallelDirOps"},
+	{uint32(InitHandleKillPriv), "InitHandleKillPriv"},
+	{uint32(InitPosixACL), "InitPosixACL"},
 }
 
 func (fl InitFlags) String() string {
