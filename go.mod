@@ -3,9 +3,9 @@ module bazil.org/fuse
 go 1.19
 
 require (
-	github.com/dvyukov/go-fuzz v0.0.0-20200318091601-be3528f3a813
+	github.com/dvyukov/go-fuzz v0.0.0-20220726122315-1d375ef9f9f6
 	github.com/tv42/httpunix v0.0.0-20191220191345-2ba4b9c3382c
-	golang.org/x/sys v0.0.0-20191210023423-ac6580df4449
+	golang.org/x/sys v0.4.0
 )
 
 require (
