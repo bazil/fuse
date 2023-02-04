@@ -418,9 +418,15 @@ var bufSize = maxRequestSize + maxWrite
 //
 // Messages in the pool are guaranteed to have conn and off zeroed,
 // buf allocated and len==bufSize, and hdr set.
+//
+// Allocating buffer of bufSize is typically large enough to kick off GC,
+// and GC flushes all pooled messages.
+// To avoid too much GC kicking in, let 2 messages survive between GC.
 var reqPool = sync.Pool{
 	New: allocMessage,
 }
+var minPooledReq = 2
+var reqCh = make(chan *message, minPooledReq)
 
 func allocMessage() interface{} {
 	m := &message{buf: make([]byte, bufSize)}
@@ -429,7 +435,13 @@ func allocMessage() interface{} {
 }
 
 func getMessage(c *Conn) *message {
-	m := reqPool.Get().(*message)
+	var m *message
+	select {
+	case m = <-reqCh:
+		break
+	default:
+		m = reqPool.Get().(*message)
+	}
 	m.conn = c
 	return m
 }
@@ -438,7 +450,13 @@ func putMessage(m *message) {
 	m.buf = m.buf[:bufSize]
 	m.conn = nil
 	m.off = 0
-	reqPool.Put(m)
+
+	select {
+	case reqCh <- m:
+		break
+	default:
+		reqPool.Put(m)
+	}
 }
 
 // a message represents the bytes of a single FUSE message
