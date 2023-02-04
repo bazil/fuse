@@ -148,6 +148,16 @@ func AsyncRead() MountOption {
 	}
 }
 
+// AsyncDIO enables multiple outstanding read/write requests for the same
+// handle. It required the file to be opened with O_DIRECT, and
+// fuse.OpenDirectIO flag must not be set for this to take effect
+func AsyncDIO() MountOption {
+	return func(conf *mountConfig) error {
+		conf.initFlags |= InitAsyncDIO
+		return nil
+	}
+}
+
 // WritebackCache enables the kernel to buffer writes before sending
 // them to the FUSE server. Without this, writethrough caching is
 // used.
