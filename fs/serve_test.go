@@ -466,6 +466,37 @@ func TestReadAllWithHandleRead(t *testing.T) {
 	}
 }
 
+type readWithStreamingHandleRead struct {
+}
+
+func (readWithStreamingHandleRead) Attr(ctx context.Context, a *fuse.Attr) error {
+	a.Mode = 0666
+	a.Size = uint64(len(hi))
+
+	return nil
+}
+
+func (readWithStreamingHandleRead) StreamingRead(ctx context.Context, req *fuse.ReadRequest, resp *fuse.StreamingReadResponse) error {
+	_, err := io.Copy(resp, bytes.NewReader([]byte(hi)))
+	if err != nil {
+		return fuse.EIO
+	}
+
+	return nil
+}
+
+func TestStreamingReadAllWithHandleRead(t *testing.T) {
+	t.Parallel()
+	mnt, err := fstestutil.MountedT(t, fstestutil.SimpleFS{&fstestutil.ChildMap{"child": readWithStreamingHandleRead{}}}, nil)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mnt.Close()
+
+	testReadAll(t, mnt.Dir+"/child")
+}
+
 type readFlags struct {
 	fstestutil.File
 	fileFlags record.Recorder
