@@ -582,11 +582,11 @@ func (c *Server) saveNode(inode uint64, node Node) (id fuse.NodeID, gen uint64) 
 		id = c.freeNode[n-1]
 		c.freeNode = c.freeNode[:n-1]
 		c.node[id] = sn
-		c.nodeGen++
 	} else {
 		id = fuse.NodeID(len(c.node))
 		c.node = append(c.node, sn)
 	}
+	c.nodeGen++
 	sn.generation = c.nodeGen
 	c.nodeRef[node] = id
 	return id, sn.generation
