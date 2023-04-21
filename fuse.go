@@ -1599,6 +1599,9 @@ func (a *Attr) attr(out *attr, proto Protocol) {
 	if a.Mode&os.ModeSetgid != 0 {
 		out.Mode |= syscall.S_ISGID
 	}
+	if a.Mode&os.ModeSticky != 0 {
+		out.Mode |= syscall.S_ISVTX
+	}
 	out.Nlink = a.Nlink
 	out.Uid = a.Uid
 	out.Gid = a.Gid
