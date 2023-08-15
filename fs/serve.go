@@ -413,6 +413,10 @@ type HandleFAllocater interface {
 	FAllocate(ctx context.Context, req *fuse.FAllocateRequest) error
 }
 
+type HandleIoctler interface {
+	Ioctl(ctx context.Context, req *fuse.IoctlRequest, resp *fuse.IoctlResponse) error
+}
+
 type Config struct {
 	// Function to send debug log messages to. If nil, use fuse.Debug.
 	// Note that changing this or fuse.Debug may not affect existing
@@ -1694,6 +1698,25 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 		}
 		done(nil)
 		r.Respond()
+		return nil
+
+	case *fuse.IoctlRequest:
+		shandle := c.getHandle(r.Handle)
+		if shandle == nil {
+			return syscall.ESTALE
+		}
+		h, ok := shandle.handle.(HandleIoctler)
+		if !ok {
+			return syscall.ENOTSUP
+		}
+		s := &fuse.IoctlResponse{
+			Result: 0,
+		}
+		if err := h.Ioctl(ctx, r, s); err != nil {
+			return err
+		}
+		done(s)
+		r.Respond(s)
 		return nil
 
 		/*	case *FsyncdirRequest:
