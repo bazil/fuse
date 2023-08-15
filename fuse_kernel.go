@@ -933,6 +933,51 @@ type notifyRetrieveIn struct {
 	_      uint64
 }
 
+type IoctlFlags uint32
+
+const (
+	IoctlCompat       IoctlFlags = 1 << 0 // 32bit compat ioctl on 64bit machine
+	IoctlUnrestricted            = 1 << 1 // not restricted to well-formed ioctls, retry allowed
+	IoctlRetry                   = 1 << 2 // retry with new iovecs
+	Ioctl32Bit                   = 1 << 3 // 32bit ioctl
+	IoctlDir                     = 1 << 4 // is a directory
+	IoctlCompatX32               = 1 << 5 // x32 compat ioctl on 64bit machine (64bit time_t)
+)
+
+var ioctlFlagNames = []flagName{
+	{uint32(IoctlCompat), "IoctlCompatX32"},
+	{uint32(IoctlUnrestricted), "IoctlUnrestricted"},
+	{uint32(IoctlRetry), "IoctlRetry"},
+	{uint32(Ioctl32Bit), "Ioctl32Bit"},
+	{uint32(IoctlDir), "IoctlDir"},
+	{uint32(IoctlCompatX32), "IoctlCompatX32"},
+}
+
+func (fl IoctlFlags) String() string {
+	return flagString(uint32(fl), ioctlFlagNames)
+}
+
+type ioctlIn struct {
+	Fh      uint64
+	Flags   uint32
+	Cmd     uint32
+	Arg     uint64
+	InSize  uint32
+	OutSize uint32
+}
+
+type ioctlIovec struct {
+	Base uint64
+	Len  uint64
+}
+
+type ioctlOut struct {
+	Result  int32
+	Flags   uint32
+	InIovs  uint32
+	OutIovs uint32
+}
+
 // PollFlags are passed in PollRequest.Flags
 type PollFlags uint32
 

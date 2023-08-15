@@ -1118,6 +1118,25 @@ func (c *Conn) ReadRequest() (Request, error) {
 			Length: in.Length,
 			Mode:   FAllocateFlags(in.Mode),
 		}
+
+	case opIoctl:
+		in := (*ioctlIn)(m.data())
+		if m.len() < unsafe.Sizeof(*in) {
+			goto corrupt
+		}
+		m.off += int(unsafe.Sizeof(*in))
+		if m.len() < uintptr(in.InSize) {
+			goto corrupt
+		}
+		req = &IoctlRequest{
+			Header:  m.Header(),
+			Handle:  HandleID(in.Fh),
+			Flags:   IoctlFlags(in.Flags),
+			Cmd:     in.Cmd,
+			Arg:     in.Arg,
+			InData:  m.bytes(),
+			OutSize: in.OutSize,
+		}
 	}
 
 	return req, nil
@@ -2742,4 +2761,39 @@ func (r *FAllocateRequest) String() string {
 func (r *FAllocateRequest) Respond() {
 	buf := newBuffer(0)
 	r.respond(buf)
+}
+
+// An IoctlRequest asks to perform an ioctl on an open file.
+type IoctlRequest struct {
+	Header
+	Handle  HandleID
+	Flags   IoctlFlags
+	Cmd     uint32
+	Arg     uint64
+	InData  []byte
+	OutSize uint32
+}
+
+var _ Request = (*IoctlRequest)(nil)
+
+func (r *IoctlRequest) String() string {
+	return fmt.Sprintf("Ioctl [%s] %v fl=%v cmd=%d arg=%d in=%d out=%d", &r.Header, r.Handle, r.Flags, r.Cmd, r.Arg, len(r.InData), r.OutSize)
+}
+
+// Respond replies to the request with the given response.
+func (r *IoctlRequest) Respond(resp *IoctlResponse) {
+	buf := newBuffer(unsafe.Sizeof(ioctlOut{}))
+	out := (*ioctlOut)(buf.alloc(unsafe.Sizeof(ioctlOut{})))
+	out.Result = int32(resp.Result)
+	buf = append(buf, resp.OutData...)
+	r.respond(buf)
+}
+
+type IoctlResponse struct {
+	Result  int
+	OutData []byte
+}
+
+func (r *IoctlResponse) String() string {
+	return fmt.Sprintf("Ioctl %d", len(r.OutData))
 }
