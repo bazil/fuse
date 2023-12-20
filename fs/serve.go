@@ -18,9 +18,10 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/sys/unix"
+
 	"bazil.org/fuse"
 	"bazil.org/fuse/fuseutil"
-	"golang.org/x/sys/unix"
 )
 
 const (
@@ -1092,10 +1093,10 @@ func (c *Server) handleRequest(ctx context.Context, node Node, snode *serveNode,
 			if err := n.Setattr(ctx, r, s); err != nil {
 				return err
 			}
-		}
-
-		if err := snode.attr(ctx, &s.Attr); err != nil {
-			return err
+		} else {
+			if err := snode.attr(ctx, &s.Attr); err != nil {
+				return err
+			}
 		}
 		done(s)
 		r.Respond(s)
