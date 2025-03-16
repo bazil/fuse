@@ -47,7 +47,7 @@ func isBoringMountFusefsError(err error) bool {
 	return false
 }
 
-func mount(dir string, conf *mountConfig) (*os.File, error) {
+func mount(dir string, conf *MountConfig) (*os.File, error) {
 	for k, v := range conf.options {
 		if strings.Contains(k, ",") || strings.Contains(v, ",") {
 			// Silly limitation but the mount helper does not
@@ -64,7 +64,7 @@ func mount(dir string, conf *mountConfig) (*os.File, error) {
 	cmd := exec.Command(
 		"/sbin/mount_fusefs",
 		"--safe",
-		"-o", conf.getOptions(),
+		"-o", conf.GetOptions(),
 		"3",
 		dir,
 	)
