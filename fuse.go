@@ -143,7 +143,7 @@ func (e *MountpointDoesNotExistError) Error() string {
 // After a successful return, caller must call Close to free
 // resources.
 func Mount(dir string, options ...MountOption) (*Conn, error) {
-	conf := mountConfig{
+	conf := MountConfig{
 		options:   make(map[string]string),
 		initFlags: InitAsyncDIO | InitSetxattrExt,
 	}
@@ -154,7 +154,12 @@ func Mount(dir string, options ...MountOption) (*Conn, error) {
 	}
 
 	c := &Conn{}
-	f, err := mount(dir, &conf)
+	m := mount
+	if conf.mountFunc != nil {
+		m = conf.mountFunc
+	}
+
+	f, err := m(dir, &conf)
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +187,7 @@ var (
 	ErrClosedWithoutInit = errors.New("fuse connection closed without init")
 )
 
-func initMount(c *Conn, conf *mountConfig) error {
+func initMount(c *Conn, conf *MountConfig) error {
 	req, err := c.ReadRequest()
 	if err != nil {
 		if err == io.EOF {
@@ -215,7 +220,7 @@ func initMount(c *Conn, conf *mountConfig) error {
 	c.flags = r.Flags & (InitBigWrites | InitParallelDirOps | conf.initFlags)
 	s := &initResponse{
 		Library:             proto,
-		MaxReadahead:        conf.maxReadahead,
+		MaxReadahead:        conf.MaxReadahead,
 		Flags:               c.flags,
 		MaxBackground:       conf.maxBackground,
 		CongestionThreshold: conf.congestionThreshold,

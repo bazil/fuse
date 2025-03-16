@@ -1,21 +1,25 @@
 package fuse
 
 import (
+	"os"
 	"strings"
 )
 
-func dummyOption(conf *mountConfig) error {
+func dummyOption(conf *MountConfig) error {
 	return nil
 }
 
-// mountConfig holds the configuration for a mount operation.
+// MountConfig holds the configuration for a mount operation.
 // Use it by passing MountOption values to Mount.
-type mountConfig struct {
+type MountConfig struct {
 	options             map[string]string
-	maxReadahead        uint32
+	MaxReadahead        uint32
 	initFlags           InitFlags
 	maxBackground       uint16
 	congestionThreshold uint16
+
+	mountFunc  MFunc
+	umountFunc UMFunc
 }
 
 func escapeComma(s string) string {
@@ -24,10 +28,10 @@ func escapeComma(s string) string {
 	return s
 }
 
-// getOptions makes a string of options suitable for passing to FUSE
+// GetOptions makes a string of options suitable for passing to FUSE
 // mount flag `-o`. Returns an empty string if no options were set.
 // Any platform specific adjustments should happen before the call.
-func (m *mountConfig) getOptions() string {
+func (m *MountConfig) GetOptions() string {
 	var opts []string
 	for k, v := range m.options {
 		k = escapeComma(k)
@@ -39,17 +43,23 @@ func (m *mountConfig) getOptions() string {
 	return strings.Join(opts, ",")
 }
 
-type mountOption func(*mountConfig) error
+type mountOption func(*MountConfig) error
 
 // MountOption is passed to Mount to change the behavior of the mount.
 type MountOption mountOption
+
+// MFunc is a user-specified mount function.
+type MFunc func(string, *MountConfig) (*os.File, error)
+
+// UMFunc is a user-specified umount function.
+type UMFunc func(string) error
 
 // FSName sets the file system name (also called source) that is
 // visible in the list of mounted file systems.
 //
 // FreeBSD ignores this option.
 func FSName(name string) MountOption {
-	return func(conf *mountConfig) error {
+	return func(conf *MountConfig) error {
 		conf.options["fsname"] = name
 		return nil
 	}
@@ -61,7 +71,7 @@ func FSName(name string) MountOption {
 //
 // FreeBSD ignores this option.
 func Subtype(fstype string) MountOption {
-	return func(conf *mountConfig) error {
+	return func(conf *MountConfig) error {
 		conf.options["subtype"] = fstype
 		return nil
 	}
@@ -77,7 +87,7 @@ func DaemonTimeout(name string) MountOption {
 
 // AllowOther allows other users to access the file system.
 func AllowOther() MountOption {
-	return func(conf *mountConfig) error {
+	return func(conf *MountConfig) error {
 		conf.options["allow_other"] = ""
 		return nil
 	}
@@ -86,7 +96,7 @@ func AllowOther() MountOption {
 // AllowDev enables interpreting character or block special devices on the
 // filesystem.
 func AllowDev() MountOption {
-	return func(conf *mountConfig) error {
+	return func(conf *MountConfig) error {
 		conf.options["dev"] = ""
 		return nil
 	}
@@ -95,7 +105,7 @@ func AllowDev() MountOption {
 // AllowSUID allows set-user-identifier or set-group-identifier bits to take
 // effect.
 func AllowSUID() MountOption {
-	return func(conf *mountConfig) error {
+	return func(conf *MountConfig) error {
 		conf.options["suid"] = ""
 		return nil
 	}
@@ -110,7 +120,7 @@ func AllowSUID() MountOption {
 //
 // FreeBSD ignores this option.
 func DefaultPermissions() MountOption {
-	return func(conf *mountConfig) error {
+	return func(conf *MountConfig) error {
 		conf.options["default_permissions"] = ""
 		return nil
 	}
@@ -118,7 +128,7 @@ func DefaultPermissions() MountOption {
 
 // ReadOnly makes the mount read-only.
 func ReadOnly() MountOption {
-	return func(conf *mountConfig) error {
+	return func(conf *MountConfig) error {
 		conf.options["ro"] = ""
 		return nil
 	}
@@ -132,8 +142,24 @@ func ReadOnly() MountOption {
 // originate from any client process. This usually tremendously
 // improves read performance.
 func MaxReadahead(n uint32) MountOption {
-	return func(conf *mountConfig) error {
-		conf.maxReadahead = n
+	return func(conf *MountConfig) error {
+		conf.MaxReadahead = n
+		return nil
+	}
+}
+
+// MountFunc allows the user to specify their own mount function.
+func MountFunc(f MFunc) MountOption {
+	return func(conf *MountConfig) error {
+		conf.mountFunc = f
+		return nil
+	}
+}
+
+// UMountFunc allow the user to specify their own umount function.
+func UMountFunc(f UMFunc) MountOption {
+	return func(conf *MountConfig) error {
+		conf.umountFunc = f
 		return nil
 	}
 }
@@ -142,7 +168,7 @@ func MaxReadahead(n uint32) MountOption {
 // handle. Without this, there is at most one request in flight at a
 // time.
 func AsyncRead() MountOption {
-	return func(conf *mountConfig) error {
+	return func(conf *MountConfig) error {
 		conf.initFlags |= InitAsyncRead
 		return nil
 	}
@@ -152,7 +178,7 @@ func AsyncRead() MountOption {
 // them to the FUSE server. Without this, writethrough caching is
 // used.
 func WritebackCache() MountOption {
-	return func(conf *mountConfig) error {
+	return func(conf *MountConfig) error {
 		conf.initFlags |= InitWritebackCache
 		return nil
 	}
@@ -160,7 +186,7 @@ func WritebackCache() MountOption {
 
 // CacheSymlinks enables the kernel to cache symlink contents.
 func CacheSymlinks() MountOption {
-	return func(conf *mountConfig) error {
+	return func(conf *MountConfig) error {
 		conf.initFlags |= InitCacheSymlinks
 		return nil
 	}
@@ -169,7 +195,7 @@ func CacheSymlinks() MountOption {
 // ExplicitInvalidateData stops the kernel from invalidating cached file data automatically.
 // Use e.g. `InvalidateNodeData` to invalidate cached data as needed.
 func ExplicitInvalidateData() MountOption {
-	return func(conf *mountConfig) error {
+	return func(conf *MountConfig) error {
 		conf.initFlags |= InitExplicitInvalidateData
 		return nil
 	}
@@ -181,7 +207,7 @@ func ExplicitInvalidateData() MountOption {
 // default these mounts are rejected to prevent accidental covering up
 // of data, which could for example prevent automatic backup.
 func AllowNonEmptyMount() MountOption {
-	return func(conf *mountConfig) error {
+	return func(conf *MountConfig) error {
 		conf.options["nonempty"] = ""
 		return nil
 	}
@@ -194,7 +220,7 @@ func AllowNonEmptyMount() MountOption {
 // On Linux, this can be adjusted on the fly with
 // /sys/fs/fuse/connections/CONN/max_background
 func MaxBackground(n uint16) MountOption {
-	return func(conf *mountConfig) error {
+	return func(conf *MountConfig) error {
 		conf.maxBackground = n
 		return nil
 	}
@@ -209,7 +235,7 @@ func MaxBackground(n uint16) MountOption {
 func CongestionThreshold(n uint16) MountOption {
 	// TODO to test this, we'd have to figure out our connection id
 	// and read /sys
-	return func(conf *mountConfig) error {
+	return func(conf *MountConfig) error {
 		conf.congestionThreshold = n
 		return nil
 	}
@@ -219,7 +245,7 @@ func CongestionThreshold(n uint16) MountOption {
 // useful for distributed filesystems with global locking. Without
 // this, kernel manages local locking automatically.
 func LockingFlock() MountOption {
-	return func(conf *mountConfig) error {
+	return func(conf *MountConfig) error {
 		conf.initFlags |= InitFlockLocks
 		return nil
 	}
@@ -232,7 +258,7 @@ func LockingFlock() MountOption {
 // Beware POSIX locks are a broken API with unintuitive behavior for
 // callers.
 func LockingPOSIX() MountOption {
-	return func(conf *mountConfig) error {
+	return func(conf *MountConfig) error {
 		conf.initFlags |= InitPOSIXLocks
 		return nil
 	}
@@ -242,7 +268,7 @@ func LockingPOSIX() MountOption {
 //
 // This is the newer `InitHandleKillPrivV2` interface from FUSE protocol 7.33, not the deprecated one from 7.26.
 func HandleKillPriv() MountOption {
-	return func(conf *mountConfig) error {
+	return func(conf *MountConfig) error {
 		conf.initFlags |= InitHandleKillPrivV2
 		return nil
 	}

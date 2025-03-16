@@ -55,7 +55,7 @@ func isBoringFusermountError(err error) bool {
 	return false
 }
 
-func mount(dir string, conf *mountConfig) (fusefd *os.File, err error) {
+func mount(dir string, conf *MountConfig) (fusefd *os.File, err error) {
 	fds, err := syscall.Socketpair(syscall.AF_UNIX, syscall.SOCK_STREAM, 0)
 	if err != nil {
 		return nil, fmt.Errorf("socketpair error: %v", err)
@@ -69,7 +69,7 @@ func mount(dir string, conf *mountConfig) (fusefd *os.File, err error) {
 
 	cmd := exec.Command(
 		"fusermount3",
-		"-o", conf.getOptions(),
+		"-o", conf.GetOptions(),
 		"--",
 		dir,
 	)
